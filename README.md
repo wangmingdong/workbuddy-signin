@@ -64,7 +64,7 @@ schtasks /run /tn WorkBuddyDailyCheckin
 | 项目 | 值 |
 |------|----|
 | 查看地址 | **https://SERVICE_DOMAIN/buddy/** |
-| 访问口令 | `SERVER_SSH_PASSWORD`（手机首次输入一次，之后浏览器记住；由服务器 `WB_ACCESS_KEY` 环境变量注入，**不写在代码里**）|
+| 访问口令 | `CENTER_ACCESS_KEY`（手机首次输入一次，之后浏览器记住；由服务器 `WB_ACCESS_KEY` 环境变量注入，**不写在代码里**）|
 | 自动签到 | systemd `wb-checkin-daily.timer` → 每天 09:10 触发 `wb-checkin-daily.service` |
 | 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790` |
 | nginx | `SERVICE_DOMAIN` 443 块内 `location /buddy/` 反代 |

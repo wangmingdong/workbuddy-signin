@@ -5,6 +5,7 @@ last_run.json
 
 # 含 ECS root 密码的部署脚本，禁止入库
 deploy*.py
+change_key.py
 
 # 接口探测/调试产物（非交付物，排查接口时临时生成）
 probe*.py
