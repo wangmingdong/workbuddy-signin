@@ -1,11 +1,20 @@
 # 密钥与运行时文件（含敏感信息，禁止入库）
 token.info
 last_run.json
-balance_history.json
 *.info
 
 # 含 ECS root 密码的部署脚本，禁止入库
 deploy*.py
+
+# 接口探测/调试产物（非交付物，排查接口时临时生成）
+probe*.py
+_asar/
+node_modules/
+*.html
+config-*.js
+vendor-*.js
+idx.js
+checkin.log
 
 # Python 缓存
 __pycache__/

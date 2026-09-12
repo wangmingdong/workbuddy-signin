@@ -1,8 +1,0 @@
-# Force-include built-in plugin assets that would otherwise be ignored
-# by repo-wide .gitignore rules ("dist", "bin").
-# These directories contain pre-built MCP server bundles and platform-
-# specific CLI binaries that ship with the desktop app.
-!*/bin/
-!*/bin/**
-!*/dist/
-!*/dist/**
