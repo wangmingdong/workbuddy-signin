@@ -1,0 +1,4456 @@
+.automation-panel,
+.code-buddy-automation,
+.atm-modal-overlay,
+.atm-floating-layer {
+  padding: 0 0 16px;
+  color: var(--wb-color-text-primary);
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  /* flex column 让空状态可以 flex:1 填满剩余高度，将卡片贴到底部 */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+.atm-floating-layer {
+  padding: 0;
+  color: var(--wb-color-text-primary);
+  overflow: visible;
+  height: auto;
+  position: static;
+  scrollbar-color: auto;
+  scrollbar-width: auto;
+}
+:root.dark,
+:root.cb-dark,
+:root .dark,
+:root .cb-dark,
+body[data-vscode-theme-kind="vscode-dark"],
+body[data-vscode-theme-name="IDE Night"],
+body.vscode-dark,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+  /* --atm-* 深色覆盖已移除，--wb-* token 体系自动处理深浅主题 */
+  /* 模板返回按钮深色覆盖；.atm-create-btn 不在此处退化为透明描边——
+         * 它是 primary CTA，颜色由基础规则的 --wb-button-primary-* token 管理 */
+  /* CustomSelect 已迁移到 foundation Dropdown（#40818）；
+     * .atm-custom-select-menu / .atm-custom-select-item 不再渲染，
+     * 这里删除对应的 modal/detail-page 内的覆盖样式。 */
+}
+:root.dark .automation-panel,
+:root.cb-dark .automation-panel,
+:root .dark .automation-panel,
+:root .cb-dark .automation-panel,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel,
+body[data-vscode-theme-name="IDE Night"] .automation-panel,
+body.vscode-dark .automation-panel,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel,
+:root.dark .code-buddy-automation,
+:root.cb-dark .code-buddy-automation,
+:root .dark .code-buddy-automation,
+:root .cb-dark .code-buddy-automation,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation,
+body.vscode-dark .code-buddy-automation,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation {
+  color: var(--wb-color-text-primary);
+}
+:root.dark .automation-panel .code-buddy-custom-add-card-description,
+:root.cb-dark .automation-panel .code-buddy-custom-add-card-description,
+:root .dark .automation-panel .code-buddy-custom-add-card-description,
+:root .cb-dark .automation-panel .code-buddy-custom-add-card-description,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .code-buddy-custom-add-card-description,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .code-buddy-custom-add-card-description,
+body.vscode-dark .automation-panel .code-buddy-custom-add-card-description,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .code-buddy-custom-add-card-description,
+:root.dark .code-buddy-automation .code-buddy-custom-add-card-description,
+:root.cb-dark .code-buddy-automation .code-buddy-custom-add-card-description,
+:root .dark .code-buddy-automation .code-buddy-custom-add-card-description,
+:root .cb-dark .code-buddy-automation .code-buddy-custom-add-card-description,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .code-buddy-custom-add-card-description,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .code-buddy-custom-add-card-description,
+body.vscode-dark .code-buddy-automation .code-buddy-custom-add-card-description,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .code-buddy-custom-add-card-description {
+  color: var(--wb-color-text-secondary);
+}
+:root.dark .automation-panel .atm-template-back-btn,
+:root.cb-dark .automation-panel .atm-template-back-btn,
+:root .dark .automation-panel .atm-template-back-btn,
+:root .cb-dark .automation-panel .atm-template-back-btn,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-back-btn,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-back-btn,
+body.vscode-dark .automation-panel .atm-template-back-btn,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-back-btn,
+:root.dark .code-buddy-automation .atm-template-back-btn,
+:root.cb-dark .code-buddy-automation .atm-template-back-btn,
+:root .dark .code-buddy-automation .atm-template-back-btn,
+:root .cb-dark .code-buddy-automation .atm-template-back-btn,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-back-btn,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-back-btn,
+body.vscode-dark .code-buddy-automation .atm-template-back-btn,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-back-btn {
+  background: transparent;
+  border-color: var(--wb-border-default);
+  color: var(--wb-color-text-secondary);
+}
+:root.dark .automation-panel .atm-template-back-btn:hover,
+:root.cb-dark .automation-panel .atm-template-back-btn:hover,
+:root .dark .automation-panel .atm-template-back-btn:hover,
+:root .cb-dark .automation-panel .atm-template-back-btn:hover,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-back-btn:hover,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-back-btn:hover,
+body.vscode-dark .automation-panel .atm-template-back-btn:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-back-btn:hover,
+:root.dark .code-buddy-automation .atm-template-back-btn:hover,
+:root.cb-dark .code-buddy-automation .atm-template-back-btn:hover,
+:root .dark .code-buddy-automation .atm-template-back-btn:hover,
+:root .cb-dark .code-buddy-automation .atm-template-back-btn:hover,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-back-btn:hover,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-back-btn:hover,
+body.vscode-dark .code-buddy-automation .atm-template-back-btn:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-back-btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-focus) !important;
+  color: var(--wb-color-text-primary);
+}
+:root.dark .automation-panel .atm-template-card,
+:root.cb-dark .automation-panel .atm-template-card,
+:root .dark .automation-panel .atm-template-card,
+:root .cb-dark .automation-panel .atm-template-card,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-card,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-card,
+body.vscode-dark .automation-panel .atm-template-card,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-card,
+:root.dark .code-buddy-automation .atm-template-card,
+:root.cb-dark .code-buddy-automation .atm-template-card,
+:root .dark .code-buddy-automation .atm-template-card,
+:root .cb-dark .code-buddy-automation .atm-template-card,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-card,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-card,
+body.vscode-dark .code-buddy-automation .atm-template-card,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-card {
+  background: var(--wb-bg-card);
+  border-color: var(--wb-border-weak);
+  color: var(--wb-color-text-primary);
+}
+:root.dark .automation-panel .atm-template-card:hover,
+:root.cb-dark .automation-panel .atm-template-card:hover,
+:root .dark .automation-panel .atm-template-card:hover,
+:root .cb-dark .automation-panel .atm-template-card:hover,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-card:hover,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-card:hover,
+body.vscode-dark .automation-panel .atm-template-card:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-card:hover,
+:root.dark .code-buddy-automation .atm-template-card:hover,
+:root.cb-dark .code-buddy-automation .atm-template-card:hover,
+:root .dark .code-buddy-automation .atm-template-card:hover,
+:root .cb-dark .code-buddy-automation .atm-template-card:hover,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-card:hover,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-card:hover,
+body.vscode-dark .code-buddy-automation .atm-template-card:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-card:hover {
+  background: var(--wb-bg-card-hover);
+  border-color: var(--wb-border-focus);
+}
+:root.dark .automation-panel .atm-template-icon-wrap,
+:root.cb-dark .automation-panel .atm-template-icon-wrap,
+:root .dark .automation-panel .atm-template-icon-wrap,
+:root .cb-dark .automation-panel .atm-template-icon-wrap,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-icon-wrap,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-icon-wrap,
+body.vscode-dark .automation-panel .atm-template-icon-wrap,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-icon-wrap,
+:root.dark .code-buddy-automation .atm-template-icon-wrap,
+:root.cb-dark .code-buddy-automation .atm-template-icon-wrap,
+:root .dark .code-buddy-automation .atm-template-icon-wrap,
+:root .cb-dark .code-buddy-automation .atm-template-icon-wrap,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-icon-wrap,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-icon-wrap,
+body.vscode-dark .code-buddy-automation .atm-template-icon-wrap,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-icon-wrap {
+  color: var(--wb-color-text-tertiary);
+}
+:root.dark .automation-panel .atm-template-name,
+:root.cb-dark .automation-panel .atm-template-name,
+:root .dark .automation-panel .atm-template-name,
+:root .cb-dark .automation-panel .atm-template-name,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-name,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-name,
+body.vscode-dark .automation-panel .atm-template-name,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-name,
+:root.dark .code-buddy-automation .atm-template-name,
+:root.cb-dark .code-buddy-automation .atm-template-name,
+:root .dark .code-buddy-automation .atm-template-name,
+:root .cb-dark .code-buddy-automation .atm-template-name,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-name,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-name,
+body.vscode-dark .code-buddy-automation .atm-template-name,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-name {
+  color: var(--wb-color-text-primary);
+}
+:root.dark .automation-panel .atm-template-content,
+:root.cb-dark .automation-panel .atm-template-content,
+:root .dark .automation-panel .atm-template-content,
+:root .cb-dark .automation-panel .atm-template-content,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-template-content,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-template-content,
+body.vscode-dark .automation-panel .atm-template-content,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-template-content,
+:root.dark .code-buddy-automation .atm-template-content,
+:root.cb-dark .code-buddy-automation .atm-template-content,
+:root .dark .code-buddy-automation .atm-template-content,
+:root .cb-dark .code-buddy-automation .atm-template-content,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-template-content,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-template-content,
+body.vscode-dark .code-buddy-automation .atm-template-content,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-template-content {
+  color: var(--wb-color-text-secondary);
+}
+:root.dark .automation-panel .atm-row:hover,
+:root.cb-dark .automation-panel .atm-row:hover,
+:root .dark .automation-panel .atm-row:hover,
+:root .cb-dark .automation-panel .atm-row:hover,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-row:hover,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-row:hover,
+body.vscode-dark .automation-panel .atm-row:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-row:hover,
+:root.dark .code-buddy-automation .atm-row:hover,
+:root.cb-dark .code-buddy-automation .atm-row:hover,
+:root .dark .code-buddy-automation .atm-row:hover,
+:root .cb-dark .code-buddy-automation .atm-row:hover,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-row:hover,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-row:hover,
+body.vscode-dark .code-buddy-automation .atm-row:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-row:hover {
+  background: var(--wb-bg-hover);
+}
+:root.dark .automation-panel .atm-row-next,
+:root.cb-dark .automation-panel .atm-row-next,
+:root .dark .automation-panel .atm-row-next,
+:root .cb-dark .automation-panel .atm-row-next,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-row-next,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-row-next,
+body.vscode-dark .automation-panel .atm-row-next,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-row-next,
+:root.dark .automation-panel .atm-row-time,
+:root.cb-dark .automation-panel .atm-row-time,
+:root .dark .automation-panel .atm-row-time,
+:root .cb-dark .automation-panel .atm-row-time,
+body[data-vscode-theme-kind="vscode-dark"] .automation-panel .atm-row-time,
+body[data-vscode-theme-name="IDE Night"] .automation-panel .atm-row-time,
+body.vscode-dark .automation-panel .atm-row-time,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .automation-panel .atm-row-time,
+:root.dark .code-buddy-automation .atm-row-next,
+:root.cb-dark .code-buddy-automation .atm-row-next,
+:root .dark .code-buddy-automation .atm-row-next,
+:root .cb-dark .code-buddy-automation .atm-row-next,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-row-next,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-row-next,
+body.vscode-dark .code-buddy-automation .atm-row-next,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-row-next,
+:root.dark .code-buddy-automation .atm-row-time,
+:root.cb-dark .code-buddy-automation .atm-row-time,
+:root .dark .code-buddy-automation .atm-row-time,
+:root .cb-dark .code-buddy-automation .atm-row-time,
+body[data-vscode-theme-kind="vscode-dark"] .code-buddy-automation .atm-row-time,
+body[data-vscode-theme-name="IDE Night"] .code-buddy-automation .atm-row-time,
+body.vscode-dark .code-buddy-automation .atm-row-time,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .code-buddy-automation .atm-row-time {
+  color: var(--wb-color-text-disabled);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal {
+  background: var(--wb-bg-modal);
+  border-color: var(--wb-border-weak);
+  box-shadow: var(--wb-shadow-xl);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-header,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-footer {
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-meta {
+  color: var(--wb-color-text-tertiary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.active .atm-modal-status-dot {
+  background: var(--wb-status-success);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-status.paused .atm-modal-status-dot {
+  background: var(--wb-bg-tertiary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-days {
+  background: var(--wb-bg-modal);
+  border-color: var(--wb-border-input);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-input:focus,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-textarea:focus,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tags:focus-within,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger:hover,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-trigger.active,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-trigger:hover,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker.open .atm-time-picker-trigger {
+  border-color: var(--wb-border-focus);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input {
+  --cb-content-background: transparent;
+  --cb-main-area-background: var(--wb-bg-modal);
+  --cb-input-background: var(--wb-bg-modal);
+  --cb-input-border-color: var(--wb-border-default);
+  --cb-panel-border-color: var(--wb-border-default);
+  --cb-dropdown-bg-color: var(--wb-bg-popover);
+  --cb-vscode-dropdown-background: var(--wb-bg-popover);
+  --cb-vscode-editorWidget-border: var(--wb-border-default);
+  --cb-vscode-scrollbarSlider-background: var(--wb-scrollbar-thumb);
+  --cb-vscode-scrollbarSlider-hoverBackground: var(--wb-scrollbar-thumb-hover);
+  --cb-hover-bg: var(--wb-bg-hover);
+  --cb-text-primary: var(--wb-color-text-primary);
+  --cb-text-secondary: var(--wb-color-text-secondary);
+  --cb-input-foreground: var(--wb-color-text-primary);
+  --cb-text-placeholder: var(--wb-color-text-placeholder);
+  --cb-list-item-foreground: var(--wb-color-text-secondary);
+  --cb-list-item-selected-foreground: var(--wb-color-text-primary);
+  --chat-input-area-header-font-color: var(--wb-color-text-primary);
+  --cb-green-color: var(--wb-status-success);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="modelIcon"] svg path {
+  fill-opacity: 1 !important;
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"],
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input [class*="_mainArea_"] {
+  background: var(--wb-bg-modal) !important;
+  border-color: var(--wb-border-input) !important;
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"],
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-chat-input:focus-within [class*="_mainArea_"] {
+  border-color: var(--wb-border-focus) !important;
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-modal-tag,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-row-project,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-row-schedule {
+  background: var(--wb-bg-card-strong);
+  border-color: var(--wb-border-weak);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day {
+  background: var(--wb-bg-primary);
+  border-color: var(--wb-color-border-primary, #34373d);
+  color: var(--wb-color-text-secondary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option.active {
+  background-color: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day.active {
+  background: var(--wb-bg-primary);
+  border-color: var(--wb-color-text-tertiary, rgba(255, 255, 255, 0.45));
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active),
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-schedule-day:hover:not(.active) {
+  background: var(--wb-bg-primary);
+  border-color: var(--wb-border-focus);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option:hover {
+  background: var(--wb-bg-hover-light);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-dropdown,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-dropdown {
+  background: var(--wb-dropdown-bg-color);
+  border-color: var(--wb-dropdown-border-color);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.36);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-column-title,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-weekday,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-hint-text,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-push-info-icon,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-toggle-text {
+  color: var(--wb-color-text-secondary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-time-picker-option,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-title,
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day {
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn {
+  color: var(--wb-color-text-secondary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-nav-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day:hover {
+  background: var(--wb-bg-hover);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-day.today {
+  color: var(--wb-color-text-primary);
+  font-weight: 600;
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn {
+  color: var(--wb-color-text-secondary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-today-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-validity-calendar-footer {
+  border-top-color: var(--wb-border-input);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary {
+  background: transparent;
+  color: var(--wb-button-secondary-fg);
+  border-color: var(--wb-button-secondary-border);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled),
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-secondary:hover:not(:disabled) {
+  background: var(--wb-button-secondary-bg-hover);
+  border-color: var(--wb-border-focus);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger {
+  background: var(--wb-status-error-soft-bg);
+  border-color: var(--wb-status-error-border-subtle);
+  color: var(--wb-color-text-error-default);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled),
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-btn-danger:hover:not(:disabled) {
+  background: var(--wb-bg-error-hover);
+  border-color: var(--wb-status-error);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger {
+  background-color: var(--wb-bg-modal);
+  border-color: var(--wb-border-input);
+  color: var(--wb-color-text-primary);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger:hover {
+  border-color: var(--wb-border-focus);
+}
+:root.dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+:root.cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+:root .dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+:root .cb-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+body[data-vscode-theme-kind="vscode-dark"] :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+body[data-vscode-theme-name="IDE Night"] :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+body.vscode-dark :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) :is(.atm-modal-overlay, .atm-detail-page) .atm-custom-select-trigger.open {
+  border-color: var(--wb-border-focus);
+}
+.automation-panel:hover,
+.code-buddy-automation:hover {
+  scrollbar-color: var(--wb-scrollbar-thumb) transparent;
+}
+.automation-panel::-webkit-scrollbar,
+.code-buddy-automation::-webkit-scrollbar {
+  width: 6px;
+}
+.automation-panel::-webkit-scrollbar-track,
+.code-buddy-automation::-webkit-scrollbar-track {
+  background: transparent;
+}
+.automation-panel::-webkit-scrollbar-thumb,
+.code-buddy-automation::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+.automation-panel:hover::-webkit-scrollbar-thumb,
+.code-buddy-automation:hover::-webkit-scrollbar-thumb {
+  background-color: var(--wb-scrollbar-thumb);
+}
+.automation-panel:hover::-webkit-scrollbar-thumb:hover,
+.code-buddy-automation:hover::-webkit-scrollbar-thumb:hover {
+  background-color: var(--wb-scrollbar-thumb-hover);
+}
+.code-buddy-custom-add-card {
+  padding: 7px 0 16px;
+}
+.code-buddy-custom-add-card .code-buddy-custom-add-card-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 28px;
+}
+.code-buddy-custom-add-card .code-buddy-custom-add-card-title .code-buddy-custom-add-card-title-text {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.33;
+  color: var(--wb-color-text-primary);
+}
+.code-buddy-custom-add-card .code-buddy-custom-add-card-title-extra {
+  display: flex;
+  gap: 8px;
+}
+.code-buddy-custom-add-card .code-buddy-custom-add-card-description {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--codebuddy-text-secondary);
+}
+.atm-create-btn-secondary {
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.atm-create-btn-secondary:hover {
+  color: var(--wb-color-text-primary);
+}
+.atm-template-page {
+  margin-top: 4px;
+  /* 占满剩余高度并在内部滚动（外层 .automation-panel 已 overflow:hidden）。 */
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* 横向/底部内边距承接自原 .automation-main-page（toolbar 已改整宽拖拽区）。 */
+  padding: 0 24px 20px;
+}
+.atm-template-page-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.atm-template-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.atm-template-back-btn:hover {
+  border-color: var(--wb-border-focus);
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.atm-loading {
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.atm-empty {
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  padding: 20px 24px;
+}
+.atm-template-section {
+  margin: 8px 0 40px;
+}
+.atm-template-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .atm-template-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .atm-template-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.atm-template-card {
+  width: 100%;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-card);
+  color: var(--wb-color-text-primary);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  text-align: left;
+}
+.atm-template-card:hover {
+  border-color: var(--wb-border-focus);
+  background: var(--wb-bg-hover);
+}
+.atm-template-icon-wrap {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--wb-color-text-secondary);
+  margin-top: 1px;
+}
+.atm-template-icon {
+  width: 20px;
+  height: 20px;
+}
+.atm-template-card:hover .atm-template-icon-wrap {
+  color: var(--wb-text-strong);
+}
+.atm-template-texts {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.atm-template-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-template-content {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-section {
+  margin-bottom: 20px;
+}
+.atm-section-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wb-color-text-secondary);
+  padding: 16px 0 8px;
+}
+.atm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 8px;
+  flex-shrink: 0;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  gap: 64px;
+  position: relative;
+}
+.atm-row:hover {
+  /* hover 底色 #F2F2F2，复用 token --wb-palette-gray-3（light 精确等值）。
+    * 不改 --wb-bg-secondary 变量本身（多处复用），仅本处覆盖。 */
+  background: var(--wb-bg-hover-light);
+  border-radius: 8px;
+}
+.atm-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.atm-row-leading {
+  width: 16px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  /* 状态图标走 currentColor，深浅主题下都能看清；避免硬编码 #000 0.3 在深色不可见 */
+  color: var(--wb-color-text-disabled);
+}
+.atm-row-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  flex-direction: row;
+  gap: 8px;
+  overflow: hidden;
+}
+.atm-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  /* 任务名：自然宽度，最多占左侧信息区 28% */
+  max-width: 28%;
+}
+.atm-row-main-inbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  /* inbox 行：名称最多占父容器 50% */
+  max-width: 50%;
+  min-width: 0;
+}
+.atm-row-meta {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.atm-row-warnings {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+.atm-row-warning-label {
+  font-size: 11px;
+  color: var(--wb-warning);
+  cursor: help;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-row-right {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--wb-color-text-disabled);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  height: 24px;
+}
+.atm-active-status-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  animation: atm-spin 3s linear infinite;
+}
+@keyframes atm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.atm-row-pause-icon {
+  flex-shrink: 0;
+  color: var(--wb-icon-tertiary);
+}
+.atm-task-status-icon {
+  flex-shrink: 0;
+}
+.atm-task-status-icon--scheduled {
+  color: var(--wb-color-text-disabled);
+}
+.atm-task-status-icon--paused {
+  color: var(--wb-icon-tertiary);
+}
+.atm-row-status-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.atm-row-status-dot::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.atm-row-status-dot.success::after {
+  background: var(--wb-status-success);
+}
+.atm-row-status-dot.pending::after {
+  background: var(--wb-bg-tertiary);
+}
+.atm-row-status-dot.failed::after {
+  background: var(--wb-status-error);
+}
+.atm-row-name {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-row-name.atm-row-name--link {
+  cursor: pointer;
+}
+.atm-row-name.atm-row-name--link:hover {
+  text-decoration: underline;
+}
+.atm-row-project,
+.atm-row-schedule,
+.atm-row-validity {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--wb-color-text-tertiary);
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* 空间充足时按内容自然宽度占位，不足时收缩并省略号截断 */
+  flex: 0 1 auto;
+  min-width: 0;
+}
+/* 各字段独立 max-width，相对于 atm-row-meta（= atm-row-content 的 ~72%）：
+ * 文件夹 20%/content ≈ 28% of meta
+ * 重复规则 30%/content ≈ 42% of meta
+ * 生效期 22%/content ≈ 30% of meta */
+.atm-row-project {
+  max-width: 28%;
+}
+.atm-row-schedule {
+  max-width: 42%;
+  display: inline-block;
+  vertical-align: bottom;
+}
+.atm-row-validity {
+  max-width: 30%;
+}
+.atm-row-schedule-icon {
+  font-size: 12px;
+}
+.atm-row-next,
+.atm-row-paused-label {
+  color: var(--wb-color-text-disabled, rgba(0, 0, 0, 0.3));
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  text-decoration-line: none;
+  line-height: 22px;
+}
+.atm-row-summary {
+  font-size: 14px;
+  color: var(--wb-color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-row-time {
+  font-size: 14px;
+  line-height: 22px;
+  /* 与 .atm-row-result-label 统一：#000 30%(text-disabled) */
+  color: var(--wb-color-text-disabled);
+}
+@keyframes atm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.atm-row-archive-btn,
+.atm-row-delete-btn {
+  display: none;
+}
+/* 运行记录行的归档/删除按钮，处理方式与定时任务行 .atm-row-action-btn 完全一致：
+ * 16×16 纯图标、无 hover 底色、hover 只改图标颜色。
+ * 同为 variant="ghost"，需用 ghost 完整类链 + :hover:not(:disabled) 盖过 foundation
+ * 自带的 36/32px 热区与 ghost hover 配色规则。 */
+.atm-row-hover-actions .atm-row-archive-btn.wb-button.wb-button--icon-only.wb-button--ghost,
+.atm-row-hover-actions .atm-row-delete-btn.wb-button.wb-button--icon-only.wb-button--ghost {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  /* ArchiveIcon 内 path 自带 opacity=0.7 会让图标偏浅，强制 opacity=1 与其它按钮一致 */
+}
+.atm-row-hover-actions .atm-row-archive-btn.wb-button.wb-button--icon-only.wb-button--ghost svg,
+.atm-row-hover-actions .atm-row-delete-btn.wb-button.wb-button--icon-only.wb-button--ghost svg {
+  width: 16px;
+  height: 16px;
+}
+.atm-row-hover-actions .atm-row-archive-btn.wb-button.wb-button--icon-only.wb-button--ghost svg path,
+.atm-row-hover-actions .atm-row-delete-btn.wb-button.wb-button--icon-only.wb-button--ghost svg path {
+  opacity: 1;
+}
+.atm-row-hover-actions .atm-row-archive-btn.wb-button.wb-button--icon-only.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled),
+.atm-row-hover-actions .atm-row-delete-btn.wb-button.wb-button--icon-only.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+.atm-inbox-row:hover .atm-row-right-text {
+  display: none;
+}
+.atm-inbox-row:hover .atm-row-hover-actions {
+  display: flex;
+}
+.atm-inbox-row:hover .atm-row-hover-actions .atm-row-archive-btn,
+.atm-inbox-row:hover .atm-row-hover-actions .atm-row-delete-btn {
+  display: flex;
+}
+.atm-archived {
+  opacity: 1;
+}
+.atm-row-icon-archived {
+  color: var(--wb-color-text-disabled);
+  flex-shrink: 0;
+  line-height: 0;
+}
+.atm-row-result-label {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 22px;
+  /* 与 .atm-row-time 统一：#000 30%(text-disabled) */
+  color: var(--wb-color-text-disabled);
+  background: none;
+  /* 结果文案：紧凑展示，过长时省略并 hover 显示全部 */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atm-row-result-label.success {
+  color: var(--wb-color-text-disabled);
+  background: none;
+}
+.atm-row-result-label.failed {
+  color: var(--wb-color-text-disabled);
+  background: none;
+}
+.atm-row-result-label.neutral {
+  color: var(--wb-color-text-disabled);
+  background: none;
+}
+.atm-archived-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  min-height: 18px;
+  border-radius: 999px;
+  background: var(--wb-bg-card-strong);
+  color: var(--wb-color-text-disabled);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.atm-row-display-status {
+  white-space: nowrap;
+}
+.atm-row-display-status.missed_pending,
+.atm-row-display-status.waiting_login,
+.atm-row-display-status.queued {
+  color: var(--wb-color-text-secondary);
+}
+.atm-row-display-status.expired,
+.atm-row-display-status.interrupted {
+  color: var(--wb-color-text-error-default);
+}
+.atm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--wb-bg-overlay);
+  z-index: 1000;
+}
+.atm-modal {
+  background: var(--wb-bg-modal);
+  border: 1px solid var(--wb-border-weak);
+  border-radius: 12px;
+  width: 600px;
+  display: flex;
+  gap: 16px;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: visible;
+  padding: 24px;
+  box-sizing: border-box;
+  box-shadow: var(--wb-shadow-xl);
+}
+body[data-electron-desktop="true"][data-platform="windows"] .atm-modal-overlay,
+body[data-electron-desktop="true"]:not([data-platform="mac"]):not(
+        [data-platform="windows"]
+    ) .atm-modal-overlay {
+  top: 30px;
+}
+body[data-electron-desktop="true"][data-platform="windows"] .atm-modal,
+body[data-electron-desktop="true"]:not([data-platform="mac"]):not(
+        [data-platform="windows"]
+    ) .atm-modal {
+  max-height: calc(100vh - 78px);
+}
+.atm-modal-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0;
+  flex-shrink: 0;
+}
+.atm-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--wb-color-text-primary);
+}
+.atm-modal-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+}
+.atm-modal-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.atm-modal-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.atm-modal-status.active .atm-modal-status-dot {
+  background: var(--wb-status-success);
+}
+.atm-modal-status.paused .atm-modal-status-dot {
+  background: var(--wb-bg-tertiary);
+}
+.atm-modal-body {
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: visible;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.atm-modal-body > * {
+  flex-shrink: 0;
+}
+.atm-modal-body.atm-model-selector-open {
+  overflow: visible;
+}
+.atm-modal-body.atm-model-selector-open .atm-modal-chat-input {
+  position: relative;
+  z-index: 2;
+}
+.atm-modal-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  margin: 0 0 8px;
+  padding-top: 16px;
+  color: var(--wb-color-text-secondary);
+}
+.atm-modal-label:first-child {
+  padding-top: 0;
+}
+.atm-modal-hint {
+  font-size: 12px;
+  color: var(--wb-color-text-disabled);
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.atm-modal-hint-inline {
+  display: inline;
+  font-size: 12px;
+  font-weight: normal;
+  margin-left: 4px;
+  color: var(--wb-color-text-disabled);
+}
+.atm-modal-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 8px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid color-mix(in srgb, var(--wb-alert-info-text) 18%, transparent);
+  border-radius: 10px;
+  background: var(--wb-alert-info-bg);
+  color: var(--wb-alert-info-text);
+}
+.atm-modal-notice + .atm-modal-label {
+  padding-top: 0;
+}
+.atm-modal-notice__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--wb-alert-info-text) 14%, transparent);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.atm-modal-notice__content {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: inherit;
+  word-break: break-word;
+}
+.atm-modal-notice__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.atm-modal-notice__close:hover {
+  background: color-mix(in srgb, var(--wb-alert-info-text) 10%, transparent);
+}
+.atm-modal-notice__close:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--wb-alert-info-text) 38%, transparent);
+  outline-offset: 1px;
+}
+.atm-schedule-peak-hour-hint-inline {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.atm-modal-input {
+  width: 100%;
+  height: 32px;
+  /* 与 atm-modal-textarea / atm-modal-tags 保持一致，使用 token 适配深浅主题 */
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  border-radius: 8px;
+  padding: 5px 8px;
+  box-sizing: border-box;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.atm-modal-input:focus {
+  border-color: var(--wb-border-focus);
+}
+.atm-modal-textarea {
+  width: 100%;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  font-size: 13px;
+  min-height: 120px;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.atm-modal-textarea:focus {
+  border-color: var(--wb-border-focus);
+}
+.atm-modal-chat-input {
+  padding-bottom: 16px;
+  --cb-content-background: var(--wb-bg-primary);
+  --cb-main-area-background: var(--wb-bg-primary);
+  --cb-input-foreground: var(--wb-color-text-primary);
+  --cb-text-primary: var(--wb-color-text-primary);
+  --cb-text-placeholder: var(--wb-color-text-placeholder);
+}
+.atm-modal-chat-input [class*="_content_"] {
+  padding: 0 !important;
+  background: var(--wb-bg-primary) !important;
+  border-radius: 6px !important;
+}
+.atm-modal-chat-input [class*="_mainArea_"] {
+  border-radius: 6px !important;
+  border: 1px solid var(--wb-border-default) !important;
+  background: var(--wb-bg-primary) !important;
+  padding: 12px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.atm-modal-chat-input:focus-within [class*="_mainArea_"] {
+  border-color: var(--wb-border-focus) !important;
+}
+.atm-modal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  border-radius: 6px;
+  min-height: 36px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.atm-modal-tags:focus-within {
+  border-color: var(--wb-border-focus);
+}
+.atm-modal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--wb-bg-card-strong);
+  color: var(--wb-text-strong);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+/* 周期/间隔/单次 切换 —— 直接用 foundation <Segmented> 的默认（ardot 选中态）外观，
+ * 这里只补：与下方控件的间距、按内容宽度收缩、以及 ardot 主规格的高度/内边距。
+ * （旧的 .atm-schedule-tab 手写 tab 样式已随迁移到 Segmented 而废弃，全部删除）
+ *
+ * 关键：父级 .atm-modal-body 是 column flex（align-items 默认 stretch），会把
+ * Segmented 拉成 100% 宽；用 align-self: flex-start 让它回到「按子节点宽度」。 */
+.atm-schedule-tabs {
+  align-self: flex-start;
+  height: 34px;
+  padding: 2px;
+  margin-bottom: 8px;
+  /* foundation .wb-segmented__item 写死了 height（small=20 / medium=24）且 padding 偏小，
+     * 这里清掉固定高度交给 .wb-segmented 的 align-items: stretch 撑满容器（34 - 2*2 = 30px），
+     * 并按设计稿把横/纵向内边距改为 4px 12px。 */
+}
+.atm-schedule-tabs .wb-segmented__item {
+  height: auto;
+  padding: 4px 12px;
+}
+.atm-schedule-tabs .wb-segmented__item-label {
+  font-size: 14px;
+}
+.atm-frequency-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+}
+.atm-schedule-daily,
+.atm-schedule-once {
+  margin-bottom: 0;
+}
+.atm-periodic-controls {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.atm-custom-select {
+  position: relative;
+  display: inline-block;
+}
+.atm-custom-select-trigger {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  padding: 0 10px 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background-color: var(--wb-text-inverse);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: border-color 0.15s ease;
+  outline: none;
+}
+.atm-custom-select-trigger-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 下拉箭头（foundation ChevronDownIcon）：默认弱化色，展开时翻转。 */
+.atm-custom-select-trigger-arrow {
+  flex-shrink: 0;
+  color: var(--wb-color-text-disabled);
+  transition: transform 0.15s ease;
+}
+.atm-custom-select-trigger.open .atm-custom-select-trigger-arrow {
+  transform: rotate(180deg);
+}
+.atm-custom-select-trigger:hover {
+  border-color: var(--wb-border-focus);
+}
+.atm-custom-select-trigger.open {
+  border-color: var(--wb-border-focus);
+}
+.atm-custom-select-trigger.placeholder {
+  color: var(--wb-color-text-placeholder);
+}
+/* CustomSelect 的菜单已改用 foundation Dropdown 渲染（#40818）：
+ * .atm-custom-select-menu / .atm-custom-select-item 不再使用，原样式删除。
+ * 菜单视觉规格由 foundation Dropdown 统一提供。 */
+.atm-yearly-selectors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* WeekdayMultiPicker */
+.atm-weekday-picker {
+  position: relative;
+  width: 220px;
+  max-width: 100%;
+}
+.atm-weekday-picker.disabled {
+  opacity: 0.6;
+}
+.atm-weekday-picker-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: var(--wb-bg-tooltip);
+  color: var(--wb-text-white);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1200;
+  pointer-events: none;
+}
+.atm-weekday-picker:hover .atm-weekday-picker-tooltip {
+  display: block;
+}
+.atm-weekday-picker.dropdown-open .atm-weekday-picker-tooltip {
+  display: none !important;
+}
+.atm-weekday-picker-trigger {
+  min-height: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 4px 28px 4px 8px;
+  border: 1px solid var(--wb-border-input);
+  border-radius: 8px;
+  background: var(--wb-bg-modal);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+.atm-weekday-picker-trigger.active,
+.atm-weekday-picker-trigger:hover {
+  border-color: var(--wb-border-focus);
+}
+.atm-weekday-picker-trigger.disabled {
+  cursor: not-allowed;
+}
+.atm-weekday-picker-placeholder {
+  font-size: 13px;
+  color: var(--wb-color-text-tertiary);
+}
+.atm-weekday-picker-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.atm-weekday-picker-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--wb-bg-tertiary, #f2f2f2);
+  color: var(--wb-color-text-primary, rgba(0, 0, 0, 0.9));
+  font-size: var(--wb-font-caption-size, 12px);
+  font-weight: 500;
+  font-style: normal;
+  text-decoration-line: none;
+  line-height: var(--wb-font-caption-line-height, 20px);
+  flex-shrink: 0;
+}
+.atm-weekday-picker-tag-remove,
+.atm-weekday-picker-clear {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.atm-weekday-picker-tag-remove {
+  opacity: 0.75;
+}
+.atm-weekday-picker-tag-remove:hover,
+.atm-weekday-picker-clear:hover:not(:disabled) {
+  opacity: 1;
+}
+.atm-weekday-picker-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--wb-color-text-tertiary);
+  z-index: 2;
+  background: var(--wb-bg-primary);
+  padding: 0 2px;
+}
+.atm-weekday-picker-dropdown {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 1100;
+  width: 220px;
+  max-width: min(280px, calc(100vw - 64px));
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-popover);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  box-sizing: border-box;
+}
+.atm-weekday-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.atm-weekday-item {
+  min-width: 40px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--wb-border-weak);
+  background: var(--wb-bg-modal);
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.atm-weekday-item.active {
+  border-color: var(--wb-button-primary-bg);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.atm-weekday-item:hover:not(.active) {
+  background: var(--wb-bg-hover);
+}
+.atm-monthday-picker {
+  position: relative;
+  width: 220px;
+  max-width: 100%;
+}
+.atm-monthday-picker.disabled {
+  opacity: 0.6;
+}
+.atm-monthday-picker-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: var(--wb-bg-tooltip);
+  color: var(--wb-text-white);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1200;
+  pointer-events: none;
+}
+.atm-monthday-picker:hover .atm-monthday-picker-tooltip {
+  display: block;
+}
+.atm-monthday-picker.dropdown-open .atm-monthday-picker-tooltip {
+  display: none !important;
+}
+.atm-monthday-picker-trigger {
+  min-height: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 4px 28px 4px 8px;
+  border: 1px solid var(--wb-border-input);
+  border-radius: 8px;
+  background: var(--wb-bg-modal);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+.atm-monthday-picker-trigger.active,
+.atm-monthday-picker-trigger:hover {
+  border-color: var(--wb-border-focus);
+}
+.atm-monthday-picker-trigger.disabled {
+  cursor: not-allowed;
+}
+.atm-monthday-picker-placeholder {
+  font-size: 13px;
+  color: var(--wb-color-text-tertiary);
+}
+.atm-monthday-picker-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.atm-monthday-picker-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--wb-bg-tertiary, #f2f2f2);
+  color: var(--wb-color-text-primary, rgba(0, 0, 0, 0.9));
+  font-size: var(--wb-font-caption-size, 12px);
+  font-weight: 500;
+  font-style: normal;
+  text-decoration-line: none;
+  line-height: var(--wb-font-caption-line-height, 20px);
+  flex-shrink: 0;
+}
+.atm-monthday-picker-tag-remove,
+.atm-monthday-picker-clear {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.atm-monthday-picker-tag-remove {
+  opacity: 0.75;
+}
+.atm-monthday-picker-tag-remove:hover,
+.atm-monthday-picker-clear:hover:not(:disabled) {
+  opacity: 1;
+}
+.atm-monthday-picker-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--wb-color-text-tertiary);
+  z-index: 2;
+  background: var(--wb-bg-primary);
+  padding: 0 2px;
+}
+.atm-monthday-picker-dropdown {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 1100;
+  width: 220px;
+  max-width: min(280px, calc(100vw - 64px));
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-popover);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  box-sizing: border-box;
+}
+.atm-monthday-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.atm-monthday-item {
+  min-width: 40px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--wb-border-weak);
+  background: var(--wb-bg-modal);
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 8px;
+}
+.atm-monthday-item.active {
+  border-color: var(--wb-button-primary-bg);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.atm-time-picker {
+  position: relative;
+}
+.atm-time-picker.disabled {
+  opacity: 0.6;
+}
+.atm-time-picker-trigger {
+  width: 110px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.atm-time-picker-trigger:hover,
+.atm-time-picker.open .atm-time-picker-trigger {
+  border-color: var(--wb-border-focus);
+}
+.atm-time-picker-trigger:disabled {
+  cursor: not-allowed;
+}
+.atm-time-picker-value {
+  font-size: 13px;
+  font-family: var(--cb-vscode-editor-font-family, monospace);
+  letter-spacing: 0.04em;
+}
+.atm-time-picker-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.atm-time-picker-icon {
+  color: var(--wb-color-text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+}
+.atm-time-picker-dropdown {
+  position: absolute;
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 1100;
+  width: 220px;
+  border-radius: 10px;
+  border: 1px solid var(--wb-dropdown-border-color);
+  background: var(--wb-dropdown-bg-color);
+  box-shadow: var(--wb-shadow-xl);
+  padding: 12px;
+  box-sizing: border-box;
+}
+.atm-time-picker-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.atm-time-picker-column {
+  min-width: 0;
+}
+.atm-time-picker-column-title {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  margin-bottom: 8px;
+  text-align: center;
+}
+.atm-time-picker-options {
+  max-height: 208px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.atm-time-picker-options::-webkit-scrollbar {
+  width: 0;
+  display: none;
+}
+.atm-time-picker-option {
+  width: 100%;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--cb-vscode-editor-font-family, monospace);
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.atm-time-picker-option + .atm-time-picker-option {
+  margin-top: 2px;
+}
+.atm-time-picker-option:hover {
+  background: var(--wb-bg-hover-light);
+  color: var(--wb-color-text-primary);
+}
+.atm-time-picker-option.active {
+  background-color: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+}
+/* 对齐 ardot radioGroup(18194:1327)：容器自身无边框/圆角，边框落在每个 segment 上。
+ *
+ * `isolation: isolate` 让 .atm-schedule-days 成为独立层叠上下文，把内部
+ * `.atm-schedule-day:hover { z-index: 1 }` 与 `.atm-schedule-day.active { z-index: 2 }`
+ * （用来保证 active 深边框压过 hover 亮边框、hover 亮边框压过普通邻居灰边）关在自己
+ * 栈里，对外整体只表现为一层。这样在 .atm-modal-body 栈里，segmented 不会与同级兄弟
+ * .atm-modal-chat-input 的 ModelSelector inline 弹层撞 z-index #62789。
+ */
+.atm-schedule-days {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  width: fit-content;
+  flex-wrap: nowrap;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  isolation: isolate;
+}
+/* 每个 segment 自带 1px 边框（对齐 ardot 各 cell 独立描边 + 白底 + 14px 文字 + 5/16 内边距）
+ * 边框用 foundation 主边框 token；背景沿用 --wb-bg-primary（白/暗），不用 wb-bg-secondary(黑70) */
+.atm-schedule-day {
+  min-width: 0;
+  height: 32px;
+  padding: 5px 16px;
+  border-radius: 0;
+  border: 1px solid var(--wb-color-border-primary, #e5e5e5);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  position: relative;
+}
+/* 相邻 segment 折叠边框，避免 2px 双线（ardot itemSpacing:0 的连排效果） */
+.atm-schedule-day + .atm-schedule-day {
+  margin-left: -1px;
+}
+.atm-schedule-day:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.atm-schedule-day:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+.atm-schedule-day:hover:not(.active) {
+  z-index: 1;
+  border-color: var(--wb-border-focus);
+  color: var(--wb-color-text-primary);
+}
+/* 选中态（支持多选，每个 day 独立 toggle）：填充 #F2F2F2 灰底 + 深描边 + 主文字色强调 */
+.atm-schedule-day.active {
+  /* 背景 #F2F2F2 → token --wb-palette-gray-3（light 精确等值） */
+  background: var(--wb-bg-hover-light);
+  /* 边框 rgba(0,0,0,0.5) → token --wb-palette-black-50 */
+  border-color: var(--wb-color-text-tertiary);
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+}
+/* disabled（saving 中）：div 自身没有原生 disabled，用类显式禁用交互 */
+.atm-schedule-day.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.atm-schedule-interval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 0;
+  flex-wrap: wrap;
+}
+.atm-schedule-interval-prefix,
+.atm-schedule-interval-unit {
+  color: var(--wb-color-text-secondary);
+}
+.atm-schedule-interval-input {
+  width: 70px;
+  height: 36px;
+  text-align: center;
+  border-radius: 6px;
+}
+.atm-validity-picker {
+  position: relative;
+  margin-bottom: 16px;
+}
+.atm-single-date-picker {
+  min-width: 220px;
+  margin-bottom: 0;
+}
+.atm-single-date-picker .atm-validity-trigger {
+  min-height: 36px;
+}
+.atm-single-date-picker .atm-validity-dropdown {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.atm-validity-trigger {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  box-sizing: border-box;
+}
+.atm-validity-trigger:hover,
+.atm-validity-trigger.active {
+  border-color: var(--wb-border-focus);
+}
+.atm-validity-trigger.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.atm-validity-placeholder,
+.atm-validity-value {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-validity-placeholder {
+  color: var(--wb-color-text-tertiary);
+}
+.atm-validity-value {
+  color: var(--wb-color-text-primary);
+}
+.atm-validity-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.atm-validity-clear {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.atm-validity-clear:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.atm-validity-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 1100;
+  width: 340px;
+  max-width: min(340px, calc(100vw - 64px));
+  border-radius: 10px;
+  border: 1px solid var(--wb-dropdown-border-color);
+  background: var(--wb-dropdown-bg-color);
+  box-shadow: var(--wb-shadow-xl);
+  padding: 16px;
+  box-sizing: border-box;
+}
+.atm-validity-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.atm-validity-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.atm-validity-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.atm-validity-nav-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.atm-validity-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.atm-validity-weekdays,
+.atm-validity-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.atm-validity-weekdays {
+  margin-bottom: 6px;
+}
+.atm-validity-weekday {
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  padding: 4px 0;
+}
+.atm-validity-days {
+  gap: 2px 0;
+}
+.atm-validity-day {
+  height: 34px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.atm-validity-day:hover {
+  background: var(--wb-bg-hover);
+}
+.atm-validity-day:disabled {
+  color: color-mix(in srgb, var(--wb-color-text-disabled) 75%, transparent);
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.atm-validity-day:disabled:hover {
+  background: transparent;
+}
+.atm-validity-day.other-month {
+  color: color-mix(in srgb, var(--wb-color-text-disabled) 85%, transparent);
+}
+.atm-validity-day.other-month:disabled {
+  color: color-mix(in srgb, var(--wb-color-text-disabled) 60%, transparent);
+}
+.atm-validity-day.today {
+  font-weight: 700;
+  color: var(--wb-color-text-primary);
+}
+.atm-validity-day.range-start,
+.atm-validity-day.range-end,
+.atm-validity-day.preview-start,
+.atm-validity-day.preview-end {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  font-weight: 500;
+}
+.atm-validity-day.range-start,
+.atm-validity-day.preview-start {
+  border-radius: 8px 0 0 8px;
+}
+.atm-validity-day.range-end,
+.atm-validity-day.preview-end {
+  border-radius: 0 8px 8px 0;
+}
+.atm-validity-day.range-start.range-end,
+.atm-validity-day.preview-start.preview-end {
+  border-radius: 8px;
+}
+.atm-validity-day.in-range,
+.atm-validity-day.preview-in-range {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.atm-validity-day.in-range:hover,
+.atm-validity-day.preview-in-range:hover {
+  background: var(--wb-bg-active);
+}
+.atm-validity-calendar-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--wb-border-input);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.atm-validity-hint-text {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+}
+.atm-validity-today-btn {
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+.atm-validity-today-btn:hover {
+  background: var(--wb-bg-hover);
+}
+.atm-connector-multi-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--wb-border-control);
+  border-radius: 8px;
+  padding: 4px 0;
+  background: var(--wb-bg-primary);
+}
+.atm-connector-multi-select:focus-within {
+  border-color: var(--wb-border-control) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.atm-detail-page [class*="trigger--open"],
+.automation-panel [class*="trigger--open"],
+.atm-detail-page [class*="__trigger--open"],
+.automation-panel [class*="__trigger--open"] {
+  border-color: var(--wb-border-focus) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.atm-detail-page [class*="__trigger"]:hover,
+.automation-panel [class*="__trigger"]:hover {
+  border-color: var(--wb-border-focus);
+  outline: none !important;
+  box-shadow: none !important;
+}
+.atm-modal-body [class*="dropdown"] [class*="trigger"]:focus,
+.atm-modal-body [class*="dropdown"] [class*="trigger"]:focus-within,
+.atm-modal-body [class*="dropdown"] [class*="trigger"]:focus-visible {
+  outline: none !important;
+  border-color: var(--wb-border-focus) !important;
+  box-shadow: none !important;
+}
+.atm-connector-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  transition: background-color 0.15s ease;
+}
+.atm-connector-option:hover {
+  background: var(--wb-bg-hover);
+}
+.atm-connector-option input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--wb-button-primary-bg);
+}
+.atm-connector-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atm-schedule-push-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 0;
+  min-height: 36px;
+  /* 关闭态 track 用中性 border 色，避免与 panel 风格冲突 */
+  /* 开启态 track：统一走 panel primary-btn 色（浅色 #111 / 深色 #FFF），
+     * 不再用 cb-switch 默认的绿色 #00b96b */
+  /* thumb 用纯白 + 阴影，浅色/深色下在 track 上都有清晰的浮起感 */
+}
+.atm-schedule-push-toggle .cb-switch__track {
+  background: var(--wb-border-default) !important;
+}
+.atm-schedule-push-toggle .cb-switch--checked .cb-switch__track,
+.atm-schedule-push-toggle .cb-switch.cb-switch--checked .cb-switch__track {
+  background: var(--wb-button-primary-bg) !important;
+}
+.atm-schedule-push-toggle .cb-switch__thumb {
+  background: var(--wb-text-white) !important;
+  box-shadow: var(--wb-shadow-thumb);
+}
+.atm-push-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* 创建时间：推送开关下方的弱化辅助信息（仅编辑模式展示） */
+.atm-detail-created-at {
+  color: var(--wb-color-text-tertiary, rgba(0, 0, 0, 0.5));
+  font-family: "PingFang SC";
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 22px;
+  text-decoration-line: none;
+  margin-top: 16px;
+}
+.atm-push-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  opacity: 0.7;
+}
+.atm-push-info-icon:hover {
+  opacity: 1;
+}
+.atm-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.atm-toggle-text {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--wb-color-text-secondary);
+}
+/* 推送开关：本面板把 foundation 默认 Switch（track 32×18 / thumb 12）放大到 36×20 / thumb 16。
+ * 仅本面板生效，不改 foundation 默认值。checked 位移 = 36 - padding(2×2) - thumb(16) = 16px。 */
+.atm-push-switch.wb-switch .wb-switch__track {
+  width: 36px;
+  height: 20px;
+}
+.atm-push-switch.wb-switch .wb-switch__thumb {
+  width: 16px;
+  height: 16px;
+}
+.atm-push-switch.wb-switch .wb-switch__input:checked + .wb-switch__track .wb-switch__thumb {
+  transform: translateX(16px);
+}
+.atm-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  flex-shrink: 0;
+}
+.atm-modal-footer-left {
+  display: flex;
+  gap: 8px;
+}
+.atm-modal-footer-left .atm-btn {
+  padding: 6px 8px;
+}
+.atm-modal-footer-right {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 224px;
+}
+.atm-btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  height: 36px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, background-color 0.15s, border-color 0.15s, color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.atm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.atm-btn-primary {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg) !important;
+  -webkit-text-fill-color: var(--wb-button-primary-fg) !important;
+  border-color: var(--wb-button-primary-bg);
+  text-shadow: none;
+  opacity: 1;
+}
+.atm-btn-primary:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-hover);
+  border-color: var(--wb-button-primary-bg-hover);
+  color: var(--wb-button-primary-fg) !important;
+  -webkit-text-fill-color: var(--wb-button-primary-fg) !important;
+}
+.atm-btn-primary:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--wb-button-primary-bg) 72%, var(--wb-bg-modal) 28%);
+  border-color: color-mix(in srgb, var(--wb-button-primary-bg) 72%, var(--wb-bg-modal) 28%);
+  color: var(--wb-button-primary-fg) !important;
+  -webkit-text-fill-color: var(--wb-button-primary-fg) !important;
+}
+.atm-btn-secondary {
+  background: var(--wb-button-secondary-bg);
+  color: var(--wb-button-secondary-fg);
+  border: 1px solid var(--wb-button-secondary-border);
+}
+.atm-btn-secondary:hover:not(:disabled) {
+  background: var(--wb-button-secondary-bg-hover);
+}
+.atm-btn-danger {
+  background: var(--wb-status-error-soft-bg);
+  color: var(--wb-color-text-error-default);
+  border: 1px solid var(--wb-status-error);
+}
+.atm-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-status-error-soft-bg) 85%, var(--wb-color-text-error-default) 15%);
+  border-color: color-mix(in srgb, var(--wb-status-error) 78%, var(--wb-color-text-error-default) 22%);
+}
+.atm-btn-delete-confirm {
+  background: var(--wb-status-error-soft-bg);
+  color: var(--wb-color-text-error-default);
+  border: 1px solid var(--wb-status-error);
+}
+.atm-btn-delete-confirm:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-status-error-soft-bg) 82%, var(--wb-color-text-error-default) 18%);
+  border-color: color-mix(in srgb, var(--wb-status-error) 76%, var(--wb-color-text-error-default) 24%);
+}
+.atm-btn-icon {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.atm-folder-dropdown {
+  display: inline-flex;
+}
+@media (max-width: 900px) {
+  .atm-modal-overlay {
+    padding: 16px;
+  }
+  .atm-modal {
+    width: min(600px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    padding: 20px;
+  }
+  .atm-modal-notice {
+    gap: 8px;
+    padding: 10px;
+  }
+  body[data-electron-desktop="true"][data-platform="windows"] .atm-modal,
+  body[data-electron-desktop="true"]:not([data-platform="mac"]):not(
+            [data-platform="windows"]
+        ) .atm-modal {
+    max-height: calc(100vh - 62px);
+  }
+  .atm-frequency-controls {
+    flex-wrap: wrap;
+  }
+  .atm-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .atm-modal-footer-right {
+    width: 100%;
+  }
+}
+/* ===== Toolbar + Tabs + Filter + Batch + Empty States + Records ===== */
+.atm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 横向内边距由原 .automation-main-page 的 0 24px 下沉而来，
+     * 让 toolbar 自身贴窗口左右边缘，从而整条可作为窗口拖拽区。
+     * 高度固定 56px（与 .atm-detail-header 对齐，设计稿口径），
+     * 内部按钮（segmented 36 / 搜索/新建 ~32）由 align-items: center 垂直居中。 */
+  height: 56px;
+  box-sizing: border-box;
+  padding: 0 20px 0 24px;
+  gap: 12px;
+  flex-wrap: nowrap;
+  /* 吸顶定位：当前 .automation-panel 已是 overflow:hidden（非滚动容器），
+     * 真正的滚动溢出被收敛到 toolbar 的兄弟节点（.atm-task-list-container /
+     * .atm-records-page / .atm-template-page 等，各自 overflow:auto），
+     * 因此 toolbar 不会被滚动内容覆盖，无需自带 background 防透出。
+     * 仍保留 sticky + z-index 作为保险（若未来某个分支恢复祖先级滚动，
+     * 至少不会让 toolbar 立刻位移；如确认所有分支都不会出现祖先级滚动，
+     * 可以进一步降级为普通 flex 行 0）。 */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  /* 整条 toolbar 作为窗口拖拽区（mac/Windows 桌面端）；
+     * 直接子元素（列表页的 -left/-right 容器、模板/面包屑页的按钮与 Breadcrumb）
+     * 统一 no-drag，保证按钮可点、输入框/下拉可交互。 */
+  -webkit-app-region: drag;
+}
+.atm-toolbar > * {
+  -webkit-app-region: no-drag;
+}
+/**
+ * mac 桌面端 sidebar 折叠后，.atm-toolbar 成为整页最左侧内容，需要给窗口红绿灯
+ * （traffic lights）让出空间，否则「展开侧边栏 / 新建任务」按钮会被红绿灯压住。
+ *
+ * JSX 侧的 needTrafficLightOffset = isMac && isLocalAutomation && sidebarCollapsed
+ * && !isMacFullscreen 已经保证：
+ *   - Windows/Linux（红绿灯在右侧）不挂这个 class；
+ *   - web 端（浏览器没有红绿灯）不挂；
+ *   - mac 全屏（红绿灯隐藏）不挂；
+ *   - sidebar 展开时（sidebar 自身已盖住红绿灯）不挂。
+ * 所以这里只需无条件让位即可。
+ */
+.atm-toolbar--traffic-light-offset {
+  margin-left: 67px;
+}
+.atm-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.atm-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 1;
+  min-width: 0;
+  /* toolbar 空间不足时，只允许搜索框收缩（.atm-search-input 自带 flex-shrink: 1）。
+     * 其余按钮 / 筛选按钮固定尺寸，否则会被 flex 压到比内容窄，
+     * 按钮内 white-space: nowrap 的文字就会溢出到按钮外部。 */
+}
+.atm-toolbar-right .atm-toolbar-btn,
+.atm-toolbar-right .atm-create-btn,
+.atm-toolbar-right .atm-filter-wrap {
+  flex-shrink: 0;
+}
+/* 「定时任务 / 运行记录」使用 foundation Segmented；
+ * 胶囊样式由组件自带，这里只约束在 toolbar 中的占位行为。
+ */
+.atm-tabs {
+  flex-shrink: 0;
+  /* 设计稿此处 Segmented 高 34px，foundation 默认 36px（容器 padding 2*2 + 段高 32）。
+     * 局部需求不改 foundation 默认值，这里把段高压到 30px（2*2 + 30 = 34）。
+     * 字号本面板用 14px（foundation 默认 12px）。 */
+  /* 设计稿容器底色 #F2F2F2，复用已有 token --wb-palette-gray-3（light 主题精确等值）。
+     * 不改 foundation 默认底色（--wb-bg-tertiary），仅本处覆盖；&.wb-segmented 提权确保压过 foundation。 */
+}
+.atm-tabs .wb-segmented__item {
+  height: 30px;
+  font-size: 14px;
+}
+.atm-tabs.wb-segmented {
+  background: var(--wb-bg-hover-light);
+}
+/* dark 覆盖须放顶层 —— data-theme 在 <html> 根节点（.atm-tabs 的祖先），嵌套在 .atm-tabs 内会编译成后代选择器导致匹配不到。 */
+[data-theme="dark"] .atm-tabs .wb-segmented__item--active,
+.vscode-dark .atm-tabs .wb-segmented__item--active,
+.dark .atm-tabs .wb-segmented__item--active {
+  background: var(--wb-bg-elevated);
+}
+/* atm-schedule-tabs 的 dark 单独处理：用 elevated 底色 + 原色字，与 atm-tabs 的白底深字区分。 */
+[data-theme="dark"] .atm-schedule-tabs .wb-segmented__item--active,
+.vscode-dark .atm-schedule-tabs .wb-segmented__item--active,
+.dark .atm-schedule-tabs .wb-segmented__item--active {
+  background: var(--wb-bg-elevated);
+  color: var(--wb-color-text-primary);
+}
+.atm-search-input {
+  width: 200px;
+  /* 空间不足时允许搜索框自动收缩，最小保留 80px 保证可用 */
+  flex-shrink: 1;
+  min-width: 80px;
+  /* 搜索框会随 toolbar 收缩到 80px，此时 placeholder 文案（如"搜索自动化任务"）
+     * 放不下。浏览器对 input placeholder 默认直接裁切、不带省略号，这里在业务 scope 内
+     * 给内部 input 补 text-overflow: ellipsis，使 placeholder 超出时显示"..."。
+     * 仅此搜索框有此收缩诉求，不下沉到 foundation Input。 */
+  /* wrapper 和内部 input 背景色统一为 toolbar pill 色，hover/focus 边框保持透明 */
+}
+.atm-search-input .wb-input__inner {
+  text-overflow: ellipsis;
+}
+.atm-search-input.wb-input-wrapper--filled {
+  background: var(--wb-bg-inset-strong);
+  border-color: transparent;
+}
+.atm-search-input.wb-input-wrapper--filled .wb-input--filled {
+  background: var(--wb-bg-inset-strong);
+}
+.atm-search-input.wb-input-wrapper--filled:hover:not(.wb-input-wrapper--disabled) {
+  background: var(--wb-bg-tertiary);
+  border-color: transparent;
+}
+.atm-search-input.wb-input-wrapper--filled:hover:not(.wb-input-wrapper--disabled) .wb-input--filled {
+  background: var(--wb-bg-tertiary);
+}
+.atm-search-input.wb-input-wrapper--filled:focus-within:not(.wb-input-wrapper--disabled) {
+  background: var(--wb-bg-tertiary);
+  border-color: transparent;
+}
+.atm-search-input.wb-input-wrapper--filled:focus-within:not(.wb-input-wrapper--disabled) .wb-input--filled {
+  background: var(--wb-bg-tertiary);
+}
+/* 窄屏模式（toolbar 宽度 < 480px）：按钮通过 iconOnly prop 退化为纯图标（foundation 自动 32×32），
+ * 搜索框压缩。仅保留 svg 尺寸微调。 */
+.atm-toolbar--narrow .atm-toolbar-right {
+  gap: 8px;
+}
+.atm-toolbar--narrow .atm-search-input {
+  width: 120px;
+}
+.atm-toolbar--narrow .atm-toolbar-btn svg,
+.atm-toolbar--narrow .atm-create-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.atm-filter-wrap {
+  position: relative;
+}
+/* 筛选按钮使用 foundation Button(variant=ghost, iconOnly) 标准样式 */
+.atm-filter-btn {
+  position: relative;
+}
+.atm-filter-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wb-status-error);
+}
+.atm-filter-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  width: 160px;
+  background: var(--wb-bg-popover);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 16px;
+  box-shadow: var(--wb-shadow-popover);
+  padding: 8px;
+  z-index: 100;
+}
+.atm-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 3px 8px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: var(--wb-color-text-primary);
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  box-sizing: border-box;
+  margin-bottom: 2px;
+}
+.atm-filter-option:hover {
+  background: var(--wb-bg-secondary);
+}
+.atm-filter-option.atm-filter-option--active {
+  background: var(--wb-bg-secondary);
+  font-weight: 400;
+}
+.atm-filter-option-spacer {
+  width: 16px;
+  min-width: 16px;
+  height: 1px;
+  flex-shrink: 0;
+}
+/* Batch mode */
+.atm-batch-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.atm-batch-count {
+  font-size: 14px;
+  color: var(--wb-text-strong);
+  font-weight: 400;
+}
+/* 选中数字单独成 span，与前后文案各留 2px 间距 */
+.atm-batch-count-num {
+  margin: 0 2px;
+}
+.atm-row-checkbox {
+  /* foundation 默认边框 --wb-border-default 在 dark 下为 color-mix(8% black)，
+         * 在 #1f1f1f 底色上几乎不可见；改用 --wb-checkbox-border-default
+         *（dark=rgba(255,255,255,0.2)）确保可见。
+         * 同理覆盖 foundation hover 规则（--wb-border-strong dark=#262626 也不可见）。 */
+  /* foundation hover 规则用 --wb-border-strong（dark=#262626 近黑）；
+         * atm-row-checkbox 与 .wb-checkbox 在同一元素上，须用 & 复合选择器。 */
+}
+.atm-row-checkbox .wb-checkbox__box {
+  border: 1px solid var(--wb-checkbox-border-default);
+}
+.atm-row-checkbox.wb-checkbox:hover .wb-checkbox__input:not(:disabled):not(:checked) + .wb-checkbox__box {
+  border-color: var(--wb-color-text-tertiary);
+}
+.atm-row--batch {
+  cursor: pointer;
+}
+/* Empty states */
+.atm-empty-state {
+  /* 设计稿：去掉默认 padding，hero 居于面板中部，模板卡片贴底 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  /* 横向/底部内边距承接自原 .automation-main-page（toolbar 已改整宽拖拽区）。 */
+  padding: 0 24px 20px;
+  /* 顶部留点呼吸空间，底部紧贴；hero 与卡片之间用 space-between 拉开 */
+  justify-content: space-between;
+  gap: 24px;
+}
+/* Records 空状态：无底部卡片，整体居中 */
+.atm-empty-state--records {
+  justify-content: center;
+  gap: 0;
+}
+.atm-empty-state-hero {
+  /* hero 区：图标 + 文案 + 按钮，整体水平居中、上下也尽量靠中 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 200px;
+  padding: 24px 24px 0;
+}
+.atm-empty-state-icon {
+  /* 图标主体走 currentColor（fillOpacity 已从 svg 内移除），由这里直接给最终颜色：
+    * 浅色 --wb-color-text-tertiary (#888888)：在白底上是温和的中灰，与设计稿一致
+     * 深色 rgba(255,255,255,0.56)：在 #1D1D1F 上保持足够对比度，避免过暗看不清
+     */
+  color: var(--wb-color-text-tertiary);
+}
+.atm-empty-state-text {
+  /* 设计稿 ardot 10958:1949: 12px PingFang SC Regular, 黑 0.65, line-height 20 */
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-color-text-secondary);
+  text-align: center;
+}
+.atm-empty-state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+/* 设计稿 ardot 13142:53/10958:1945: 两个 pill 按钮规格一致 */
+.atm-empty-action-btn {
+  /* foundation Button(variant=secondary) 的 .wb-button--secondary(0,3,0) 会盖过单类背景，
+     * 用 .wb-button 提权才能钉住底色。改用 primary 配色：light 黑底白字 / dark 白底黑字。 */
+}
+.atm-empty-action-btn.wb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.atm-empty-action-btn.wb-button:hover:not(:disabled):not(.wb-button--disabled) {
+  background: var(--wb-button-primary-bg-hover);
+}
+/* 空状态模板区：标题 + 模板网格，整体贴底 */
+.atm-empty-state-templates {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* 模板区标题（设计稿：16px PingFang SC 600 / 22px，主文字色，token 适配明暗） */
+.atm-empty-state-templates-title {
+  text-align: justify;
+  color: var(--wb-color-text-primary, rgba(0, 0, 0, 0.9));
+  font-size: 16px;
+  font-weight: 600;
+  font-style: normal;
+  line-height: 22px;
+  text-decoration-line: none;
+}
+/* 空状态卡片网格——3 列 12px gap，与设计稿 Frame 2147239002 一致 */
+.atm-empty-state .atm-template-section--card {
+  width: 100%;
+  /* 卡片贴在面板底部，与 hero 通过 space-between 拉开距离 */
+  margin-top: 0;
+  flex-shrink: 0;
+}
+.atm-template-list--card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .atm-template-list--card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .atm-template-list--card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.atm-template-card--card {
+  /* 设计稿 ardot 10958:1882：vertical layout, padding 16, itemSpacing 16, radius 16 */
+  display: flex;
+  flex-direction: column;
+  /* 显式 stretch 覆盖基类 .atm-template-card 的 align-items: center */
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--wb-border-subtle-soft);
+  background: var(--wb-bg-card);
+  color: var(--wb-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.atm-template-card--card:hover {
+  background: var(--wb-bg-card-hover);
+  border-color: var(--wb-border-weak);
+}
+.atm-template-card--card .atm-template-card-main {
+  /* 标题行与调度副标题紧贴 */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.atm-template-card--card .atm-template-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  height: 24px;
+}
+.atm-template-card--card .atm-template-card-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-template-card--card .atm-template-card-add {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 71px;
+  background: var(--wb-bg-inset-strong);
+  color: var(--wb-color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  transition: background-color 0.15s ease;
+}
+.atm-template-card--card:hover .atm-template-card-add {
+  background: var(--wb-bg-tertiary);
+}
+.atm-template-card--card .atm-template-card-add-icon {
+  width: 14px;
+  height: 14px;
+}
+.atm-template-card--card .atm-template-card-add-plus {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 500;
+}
+.atm-template-card--card .atm-template-card-schedule {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-color-text-disabled);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-template-card--card .atm-template-card-desc {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-color-text-secondary);
+  /* 两行截断 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+/* compact 变体：对齐 ardot Frame 2147239073 —— 头像图标 + 标题/单行描述的横向卡 */
+.atm-template-list--compact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .atm-template-list--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .atm-template-list--compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.atm-template-card--compact {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: none;
+  border-radius: 16px;
+  background: var(--wb-bg-primary);
+  /* ardot DROP_SHADOW 0 16 32 -8 rgba(0,0,0,0.03) */
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.atm-template-card--compact:hover {
+  background: var(--wb-bg-hover);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.08);
+}
+.atm-template-card--compact .atm-template-compact-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 无背景色，仅作图标居中槽位 */
+  color: var(--wb-color-text-primary);
+}
+.atm-template-card--compact .atm-template-compact-icon {
+  width: 20px;
+  height: 20px;
+}
+.atm-template-card--compact .atm-template-compact-texts {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.atm-template-card--compact .atm-template-compact-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-template-card--compact .atm-template-compact-desc {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--wb-color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atm-empty-state-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+/* Records list */
+.atm-records-list {
+  /* 占满 toolbar 之外的剩余高度并在内部滚动（与 .atm-task-list 一致，
+     * 外层 .automation-panel 已 overflow:hidden）。 */
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* 与 .atm-task-list 对齐：左右 12px、底部 20px。 */
+  padding: 0 12px 20px;
+  margin-top: 8px;
+}
+.atm-records-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.atm-records-group-label {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--wb-color-text-disabled, rgba(0, 0, 0, 0.3));
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+.atm-records-group-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.atm-records-group-chevron--collapsed {
+  transform: rotate(-90deg);
+}
+/* Task list */
+.atm-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* 占满 toolbar 之外的剩余高度并在内部滚动（外层 .automation-main-page
+     * 已去掉 overflow，滚动条收敛到这一层）。 */
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* 横向/底部内边距承接自原 .automation-main-page；左右 12px，底部保留 20px。 */
+  padding: 0 12px 20px;
+}
+/* 「当前」/「已暂停」分组标题：弱化的小标题，与下方列表行间距 6px。
+ * 列表整体 gap 是 2px，这里用 margin-bottom 补到 6px（2px gap + 4px margin）。 */
+.atm-task-group-label {
+  flex-shrink: 0;
+  height: 26px;
+  align-self: stretch;
+  display: flex;
+  padding: 4px 8px;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--wb-color-text-disabled, rgba(0, 0, 0, 0.3));
+  font-family: "PingFang SC";
+  font-size: 12px;
+  font-weight: 600;
+  font-style: normal;
+  line-height: 20px;
+  text-decoration-line: none;
+  margin-bottom: 2px;
+  /* 非首个分组标题（如「已暂停」）上方与上组列表拉开间距 */
+}
+.atm-task-group-label:not(:first-child) {
+  margin-top: 10px;
+}
+/* Hover actions */
+.atm-row-right-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* running 状态图标持续旋转 */
+.atm-status-icon-spinning {
+  animation: atm-spin 1.2s linear infinite;
+  display: inline-flex;
+  align-items: center;
+}
+.atm-row-hover-actions {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  margin-right: 0;
+}
+.atm-row:hover .atm-row-hover-actions {
+  display: flex;
+}
+/* 菜单打开时（受控 .atm-row--menu-open）保持 actions 可见，否则鼠标移出行 → 触发器隐藏 → 浮层闪退 */
+.atm-row--menu-open .atm-row-hover-actions {
+  display: flex;
+}
+/* 行菜单已改用 foundation Dropdown（Popover + floating-ui），弹层定位/样式由
+ * foundation 接管（wb-dropdown__* / wb-popover），不再需要 .atm-row-menu* 的纯 CSS 弹层。 */
+.atm-row:hover .atm-row-right-text,
+.atm-row--menu-open .atm-row-right-text {
+  display: none;
+}
+.atm-row-action-btn {
+  /* 测试 Play 图标按钮：16×16 纯图标、无 hover 底色，hover 只改图标颜色。
+     * 这个按钮是 variant="ghost"，foundation 有条更高特异性的 hover 规则
+     * （.wb-button--ghost...:hover:not(:disabled)）会把 hover 颜色钉回 ghost-fg，
+     * 因此选择器需带上 .wb-button--ghost + :not(:disabled) 才能盖过它。 */
+}
+.atm-row-hover-actions .atm-row-action-btn.wb-button.wb-button--icon-only.wb-button--ghost {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+}
+.atm-row-hover-actions .atm-row-action-btn.wb-button.wb-button--icon-only.wb-button--ghost svg {
+  width: 16px;
+  height: 16px;
+}
+.atm-row-hover-actions .atm-row-action-btn.wb-button.wb-button--icon-only.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  /* 无 hover 底色，仅改图标颜色。 */
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+.atm-row-more-hint {
+  /* 三个点：foundation Dropdown 的 trigger（hover 弹菜单，弹层定位/翻转由 floating-ui 接管）。
+     * 跟 .atm-row-action-btn 视觉对齐——16×16、灰色图标。自身 stopPropagation 不触发行点击。
+     * cursor: pointer 提示可交互。 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+}
+.atm-row-more-hint:hover {
+  color: var(--wb-color-text-primary);
+}
+.atm-row-more-hint svg {
+  width: 16px;
+  height: 16px;
+}
+/* ===== Detail Page (full-page edit view) ===== */
+.atm-detail-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  /* EditModal 详情页底色：浅色 #FFFFFF / 深色 #141414，与 sidebar(#1f1f1f) 拉开区分 */
+  background: var(--wb-bg-modal);
+}
+.atm-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 横向内边距与列表页 .atm-toolbar 一致（24px），让详情页头部也有左右边距，
+     * 并使整条头部贴窗口边缘成为窗口拖拽区。 */
+  padding: 12px 24px;
+  gap: 6px;
+  height: 56px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border: none !important;
+  /* 吸顶定位：与列表页 .atm-toolbar 同理，外层 .automation-panel 已 overflow:hidden，
+     * 滚动收敛到 header 的兄弟节点（详情正文容器），因此 header 不会被滚动内容覆盖，
+     * 无需自带 background 防透出。sticky + z-index 仅作为保险。 */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  -webkit-app-region: drag;
+  /* 只把「真正可交互的叶子元素」挖成 no-drag，容器（尤其 flex:1 的
+     * .atm-detail-header-left）以及面包屑里的非交互文本/分隔符保持随 header 可拖拽。
+     * 注意：不要把整条 .atm-detail-breadcrumb 标 no-drag —— 它的可点击项已是 <a>
+     * （被下面的 a 选择器覆盖），整条标 no-drag 会把末项任务名(span)+分隔符也变成
+     * 不可拖拽，任务名一长就几乎没有可拖拽区域了。 */
+}
+.atm-detail-header button,
+.atm-detail-header a,
+.atm-detail-header input {
+  -webkit-app-region: no-drag;
+}
+/**
+ * mac 桌面端 sidebar 折叠后，.atm-detail-header 成为整页最左侧内容，需要给窗口红绿灯
+ * 让出足够空间，否则「展开侧边栏 / 新建任务」按钮会被红绿灯压住。逻辑与 .atm-toolbar 一致。
+ *
+ * JSX 侧的 needTrafficLightOffset = isMac && isLocalAutomation && sidebarCollapsed
+ * && !isMacFullscreen 已保证 Windows/web/mac 全屏都不挂这个 class。
+ * 与 .atm-toolbar--traffic-light-offset 保持一致：对整个 header 施加 margin-left: 67px，
+ * header 自身已有 padding-left: 24px，合计 91px 让位（与列表页 toolbar 对齐）。
+ */
+.atm-detail-header--traffic-light-offset {
+  margin-left: 67px;
+}
+.atm-detail-header-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+/* 详情页面包屑文字样式覆盖：当前任务名加粗显示；最后一项充满剩余空间并截断 */
+.atm-detail-breadcrumb {
+  /* breadcrumb 自身和内部 list 都要参与 flex 收缩，否则 list 会撑开不受父容器约束 */
+  /* 最后一个面包屑项（当前页）充满剩余空间，文字过长时省略号截断 */
+}
+.atm-detail-breadcrumb.wb-breadcrumb,
+.atm-detail-breadcrumb .wb-breadcrumb__list {
+  flex: 1;
+  min-width: 0;
+}
+.atm-detail-breadcrumb .wb-breadcrumb__list {
+  gap: 4px;
+}
+.atm-detail-breadcrumb .wb-breadcrumb__text {
+  color: var(--wb-color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  font-style: normal;
+  text-decoration-line: none;
+  line-height: 28px;
+}
+.atm-detail-breadcrumb .wb-breadcrumb__item--current {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+.atm-detail-breadcrumb .wb-breadcrumb__item--current .wb-breadcrumb__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atm-detail-breadcrumb-back {
+  border: none;
+  background: none;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  padding: 4px 4px 4px 0;
+  margin: -4px 0 -4px 0;
+}
+.atm-detail-breadcrumb-back:hover {
+  color: var(--wb-color-text-primary);
+}
+.atm-detail-breadcrumb-current {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--wb-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atm-detail-status-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  /* 状态图标颜色 rgba(0,0,0,0.9) → 语义 token --wb-color-text-primary */
+  color: var(--wb-color-text-primary);
+}
+.atm-detail-status-icon .atm-task-status-icon {
+  color: var(--wb-color-text-primary);
+}
+.atm-detail-info-icon {
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+  flex-shrink: 0;
+}
+.atm-detail-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.atm-detail-icon-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.atm-detail-icon-btn {
+  /* 详情页顶部「测试 / 删除」图标按钮，hover 行为对齐 .atm-row-action-btn：
+     * 无 hover 底色，仅把图标颜色由二级 → 一级（加深）。
+     * 同为 foundation variant="ghost"，需用 .wb-button--ghost + :not(:disabled) 完整类链
+     * 盖过 foundation 自带的 ghost hover 配色与热区规则。 */
+}
+.atm-detail-icon-btn.wb-button.wb-button--icon-only.wb-button--ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+  /* 操作图标统一用二级文本色，不区分语义色（删除也不用红色） */
+}
+.atm-detail-icon-btn.wb-button.wb-button--icon-only.wb-button--ghost svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  color: currentColor;
+}
+.atm-detail-icon-btn.wb-button.wb-button--icon-only.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  /* hover 加底色 + 加深图标颜色 */
+  background: var(--wb-bg-hover);
+  border-radius: 6px;
+  color: var(--wb-color-text-primary);
+}
+.atm-detail-icon-btn.wb-button.wb-button--icon-only.wb-button--ghost:disabled,
+.atm-detail-icon-btn.wb-button.wb-button--icon-only.wb-button--ghost.wb-button--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.atm-detail-btn-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.atm-detail-content {
+  display: flex;
+  flex: 1;
+  gap: 32px;
+  overflow: auto;
+  min-height: 0;
+  margin-top: 8px;
+  /* 左右 24px 内边距下沉到两个子面板（.atm-modal-body / .atm-detail-run-history），
+     * 让右侧历史面板的 border-left 分割线能贴着 14px 间距摆放。底部 20px 保留。 */
+  padding: 0 0 20px;
+}
+.atm-detail-content > .atm-modal-body {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  /* 承接原 .atm-detail-content 的左侧 24px 内边距 */
+  padding-left: 24px;
+}
+/* 新建 / 从模板新建态不渲染右侧运行历史面板（仅 isEditMode && automationId 才挂
+ * .atm-detail-run-history），右侧 24px 内边距原本由该面板承接，缺席时表单会顶到
+ * 容器右边缘。当 .atm-modal-body 成为唯一子节点时补回右侧 24px，与左侧对称。 */
+.atm-detail-content > .atm-modal-body:last-child {
+  padding-right: 24px;
+}
+.atm-detail-run-history {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--wb-border-subtle-soft);
+  /* 左右 padding 全部下沉到 header/list 子元素，让分割线贴面板边缘 */
+}
+.atm-detail-run-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  /* 承接原 .atm-detail-run-history 的左右内边距（左 20px / 右 24px） */
+  padding-left: 20px;
+  padding-right: 24px;
+}
+.atm-detail-run-history-title {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--wb-color-text-secondary);
+}
+/* 筛选按钮使用 foundation Button(variant=ghost, iconOnly, size=small) 标准样式 */
+.atm-detail-filter-btn {
+  position: relative;
+}
+.atm-detail-filter-btn svg {
+  opacity: 0.7;
+}
+.atm-detail-run-history-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  /* 行间距与 .atm-task-list 保持一致：2px */
+  gap: 2px;
+  /* 承接原 .atm-detail-run-history 的左右内边距（左 12px / 右 16px） */
+  padding-left: 12px;
+  padding-right: 16px;
+}
+.atm-run-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 行高固定 36px；垂直 padding 移除，靠 height + align-items 居中 */
+  height: 36px;
+  padding: 0 8px;
+  gap: 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.atm-run-history-item:hover {
+  /* hover 底色与 .atm-row:hover 保持一致（#F2F2F2 = --wb-palette-gray-3） */
+  background: var(--wb-bg-hover-light);
+}
+.atm-run-history-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  /* 走 token，避免深色主题下 rgba(0,0,0,0.90) 在黑底上几乎不可见 */
+  color: var(--wb-color-text-primary);
+  font-family: "PingFang SC";
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  text-decoration-line: none;
+  line-height: 22px;
+  /* 157.143% */
+}
+.atm-run-history-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.atm-run-history-item-time {
+  color: var(--wb-color-text-tertiary, rgba(0, 0, 0, 0.5));
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  text-decoration-line: none;
+  line-height: 22px;
+}
+.atm-run-history-item-status {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.atm-run-history-item-status.success {
+  color: var(--wb-color-text-success-default);
+}
+.atm-run-history-item-status.neutral {
+  color: var(--wb-color-text-warning-default);
+}
+.atm-run-history-item-status.failed {
+  color: var(--wb-color-text-error-default);
+}
+.atm-run-history-item-status.running,
+.atm-run-history-item-status.neutral {
+  color: var(--wb-color-text-success-default);
+}
+.atm-run-history-item-archive {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  padding: 0;
+  /* 两个状态与定时任务行的归档按钮（.atm-row-archive-btn）一致：
+     * 行 hover 显形时为二级色（非更浅的 muted），图标自身 hover 再加深到一级（黑）。 */
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  /* ArchiveIcon 内 path 自带 opacity=0.7 会让图标偏浅，强制 opacity=1 与参考按钮一致 */
+}
+.atm-run-history-item-archive svg path {
+  opacity: 1;
+}
+.atm-run-history-item-archive:hover {
+  color: var(--wb-color-text-primary);
+}
+/* 已归档记录的删除按钮：默认隐藏，hover 行时显形（替换状态图标位置） */
+.atm-run-history-item-delete {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  padding: 0;
+  /* 与归档按钮同源：二级色 → hover 一级色 */
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+}
+.atm-run-history-item-delete:hover {
+  color: var(--wb-color-text-primary);
+}
+/* 已归档记录的状态图标用普通文本色（中性，不带成功/失败语义色） */
+.atm-run-history-item--archived .atm-run-history-item-status {
+  color: var(--wb-color-text-secondary);
+}
+.atm-run-history-item--archivable:hover .atm-run-history-item-status {
+  display: none;
+}
+.atm-run-history-item--archivable:hover .atm-run-history-item-archive {
+  display: flex;
+}
+/* hover 已归档行：隐藏状态图标，显示删除按钮 */
+.atm-run-history-item--archived:hover .atm-run-history-item-status {
+  display: none;
+}
+.atm-run-history-item--archived:hover .atm-run-history-item-delete {
+  display: flex;
+}
+.atm-detail-subtitle-row {
+  padding: 4px 0 12px;
+}
+.atm-detail-subtitle,
+.atm-detail-time,
+.atm-detail-evidence,
+.atm-detail-run-evidence,
+.atm-detail-artifact-path {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  line-height: 20px;
+}
+.atm-detail-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  flex-wrap: wrap;
+}
+.atm-detail-status,
+.atm-detail-evidence,
+.atm-detail-run-evidence {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-weak);
+  background: transparent;
+  font-size: 12px;
+  line-height: 20px;
+}
+.atm-detail-status.success {
+  color: var(--wb-color-text-success-default);
+  background: var(--wb-bg-success-vivid-soft);
+  border-color: color-mix(in srgb, var(--wb-status-success-vivid) 24%, transparent);
+}
+.atm-detail-status.failed,
+.atm-detail-run .failed {
+  color: var(--wb-color-text-error-default);
+}
+.atm-detail-run .neutral {
+  color: var(--wb-color-text-warning-default);
+}
+.atm-detail-status.failed {
+  background: var(--wb-status-error-soft-bg);
+  border-color: var(--wb-border-error-vivid-subtle);
+}
+.atm-detail-status.neutral {
+  color: var(--wb-color-text-warning-default);
+  background: var(--wb-bg-warning-vivid-soft);
+  border-color: color-mix(in srgb, var(--wb-status-warning-vivid) 24%, transparent);
+}
+.atm-detail-status.running {
+  color: var(--wb-color-text-secondary);
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-weak);
+}
+.atm-detail-section {
+  margin: 0 0 16px;
+}
+.atm-detail-section-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.atm-detail-text,
+.atm-detail-run,
+.atm-detail-artifact {
+  border: none;
+  border-radius: 10px;
+  background: var(--wb-bg-modal);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--wb-color-text-primary);
+  word-break: break-word;
+}
+.atm-detail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.atm-detail-summary-main {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+}
+.atm-detail-summary-technical {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-secondary);
+  font-family: var(--cb-vscode-editor-font-family, ui-monospace, SFMono-Regular, Consolas, monospace);
+}
+.atm-detail-runs,
+.atm-detail-artifacts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.atm-detail-run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  line-height: 20px;
+}
+.atm-detail-run-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wb-color-text-secondary);
+}
+.atm-detail-run {
+  border: 1px solid var(--wb-border-subtle-soft);
+}
+.atm-detail-run-block {
+  margin: 8px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-primary);
+  font-family: var(--cb-vscode-editor-font-family, ui-monospace, SFMono-Regular, Consolas, monospace);
+}
+.atm-detail-run-error {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--wb-border-weak);
+  border-left: 2px solid var(--wb-status-error);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+}
+.atm-detail-run-error .atm-detail-run-block {
+  margin: 0;
+  max-height: 120px;
+}
+.atm-detail-run-block.error {
+  color: var(--wb-color-text-secondary);
+}
+.atm-detail-run-truncated {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-tertiary);
+}
+.atm-detail-run-expand-btn.wb-button {
+  margin-top: 8px;
+}
+.atm-detail-run-technical {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-weak);
+}
+.atm-detail-run-technical-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-secondary);
+}
+.atm-detail-run-technical .atm-detail-run-block {
+  margin: 0;
+  max-height: 180px;
+}
+/**
+ * AutomationPermissionConfirmDialog styles.
+ * Overlay + centered dialog for fullAccess risk confirmation.
+ */
+.automation-permission-confirm__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-5);
+  padding: 28px var(--wb-spacing-8) var(--wb-spacing-7);
+}
+.automation-permission-confirm__header {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-3);
+}
+.automation-permission-confirm__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--wb-warning);
+}
+.automation-permission-confirm__title {
+  font-size: var(--wb-spacing-5);
+  font-weight: 600;
+  color: var(--wb-text-strong);
+  margin: 0;
+  line-height: 1.4;
+}
+.automation-permission-confirm__desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wb-text-medium);
+  margin: 0;
+}
+.automation-permission-confirm__list {
+  margin: 0;
+  padding-left: var(--wb-spacing-6);
+  list-style: disc;
+}
+.automation-permission-confirm__list li {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--wb-text-strong);
+}
+.automation-permission-confirm__checkbox {
+  align-items: flex-start;
+  margin-top: var(--wb-spacing-2);
+  /* foundation hover 用 --wb-border-strong（dark=#262626 近黑），这里与默认态同体系用 text-secondary 做 hover 强调。 */
+}
+.automation-permission-confirm__checkbox .wb-checkbox__control {
+  margin-top: 1px;
+}
+.automation-permission-confirm__checkbox .wb-checkbox__box {
+  width: 18px;
+  height: 18px;
+  border-color: var(--wb-color-text-hint);
+}
+.automation-permission-confirm__checkbox.wb-checkbox:hover .wb-checkbox__input:not(:disabled):not(:checked) + .wb-checkbox__box {
+  border-color: var(--wb-color-text-secondary);
+}
+.automation-permission-confirm__checkbox .wb-checkbox__label {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--wb-text-strong);
+}
+.automation-permission-confirm__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--wb-spacing-3);
+  margin-top: var(--wb-spacing-3);
+}
+.automation-permission-confirm__fallback-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+}
+.automation-permission-confirm__fallback-link:hover {
+  text-decoration: underline;
+}
+.automation-permission-confirm__actions-right {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-3);
+  align-self: flex-end;
+}
+/**
+ * AutomationPermissionPicker chip styles.
+ * Renders inline with SkillSelector & ExpertSelector in the ChatInput bottom toolbar.
+ * Uses same height/padding/border-radius conventions as .skill-selector__btn and .expert-selector__btn.
+ */
+.automation-permission-picker {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+.automation-permission-picker__trigger {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: var(--wb-spacing-2);
+  border: none;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  outline: none;
+  /* 文本规格对齐专家选择器标签：14px/22px、#000 90%(text-primary)、PingFang SC。
+     * 这是 foundation Button(variant=ghost, size=small)，需用 .wb-button 提权
+     * 才能盖过 foundation small 档的字号/配色默认值。 */
+  /* foundation ghost hover (0,7,0) 会改 color，完整匹配提权到 (0,8,0) 覆盖 */
+}
+.automation-permission-picker__trigger.wb-button {
+  color: var(--wb-color-text-primary);
+  font-family: "PingFang SC";
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 22px;
+  text-decoration-line: none;
+}
+.automation-permission-picker__trigger.wb-button.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  background-color: var(--wb-dropdown-item-hover-bg-color, var(--wb-bg-hover));
+  color: var(--wb-color-text-primary);
+}
+.automation-permission-picker__trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.automation-permission-picker__trigger--warning.wb-button {
+  color: var(--wb-color-text-primary);
+}
+.automation-permission-picker__trigger--warning.wb-button .wb-icon {
+  color: var(--wb-warning);
+}
+.automation-permission-picker__trigger--warning.wb-button.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  background-color: var(--wb-dropdown-item-hover-bg-color, var(--wb-bg-hover));
+  color: var(--wb-color-text-primary);
+}
+.automation-permission-picker__trigger--warning.wb-button.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) .wb-icon {
+  color: var(--wb-warning);
+}
+.automation-permission-picker__trigger--safe.wb-button {
+  color: var(--wb-color-text-primary);
+}
+.automation-permission-picker__label {
+  line-height: 1;
+}
+.automation-permission-picker__caret {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 1px;
+  line-height: 1;
+}
+.automation-permission-picker__dropdown .wb-dropdown__list {
+  width: 360px;
+}
+.automation-permission-picker__dropdown .wb-dropdown__item {
+  align-items: stretch;
+  min-height: auto;
+  padding: 12px 16px;
+}
+.automation-permission-picker__dropdown .wb-dropdown__label {
+  flex: 1;
+  min-width: 0;
+}
+.automation-permission-picker__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+.automation-permission-picker__check-col {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.automation-permission-picker__icon-col {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.automation-permission-picker__option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.automation-permission-picker__option-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+  line-height: 1.4;
+}
+.automation-permission-picker__option-recommend {
+  font-weight: 400;
+  color: var(--wb-text-weak);
+  font-size: 13px;
+  margin-left: 4px;
+}
+.automation-permission-picker__option-desc {
+  font-size: 12px;
+  color: var(--wb-text-weak);
+  line-height: 1.5;
+  white-space: normal;
+  max-width: 320px;
+}
+/**
+ * ConnectorSelector field styles
+ * Independent form field with dropdown multi-select checkboxes.
+ * Uses cb-chat-ui --cb-* theme variables.
+ */
+.connector-selector-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.connector-selector-field__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* trigger 是 foundation <Button>，文本/箭头被包在内部 .wb-button__content 里，
+     * Button 默认 inline-flex 居中、宽度贴合内容，导致外层的 space-between 不生效、
+     * 箭头跟在文字后面而非贴右。这里把按钮和内容区都拉满宽并 space-between，
+     * 让 trigger-text(flex:1) 占满、把箭头推到最右侧。
+     * 另外 ghost variant 自带 border:none（.wb-button--ghost 特异性更高会盖掉这里的
+     * 1px 边框），故下方用 &.wb-button--ghost 提权把字段边框找回来。 */
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--wb-border-input);
+  border-radius: 6px;
+  background: var(--wb-bg-modal);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-height: 38px;
+  /* 盖过 foundation ghost Button 的 border:none。
+     * foundation 默认态选择器是 .wb-button.wb-button--ghost(0,3,0)，
+     * 故这里必须补全 .wb-button 类链(0,4,0)才能压过它，否则默认态边框出不来。 */
+}
+.connector-selector-field__trigger.wb-button.wb-button--ghost {
+  border: 1px solid var(--wb-border-input);
+  /* ghost 默认 bg=transparent，补齐为与页面背景一致的 --wb-bg-modal */
+  background: var(--wb-bg-modal);
+  /* foundation ghost hover (0,7,0) 会设 border:none，完整匹配提权覆盖 */
+}
+.connector-selector-field__trigger.wb-button.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  border: 1px solid var(--wb-border-focus);
+}
+.connector-selector-field__trigger .wb-button__content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.connector-selector-field__trigger--open.wb-button.wb-button--ghost {
+  border: 1px solid var(--wb-border-focus);
+}
+.connector-selector-field__trigger--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.connector-selector-field__trigger--disabled.wb-button.wb-button--ghost:hover:not(:disabled):not(.wb-button--disabled) {
+  border: 1px solid var(--wb-border-default);
+}
+.connector-selector-field__trigger-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  /* 文本左对齐：ghost Button 内容默认居中，这里明确靠左。 */
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.connector-selector-field__trigger-text--placeholder {
+  color: var(--wb-color-text-tertiary);
+}
+.connector-selector-field__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-color-text-secondary);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.connector-selector-field__arrow--open {
+  transform: rotate(180deg);
+}
+.connector-selector-field__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: 4px;
+  background: var(--wb-dropdown-bg-color);
+  border: 1px solid var(--wb-dropdown-border-color);
+  border-radius: 6px;
+  box-shadow: var(--wb-shadow-xl);
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.connector-selector-field__list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.connector-selector-field__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.connector-selector-field__item:hover {
+  background-color: var(--wb-bg-hover);
+}
+.connector-selector-field__checkbox {
+  flex: 1;
+  min-width: 0;
+  /* foundation hover 规则用 --wb-border-strong（dark=#262626 近黑），在 dark 下过黑。
+     * connector-selector-field__checkbox 与 .wb-checkbox 在同一元素上，须用 & 复合选择器。 */
+}
+.connector-selector-field__checkbox .wb-checkbox__box {
+  width: 16px;
+  height: 16px;
+  /* foundation 默认 --wb-border-default 在 dark 下不可见，改用 --wb-checkbox-border-default */
+  border-color: var(--wb-checkbox-border-default);
+}
+.connector-selector-field__checkbox.wb-checkbox:hover .wb-checkbox__input:not(:disabled):not(:checked) + .wb-checkbox__box {
+  border-color: var(--wb-checkbox-border-selected);
+}
+.connector-selector-field__checkbox .wb-checkbox__label {
+  min-width: 0;
+}
+.connector-selector-field__item-name {
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.connector-selector-field__empty {
+  padding: 16px;
+  font-size: 12px;
+  color: var(--wb-color-text-disabled);
+  text-align: center;
+}
+.connector-selector-field__manage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  border-top: 1px solid var(--wb-border-input);
+  transition: background-color 0.12s ease;
+}
+.connector-selector-field__manage:hover {
+  background-color: var(--wb-bg-hover);
+  /* 与 automation-panel 其他文本/按钮 hover 一致；之前用 --cb-button-primary 在 VSCode 主题下会变蓝 */
+  color: var(--wb-color-text-primary);
+}
+.connector-selector-field__manage svg {
+  flex-shrink: 0;
+}
+.expert-selector {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+.expert-selector__btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  outline: none;
+  /* 箭头旋转动画，与 model selector 一致 */
+}
+.expert-selector__btn .wb-button__content > svg:last-child {
+  transition: transform 0.42s cubic-bezier(0.25, 0.8, 0.3, 1);
+  transform-origin: center;
+}
+.expert-selector__btn[aria-expanded="true"] .wb-button__content > svg:last-child {
+  transform: rotate(180deg);
+}
+/* Avatar styles */
+.expert-selector__avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.expert-selector__avatar--small {
+  width: 18px;
+  height: 18px;
+}
+.expert-selector__avatar--medium {
+  width: 24px;
+  height: 24px;
+}
+.expert-selector__avatar.wb-avatar--fallback {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--wb-text-white);
+}
+/* Label group: dual-line display (profession + identity name) in selected button */
+.expert-selector__label-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0;
+}
+.expert-selector__label {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 主文本规格：14px/22px，#000 90%(text-primary)，PingFang SC */
+  color: var(--wb-color-text-primary);
+  font-family: "PingFang SC";
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 22px;
+  text-decoration-line: none;
+}
+.expert-selector__label-identity {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--wb-color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+/* Dropdown */
+.expert-selector__dropdown {
+  z-index: 1000;
+  background: var(--wb-dropdown-bg-color);
+  border: 0.5px solid var(--wb-border-popover);
+  border-radius: var(--wb-radius-lg, 16px);
+  box-shadow: var(--wb-shadow-popover);
+  padding: var(--wb-spacing-2, 8px);
+  min-width: 200px;
+  max-width: 280px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.expert-selector__list {
+  display: flex;
+  flex-direction: column;
+}
+.expert-selector__section-title {
+  font-size: 11px;
+  color: var(--wb-color-text-tertiary);
+  padding: 6px 10px 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.expert-selector__divider {
+  height: 1px;
+  background: var(--wb-border-subtle);
+  margin: 4px 8px;
+}
+.expert-selector__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px var(--wb-spacing-2, 8px);
+  min-height: 32px;
+  border-radius: var(--wb-radius-md, 8px);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.expert-selector__item:hover {
+  background: var(--wb-dropdown-item-hover-bg-color);
+}
+.expert-selector__item--selected {
+  background: var(--wb-bg-secondary);
+  color: var(--wb-color-text-primary);
+}
+.expert-selector__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+/* Profession: primary text in expert item (consistent with chat area expert selector) */
+.expert-selector__item-profession {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  color: var(--wb-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.expert-selector__item--selected .expert-selector__item-profession {
+  font-weight: 600;
+}
+/* Name: secondary text (English identity name) in expert item */
+.expert-selector__item-name {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 12px;
+  color: var(--wb-color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  max-width: 180px;
+}

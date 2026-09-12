@@ -1,0 +1,541 @@
+/**
+ * PluginsPanel 样式
+ * 覆盖 cb-chat-ui Plugins 组件样式，统一到 WorkBuddy V2 设计体系
+ * 采用列表布局，与 MCP 面板风格一致
+ */
+.plugins-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--cb-bg-color-container);
+  overflow: hidden;
+}
+.plugins-panel .plugins-panel-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+.plugins-panel-main {
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+/* ================================================
+   Plugins Marketplace – WorkBuddy V2 Overrides
+   列表布局，与 MCP / Skills 面板统一
+   ================================================ */
+.cb-plugins {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0 24px;
+  /* ---------- Header ---------- */
+  /* ---------- Search ---------- */
+  /* ---------- Filter Button ---------- */
+  /* ---------- Marketplace Filter (search mode) ---------- */
+  /* ---------- Marketplace Tabs ---------- */
+  /* ---------- Add Marketplace Button ---------- */
+  /* ---------- Loading Overlay ---------- */
+  /* ---------- Content Area ---------- */
+  /* ==============================================
+       Plugin Card – 列表布局 (与 MCP Panel 统一)
+       每个插件一行：名称+描述在左，按钮在右
+       ============================================== */
+  /* Header: 名称在左，按钮在右，同一行 */
+  /* Description: 名称下方，单行截断 */
+  /* Tags */
+  /* Source (search mode): 紧凑显示 */
+  /* Actions: 紧凑按钮 */
+  /* Install Dropdown */
+  /* Empty State */
+  /* ---------- MCP Button Override ---------- */
+  /* ---------- Plugin Detail Overrides ---------- */
+}
+@media (max-width: 600px) {
+  .cb-plugins {
+    padding: 0 16px;
+  }
+}
+.cb-plugins .cb-plugins-header {
+  padding: 7px 0 16px;
+  gap: 14px;
+}
+.cb-plugins .cb-plugins-header .cb-plugins-header-left {
+  flex: 1;
+}
+.cb-plugins .cb-plugins-header .cb-plugins-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--cb-text-primary);
+  margin: 0 0 4px;
+}
+.cb-plugins .cb-plugins-header .cb-plugins-subtitle {
+  font-size: 13px;
+  color: var(--cb-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+.cb-plugins .cb-plugins-search {
+  padding: 0 0 12px;
+  margin-bottom: 0;
+}
+.cb-plugins .cb-plugins-search .cb-search-input {
+  width: 100%;
+}
+.cb-plugins .cb-plugins-search .cb-search-input .cb-search-input__input {
+  height: 34px;
+  border-radius: 999px;
+}
+.cb-plugins .cb-plugins-search input {
+  border-radius: 999px;
+}
+.cb-plugins .cb-plugins-filter-btn {
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  border-color: var(--cb-input-border-color);
+  background: var(--cb-bg-color-container);
+  color: var(--cb-text-secondary);
+  transition: all 0.2s ease;
+}
+.cb-plugins .cb-plugins-filter-btn:hover {
+  border-color: var(--cb-focus-outline-color);
+  background: var(--cb-hover-bg);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-filter-btn--active {
+  border-color: var(--cb-focus-outline-color);
+  background: var(--cb-hover-bg);
+}
+.cb-plugins .cb-plugins-marketplace-filter {
+  padding: 0;
+  margin-bottom: 12px;
+}
+.cb-plugins .cb-plugins-marketplace-filter-item {
+  border-radius: 999px;
+  border-color: var(--cb-input-border-color);
+  background: color-mix(in srgb, var(--cb-gray-color) 30%, transparent);
+  font-size: 12px;
+}
+.cb-plugins .cb-plugins-marketplace-tabs {
+  padding: 0;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+.cb-plugins .cb-plugins-marketplace-tab {
+  border-radius: 999px;
+  font-size: 13px;
+  padding: 6px 12px 6px 14px;
+  border-color: var(--cb-input-border-color);
+  color: var(--cb-text-secondary);
+  background: transparent;
+  transition: all 0.15s ease;
+}
+.cb-plugins .cb-plugins-marketplace-tab:hover {
+  background: var(--cb-hover-bg);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-marketplace-tab--active {
+  background: color-mix(in srgb, var(--cb-gray-color) 40%, transparent);
+  border-color: var(--cb-text-secondary);
+  color: var(--cb-text-primary);
+  font-weight: 500;
+}
+.cb-plugins .cb-plugins-marketplace-tab-menu-btn {
+  color: var(--cb-text-secondary);
+  border-radius: 6px;
+}
+.cb-plugins .cb-plugins-marketplace-tab-menu-btn:hover {
+  background: var(--cb-hover-bg);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-marketplace-tab-dropdown {
+  background: var(--cb-dropdown-bg-color);
+  border: 1px solid var(--cb-panel-border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.cb-plugins .cb-plugins-marketplace-tab-dropdown-item {
+  border-radius: 6px;
+  margin: 0 4px;
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-marketplace-tab-dropdown-item:hover:not(.disabled) {
+  background: var(--cb-dropdown-item-hover-bg-color);
+}
+.cb-plugins .cb-plugins-marketplace-tab-dropdown-item--danger {
+  color: var(--cb-danger-color, #ff6b6b);
+}
+.cb-plugins .cb-plugins-marketplace-tab-dropdown-item--danger:hover:not(.disabled) {
+  background: color-mix(in srgb, var(--cb-danger-color, #ff6b6b) 10%, transparent);
+}
+.cb-plugins .cb-plugins-marketplace-add-btn {
+  border-radius: 999px;
+  border-color: var(--cb-input-border-color);
+  color: var(--cb-text-secondary);
+}
+.cb-plugins .cb-plugins-marketplace-add-btn:hover {
+  border-color: var(--cb-focus-outline-color);
+  background: var(--cb-hover-bg);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-loading-overlay {
+  background-color: var(--cb-bg-color-container);
+}
+.cb-plugins .cb-plugins-loading-content {
+  background-color: var(--cb-bg-color-container);
+  border: 1px solid var(--cb-panel-border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.cb-plugins .cb-plugins-loading-text {
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 0 24px;
+  scrollbar-width: thin;
+}
+.cb-plugins .cb-plugins-card {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .cb-plugins .cb-plugins-card {
+    grid-template-columns: 1fr;
+  }
+}
+.cb-plugins .cb-plugins-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.cb-plugins .cb-plugins-card-item:hover {
+  background: var(--cb-hover-bg);
+}
+.cb-plugins .cb-plugins-card-item:hover .cb-plugins-card-install-btn {
+  opacity: 1;
+  visibility: visible;
+}
+.cb-plugins .cb-plugins-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cb-plugins .cb-plugins-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.cb-plugins .cb-plugins-card-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cb-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-plugins .cb-plugins-card-scope-label {
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+.cb-plugins .cb-plugins-card-description {
+  font-size: 12px;
+  color: var(--cb-text-secondary);
+  line-height: 1.5;
+  margin-top: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+.cb-plugins .cb-plugins-card-tags {
+  display: flex;
+  margin-top: 4px;
+}
+.cb-plugins .cb-plugins-card-tag {
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 1px 6px;
+}
+.cb-plugins .cb-plugins-card-source {
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: none;
+  font-size: 11px;
+}
+.cb-plugins .cb-plugins-card-source-label {
+  color: var(--cb-text-secondary);
+}
+.cb-plugins .cb-plugins-card-source-value {
+  color: var(--cb-text-secondary);
+  opacity: 0.8;
+}
+.cb-plugins .cb-plugins-card-actions {
+  flex-shrink: 0;
+}
+.cb-plugins .cb-plugins-card-install-btn,
+.cb-plugins .cb-plugins-card-manage-btn {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 14px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.cb-plugins .cb-plugins-card-install-btn:active,
+.cb-plugins .cb-plugins-card-manage-btn:active {
+  transform: scale(0.97);
+}
+.cb-plugins .cb-plugins-card-install-btn {
+  background: transparent;
+  color: var(--cb-text-primary);
+  border: 1px solid var(--cb-input-border-color);
+  opacity: 1;
+  visibility: visible;
+}
+.cb-plugins .cb-plugins-card-install-btn:hover:not(:disabled) {
+  background: var(--cb-dropdown-item-hover-bg-color);
+  border-color: var(--cb-focus-outline-color);
+}
+.cb-plugins .cb-plugins-card-install-btn:disabled {
+  opacity: 0.5;
+}
+.cb-plugins .cb-plugins-card-install-btn--installing {
+  opacity: 0.6;
+  visibility: visible;
+}
+.cb-plugins .cb-plugins-card-manage-btn {
+  background: transparent;
+  border: 1px solid var(--cb-input-border-color);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-card-manage-btn:hover {
+  background: var(--cb-dropdown-item-hover-bg-color);
+  border-color: var(--cb-focus-outline-color);
+}
+.cb-plugins .cb-plugins-card-dropdown {
+  background: var(--cb-dropdown-bg-color);
+  border: 1px solid var(--cb-panel-border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.cb-plugins .cb-plugins-card-dropdown-item {
+  border-radius: 6px;
+  margin: 0 4px;
+  transition: background 0.15s ease;
+}
+.cb-plugins .cb-plugins-card-dropdown-item:hover:not(.disabled) {
+  background: var(--cb-dropdown-item-hover-bg-color);
+}
+.cb-plugins .cb-plugins-card-dropdown-item-title {
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugins-card-dropdown-item-desc {
+  color: var(--cb-text-secondary);
+}
+.cb-plugins .cb-plugins-card-empty {
+  color: var(--cb-text-secondary);
+  padding: 32px 0;
+  text-align: center;
+  font-size: 13px;
+}
+.cb-plugins .cb-plugins-mcp-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--cb-input-border-color);
+  background: var(--cb-bg-color-container);
+  color: var(--cb-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.cb-plugins .cb-plugins-mcp-btn:hover {
+  background: var(--cb-dropdown-item-hover-bg-color);
+  border-color: var(--cb-focus-outline-color);
+}
+.cb-plugins .cb-plugins-mcp-btn:active {
+  transform: scale(0.97);
+}
+.cb-plugins .cb-plugin-detail {
+  padding: 20px 0 24px;
+}
+.cb-plugins .cb-plugin-detail-back {
+  color: var(--cb-text-secondary);
+  margin-bottom: 14px;
+  transition: color 0.2s ease;
+}
+.cb-plugins .cb-plugin-detail-back:hover {
+  opacity: 1;
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-title {
+  font-size: 18px;
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-description {
+  color: var(--cb-text-primary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.cb-plugins .cb-plugin-detail-update-btn,
+.cb-plugins .cb-plugin-detail-install-btn {
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.cb-plugins .cb-plugin-detail-update-btn:active,
+.cb-plugins .cb-plugin-detail-install-btn:active {
+  transform: scale(0.97);
+}
+.cb-plugins .cb-plugin-detail-update-btn,
+.cb-plugins .cb-plugin-detail-install-btn {
+  background: transparent;
+  border: 1px solid var(--cb-input-border-color);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-update-btn:hover:not(:disabled),
+.cb-plugins .cb-plugin-detail-install-btn:hover:not(:disabled) {
+  background: var(--cb-hover-bg);
+  border-color: var(--cb-focus-outline-color);
+}
+.cb-plugins .cb-plugin-detail-toggle-slider {
+  background-color: var(--cb-toggle-inactive-bg);
+  border: none;
+}
+.cb-plugins .cb-plugin-detail-toggle-slider::before {
+  background-color: var(--cb-toggle-slider-color, white);
+}
+.cb-plugins .cb-plugin-detail input:checked + .cb-plugin-detail-toggle-slider {
+  background-color: #4cd964;
+  border-color: #4cd964;
+}
+.cb-plugins .cb-plugin-detail input:checked + .cb-plugin-detail-toggle-slider::before {
+  background-color: white;
+}
+.cb-plugins .cb-plugin-detail-more-btn {
+  color: var(--cb-text-secondary);
+  border-radius: 8px;
+}
+.cb-plugins .cb-plugin-detail-more-btn:hover {
+  background: var(--cb-hover-bg);
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-dropdown {
+  background: var(--cb-dropdown-bg-color);
+  border: 1px solid var(--cb-panel-border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.cb-plugins .cb-plugin-detail-dropdown-item {
+  border-radius: 6px;
+  margin: 0 4px;
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-dropdown-item:hover {
+  background: var(--cb-dropdown-item-hover-bg-color);
+}
+.cb-plugins .cb-plugin-detail-dropdown-item--danger {
+  color: var(--cb-danger-color, #ff6b6b);
+}
+.cb-plugins .cb-plugin-detail-source-label {
+  color: var(--cb-text-secondary);
+}
+.cb-plugins .cb-plugin-detail-source-link {
+  color: var(--cb-focus-outline-color);
+}
+.cb-plugins .cb-plugin-detail-section-title {
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-section-desc {
+  color: var(--cb-text-secondary);
+}
+.cb-plugins .cb-plugin-detail-card {
+  border-color: var(--cb-panel-border-color);
+  border-radius: 12px;
+}
+.cb-plugins .cb-plugin-detail-card:hover {
+  border-color: var(--cb-focus-outline-color);
+}
+.cb-plugins .cb-plugin-detail-card-title {
+  color: var(--cb-text-primary);
+}
+.cb-plugins .cb-plugin-detail-card-subtitle {
+  color: var(--cb-text-secondary);
+}
+/* ================================================
+   Unified Market Topbar 搜索槽位（skills / connector）
+   仅保留布局：220px 固定宽度 + 窄屏自适应
+   视觉（按钮/搜索框）由 foundation Button / SearchInput 自己出
+   ================================================ */
+.plugins-panel .ec-search-wrapper,
+.connector-panel .ec-search-wrapper {
+  position: relative;
+  width: 220px;
+  min-width: 220px;
+  flex-shrink: 0;
+}
+@media (max-width: 540px) {
+  .plugins-panel .ec-search-wrapper,
+  .connector-panel .ec-search-wrapper {
+    width: 100%;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+}
+/* ================================================
+   Skills 子页面顶栏（点击「我安装的」后整页切换）
+   隐藏 tabs/搜索/操作按钮，整个 ec-topbar 替换为返回按钮
+   ================================================ */
+.plugins-panel {
+  /* ── 内容区子页面标题（如「我安装的」） ── */
+}
+.plugins-panel .ec-topbar--subpage .ec-topbar__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--cb-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+.plugins-panel .ec-topbar--subpage .ec-topbar__back:hover {
+  background: var(--cb-hover-bg);
+  color: var(--cb-text-primary);
+}
+.plugins-panel .ec-topbar--subpage .ec-topbar__back svg {
+  flex-shrink: 0;
+}
+.plugins-panel .ec-subpage-title {
+  margin: 0;
+  padding: 12px 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cb-text-primary);
+}

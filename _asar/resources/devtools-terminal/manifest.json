@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "WorkBuddy Terminal",
+  "version": "1.0",
+  "description": "Live PTY terminal view for CodeBuddy Code sessions",
+  "devtools_page": "devtools.html",
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' data: https:; img-src 'self' data: blob: https: local-file:; media-src 'self' blob:; font-src 'self' data:; object-src 'self';"
+  }
+}

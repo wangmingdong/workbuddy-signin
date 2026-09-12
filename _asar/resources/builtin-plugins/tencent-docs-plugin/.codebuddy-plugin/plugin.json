@@ -1,0 +1,17 @@
+{
+  "name": "tencent-docs-plugin",
+  "version": "1.0.0",
+  "description": "腾讯文档官方 MCP 插件，按用户身份自动路由到 C 端（docs.qq.com）或 SaaS 端（saas.docs.qq.com）skill，支持创建/编辑/管理在线文档、智能表格、幻灯片、思维导图等",
+  "author": {
+    "name": "tencent-docs",
+    "email": "tencent-docs@tencent.com"
+  },
+  "homepage": "https://docs.qq.com/home",
+  "repository": "https://git.woa.com/docx/docx-online",
+  "keywords": ["tencent-docs", "mcp", "saas", "office", "collaboration", "smartcanvas", "smartsheet", "slide"],
+  "category": "开发工具",
+  "skills": [],
+  "commands": [],
+  "agents": [],
+  "hooks": ""
+}

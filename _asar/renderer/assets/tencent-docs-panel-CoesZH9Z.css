@@ -1,0 +1,1640 @@
+/* ============================================================
+ * Tencent Docs Panel Styles
+ * Matches design mockup: link-style tabs with underline,
+ * spacious rows, colored icon badges, right-aligned size column
+ * Uses --wb-* CSS token system
+ * ============================================================ */
+/**
+ * OneID 官方开通组件（@tencent/oneid-open-components-react）的自定义样式 token。
+ * 详见 knowledge-base-onboarding-panel/style.scss 中同名块的说明。
+ * 这里同样在 :root 声明一份，确保 tencent-docs 面板下首次触发开通组件时，
+ * 即使 onboarding-panel 样式还没被加载也能拿到正确的背景色。
+ */
+:root {
+  --oneid-dialog-wrapper-bg: var(--wb-bg-overlay);
+}
+/* ---- Panel Layout ---- */
+.tencent-docs-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: var(--wb-bg-content);
+}
+.tencent-docs-panel__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+/*
+ * B 端 OneID 未开通时的开通引导面板（SingleServiceOnboardingPanel）：
+ * 该组件全局样式 .kb-onboarding-panel 默认使用 height: 100%，在 flex column
+ * 父容器中与 heading 共存时会撑出整个面板高度导致内容被裁切。这里覆盖为
+ * flex 子项约束——只占 TopBar + heading 之外的剩余空间，与
+ * .tencent-docs-panel__content 行为一致。
+ */
+.tencent-docs-panel > .kb-onboarding-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+/* ---- Heading（页面级标题，与腾讯乐享面板对齐） ---- */
+.tencent-docs-panel__heading {
+  flex-shrink: 0;
+  padding: 24px 24px 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tencent-docs-panel__heading-text {
+  min-width: 260px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/**
+ * 标题与「在浏览器中打开」按钮的同行容器（issue #48793）。
+ * 把按钮挪到标题右侧（标题文字+品牌徽标之后），跟整张面板右上角的三个点入口区分开。
+ * 按钮紧跟标题（gap: 8px），不用 margin-left: auto 推到容器最右——后者会与
+ * 右上角的三个点（absolute right: 4px，36×36）水平重叠。
+ */
+.tencent-docs-panel__heading-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.tencent-docs-panel__heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 102;
+  -webkit-app-region: no-drag;
+}
+.tencent-docs-panel__heading-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+}
+.tencent-docs-panel__heading-badge {
+  flex: none;
+  margin-top: 4px;
+  margin-left: -4px;
+  color: var(--wb-color-text-primary);
+}
+.tencent-docs-panel__heading-subtitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--wb-color-text-secondary);
+}
+/* ---- Search Row ---- */
+.tencent-docs-panel__search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px 0;
+  flex-shrink: 0;
+}
+.tencent-docs-panel__search-row .tencent-docs-search-bar {
+  width: 260px;
+}
+.tencent-docs-panel__search-row-spacer {
+  flex: 1;
+}
+/* ---- Create Button (主按钮，对齐 Figma 255-9209) ---- */
+.tencent-docs-panel__create-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+.tencent-docs-panel__create-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 34px;
+  padding: 6px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-family: 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  cursor: pointer;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  transition: background 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.tencent-docs-panel__create-btn:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-active);
+}
+.tencent-docs-panel__create-btn:active:not(:disabled) {
+  background: var(--wb-button-primary-bg-active);
+}
+.tencent-docs-panel__create-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.tencent-docs-panel__create-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+/* ---- Upload Button (次按钮，对齐技能页「添加技能」按钮样式) ---- */
+.tencent-docs-panel__upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--wb-border-card);
+  border-radius: 6px;
+  font-family: 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.tencent-docs-panel__upload-btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-hover);
+}
+.tencent-docs-panel__upload-btn:active {
+  transform: scale(0.97);
+}
+.tencent-docs-panel__upload-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+body.vscode-light .tencent-docs-panel__upload-btn,
+body[data-vscode-theme-kind="vscode-light"] .tencent-docs-panel__upload-btn {
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+body.vscode-light .tencent-docs-panel__upload-btn:hover,
+body[data-vscode-theme-kind="vscode-light"] .tencent-docs-panel__upload-btn:hover {
+  background: var(--wb-bg-hover);
+}
+/* ---- Upload Wrapper (容纳「导入」下拉) ---- */
+.tencent-docs-panel__upload-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+/* ---- Import Menu Popover ---- */
+/* 视觉对齐主导航「更多」浮层（foundation Dropdown .wb-popover.wb-dropdown）：
+   容器圆角 16px + 阴影 Layer 1（--wb-shadow-popover），列表项尺寸/间距/圆角同 Dropdown。 */
+.tdoc-import-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  min-width: 180px;
+  /* 容器 padding 8px，与 Dropdown 一致 */
+  padding: var(--wb-spacing-3);
+  /* 容器圆角 16px → --wb-radius-2xl */
+  border-radius: var(--wb-radius-2xl);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-color-border-secondary);
+  /* 双层柔光投影 Layer 1（0/4/12 spread:-4 + 0/3/6 spread:-8, #000 4%）→ --wb-shadow-popover */
+  box-shadow: var(--wb-shadow-popover);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+}
+.tdoc-import-menu__item {
+  display: flex;
+  align-items: center;
+  /* icon 与 label 间距 8px */
+  gap: var(--wb-spacing-3);
+  width: 100%;
+  /* item padding 5px 8px，高度 32px，圆角 8px —— 同 Dropdown */
+  padding: var(--wb-spacing-2-5) var(--wb-spacing-3);
+  min-height: var(--wb-size-control-md);
+  border: none;
+  border-radius: var(--wb-radius-lg);
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.tdoc-import-menu__item:hover {
+  background: var(--wb-bg-hover);
+}
+.tdoc-import-menu__item-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  /* 内联 SVG 用 currentColor，跟随 --wb-icon-secondary，浅/暗自动适配 */
+  color: var(--wb-icon-secondary);
+}
+.tdoc-import-menu__item-label {
+  flex: 1;
+  min-width: 0;
+}
+/* ---- Create File Popover ---- */
+/* 新建品类面板：非列表渲染（网格卡片），按用户要求仅对齐主导航「更多」浮层的
+   容器圆角 16px + 阴影 Layer 1（--wb-shadow-popover），内部卡片布局保持不变。 */
+.create-file-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  padding: 16px;
+  border-radius: var(--wb-radius-2xl);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-color-border-secondary);
+  box-shadow: var(--wb-shadow-popover);
+  z-index: 100;
+  min-width: 280px;
+}
+.create-file-popover__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.create-file-popover__group + .create-file-popover__group {
+  margin-top: 16px;
+}
+.create-file-popover__group-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-color-text-tertiary);
+}
+.create-file-popover__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.create-file-popover__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.create-file-popover__card:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+}
+.create-file-popover__card--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.create-file-popover__card--disabled:hover {
+  background: transparent !important;
+}
+.create-file-popover__card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+.create-file-popover__card-label {
+  font-size: 11px;
+  color: var(--wb-color-text-primary);
+  text-align: center;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.create-file-popover__card--disabled .create-file-popover__card-label {
+  color: var(--wb-color-text-tertiary);
+}
+/* ---- Settings Button & Menu ---- */
+.tencent-docs-panel__settings-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+/**
+ * 「在浏览器中打开」文字链接按钮（issue #48793 后挪到标题右侧）。
+ * 视觉对齐乐享面板「前往乐享知识库」：ghost 风格、文字+外链图标、跟随主题。
+ * 文案颜色用次要文本色，hover 时升至主要文本色，给一个浅 hover 背景方便点击。
+ */
+.tencent-docs-panel__open-in-browser-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tencent-docs-panel__open-in-browser-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.tencent-docs-panel__open-in-browser-btn:focus-visible {
+  outline: 2px solid var(--wb-border-action);
+  outline-offset: 1px;
+}
+.tencent-docs-panel__open-in-browser-text {
+  font-size: 13px;
+  line-height: 20px;
+}
+.tencent-docs-panel__settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.tencent-docs-panel__settings-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+/**
+ * 设置菜单的「点击外部关闭」遮罩（issue #47185）。
+ *
+ * 三个点菜单与 WorkBuddyTopBar 同行，topbar 整条带 `-webkit-app-region: drag`，
+ * Electron / macOS 拖拽区不会把鼠标事件派发给渲染进程，导致点击同高度拖拽区时
+ * 菜单收不起来。这里铺一层 no-drag 的全屏透明遮罩兜住所有点击（含拖拽区）：
+ *   - fixed + inset:0 覆盖整窗口；
+ *   - z-index 低于菜单(10000)、但因父级 heading-actions(z-index:102) 高于 topbar
+ *     (z-index:101)，遮罩仍绘制在 topbar 之上，从而能拦到拖拽区的 mousedown；
+ *   - 透明、no-drag，点击即触发 onMouseDown 关闭菜单。
+ */
+.tencent-docs-panel__settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+.tencent-docs-panel__settings-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 140px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-card);
+  box-shadow: var(--wb-shadow-popover);
+  z-index: 10000;
+}
+.tencent-docs-panel__settings-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.tencent-docs-panel__settings-menu-item:hover {
+  background: var(--wb-bg-hover);
+}
+.tencent-docs-panel__settings-menu-item--danger {
+  color: var(--wb-menu-item-danger-fg);
+}
+/* ---- Tab Bar ---- */
+.tencent-docs-panel__tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  padding: 8px 24px 0;
+  flex-shrink: 0;
+}
+.tencent-docs-panel__tabs-spacer {
+  flex: 1;
+}
+/* 历史样式 .tencent-docs-panel__admin-link 已废弃：
+ * 「进入腾讯文档管理后台」入口已迁移到面板右上角三个点菜单。 */
+.tencent-docs-panel__tab {
+  position: relative;
+  padding: 8px 0 12px;
+  border: none;
+  font-size: 16px;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: font-weight 0.15s ease;
+  line-height: normal;
+}
+.tencent-docs-panel__tab--active {
+  color: var(--wb-color-text-primary);
+  font-weight: 600;
+  cursor: default;
+}
+.tencent-docs-panel__tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--wb-bg-inverse);
+  border-radius: 1.5px;
+}
+/* ---- Folder Breadcrumb ---- */
+/* 内部结构已迁移到 @genie/cb-chat-ui 的 Breadcrumb，仅保留外层布局以维持在父容器中的位置/留白。 */
+/* 左留白对齐顶部工具区（search-row / tabs 均为 24px），保证面包屑与上方内容居左对齐 #52385 */
+.tdoc-folder-breadcrumb {
+  padding: 8px 24px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+/* ---- File List Container ---- */
+.tdoc-file-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.tdoc-file-list__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.tdoc-file-list__body > div {
+  height: 100% !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tdoc-file-list__body > div::-webkit-scrollbar {
+  display: none;
+}
+/* ---- File List Header ---- */
+.tdoc-file-list-header {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border-bottom: none;
+  flex-shrink: 0;
+  padding-left: 48px;
+  padding-right: 24px;
+  position: relative;
+  box-sizing: border-box;
+}
+.tdoc-file-list-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 48px;
+  right: 0;
+  height: 0.5px;
+  background: var(--wb-border-subtle);
+}
+.tdoc-file-list-header__checkbox-cell {
+  width: 24px;
+  margin-left: -24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.tdoc-file-list-header__checkbox-cell .cb-checkbox {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.tdoc-file-list-header__checkbox-cell .cb-checkbox .cb-checkbox__box {
+  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  border-color: var(--wb-checkbox-border-default);
+}
+.tdoc-file-list-header__checkbox-cell .cb-checkbox .cb-checkbox__box::after {
+  width: 4px;
+  height: 8px;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -55%) rotate(45deg);
+}
+.tdoc-file-list-header__checkbox-cell .cb-checkbox.cb-checkbox--checked .cb-checkbox__box {
+  background: var(--wb-control-checkbox-selected-bg);
+  border-color: var(--wb-control-checkbox-selected-bg);
+}
+.tdoc-file-list-header__checkbox-cell .cb-checkbox.cb-checkbox--checked .cb-checkbox__box::after {
+  border-color: var(--wb-control-checkbox-selected-fg);
+}
+.tdoc-file-list-header__checkbox-cell .cb-checkbox:hover .cb-checkbox__box {
+  border-color: var(--wb-checkbox-border-hover);
+}
+.tdoc-file-list-header:hover .tdoc-file-list-header__checkbox-cell .cb-checkbox {
+  opacity: 1;
+}
+.tdoc-file-list-header__cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: normal;
+  color: var(--wb-color-text-secondary);
+  min-width: 0;
+  overflow: hidden;
+}
+.tdoc-file-list-header__cell:first-child,
+.tdoc-file-list-header__checkbox-cell + .tdoc-file-list-header__cell {
+  padding-left: 0;
+}
+.tdoc-file-list-header__cell:last-child {
+  padding-right: 0;
+}
+.tdoc-file-list-header__cell--sortable {
+  cursor: pointer;
+}
+.tdoc-file-list-header__cell--sortable:hover {
+  color: var(--wb-color-text-secondary);
+}
+.tdoc-file-list-header__cell--right {
+  justify-content: flex-end;
+}
+.tdoc-file-list-header__cell--center {
+  justify-content: center;
+  text-align: center;
+}
+.tdoc-file-list-header__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdoc-file-list-header__cell:has(.tdoc-time-sort-dropdown) {
+  overflow: visible;
+}
+.tdoc-file-list-header__label:has(.tdoc-time-sort-dropdown) {
+  overflow: visible;
+}
+.tdoc-file-list-header__sort-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--wb-color-text-secondary);
+}
+/* ---- File Type Icon ---- */
+.tdoc-file-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-text-on-primary);
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  letter-spacing: -0.02em;
+}
+.tdoc-file-type-icon--folder {
+  background: transparent;
+}
+/* ---- File List Item ---- */
+.tdoc-file-list-item {
+  display: flex;
+  align-items: center;
+  padding-left: 48px;
+  padding-right: 24px;
+  height: 57px;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  border-bottom: none;
+  position: relative;
+}
+.tdoc-file-list-item::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 48px;
+  right: 0;
+  height: 0.5px;
+  background: var(--wb-border-subtle);
+}
+.tdoc-file-list-item:hover {
+  background: var(--wb-bg-hover);
+}
+.tdoc-file-list-item:hover .tdoc-file-list-item__checkbox-cell .cb-checkbox {
+  opacity: 1;
+}
+.tdoc-file-list-item--selected {
+  background: var(--wb-bg-hover);
+}
+.tdoc-file-list-item--checked {
+  background: var(--wb-bg-active);
+}
+.tdoc-file-list-item--checked::after {
+  background: transparent;
+}
+.tdoc-file-list-item--checked .tdoc-file-list-item__checkbox-cell .cb-checkbox {
+  opacity: 1;
+}
+.tdoc-file-list-item--folder .tdoc-file-list-item__name {
+  font-weight: 500;
+}
+.tdoc-file-list-item__cell {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.tdoc-file-list-item__cell:first-child,
+.tdoc-file-list-item__checkbox-cell + .tdoc-file-list-item__cell {
+  padding-left: 0;
+}
+.tdoc-file-list-item__cell:last-child {
+  padding-right: 0;
+}
+.tdoc-file-list-item__cell--right {
+  justify-content: flex-end;
+}
+.tdoc-file-list-item__cell--center {
+  justify-content: center;
+  text-align: center;
+}
+.tdoc-file-list-item__checkbox-cell {
+  width: 24px;
+  margin-left: -24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox .cb-checkbox__box {
+  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  border-color: var(--wb-checkbox-border-default);
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox .cb-checkbox__box::after {
+  width: 4px;
+  height: 8px;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -55%) rotate(45deg);
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox.cb-checkbox--checked .cb-checkbox__box {
+  background: var(--wb-control-checkbox-selected-bg);
+  border-color: var(--wb-control-checkbox-selected-bg);
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox.cb-checkbox--checked .cb-checkbox__box::after {
+  border-color: var(--wb-control-checkbox-selected-fg);
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox:hover .cb-checkbox__box {
+  border-color: var(--wb-checkbox-border-hover);
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox.cb-checkbox--disabled {
+  opacity: 0;
+  cursor: default;
+}
+.tdoc-file-list-item__checkbox-cell .cb-checkbox.cb-checkbox--disabled .cb-checkbox__box {
+  border-color: var(--wb-checkbox-border-default);
+  background: var(--wb-checkbox-bg-default);
+  cursor: default;
+}
+.tdoc-file-list-item:hover .tdoc-file-list-item__checkbox-cell .cb-checkbox.cb-checkbox--disabled {
+  opacity: 1;
+}
+.tdoc-file-list-item__name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.tdoc-file-list-item__name {
+  font-size: 14px;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+.tdoc-file-list-item__actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.tdoc-file-list-item:hover .tdoc-file-list-item__actions {
+  display: inline-flex;
+}
+.tdoc-file-list-item__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wb-color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tdoc-file-list-item__action-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.tdoc-file-list-item__add-task-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  /* 图标用 currentColor，跟随 --wb-icon-primary：浅色 rgba(0,0,0,0.9)，暗色 ≈ #FFF，自动适配 */
+  color: var(--wb-icon-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.tdoc-file-list-item__add-task-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-icon-primary);
+}
+.tdoc-file-list-item:hover .tdoc-file-list-item__add-task-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.tdoc-file-list-item__checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tdoc-file-list-item__text {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tdoc-file-list-item__text--right {
+  text-align: right;
+  width: 100%;
+}
+.tdoc-file-list-item:focus-visible {
+  outline: 2px solid var(--wb-border-action);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+/* ---- Loading More ---- */
+.tdoc-file-list__loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+}
+.tdoc-file-list__loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--wb-border-default);
+  border-top-color: var(--wb-color-text-secondary);
+  border-radius: 50%;
+  animation: tdoc-spin 0.6s linear infinite;
+}
+@keyframes tdoc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* ---- Error State ---- */
+.tdoc-file-list__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  padding: 48px 24px;
+}
+.tdoc-file-list__error-icon {
+  font-size: 36px;
+  opacity: 0.7;
+}
+.tdoc-file-list__error-message {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  text-align: center;
+}
+.tdoc-file-list__error-retry {
+  padding: 6px 20px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tdoc-file-list__error-retry:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-hover);
+}
+/* ---- Empty State ---- */
+.tdoc-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 8px;
+  padding: 48px 24px;
+  /*
+   * 「列表为空」+ 有 CTA 的增强版：
+   *   - 图标更大（视觉重心下沉，类似示意图里的纸飞机+文件夹插画）
+   *   - 标题更醒目
+   *   - 描述行字号略大
+   *   - 整体上下间距更宽，避免与按钮粘连
+   */
+}
+.tdoc-empty-state__icon {
+  font-size: 40px;
+  /*
+     * 同时承载 emoji（no-results 仍走 emoji）与 PNG 插画（no-files
+     * 替换成 figma 给的纸张插画），需要让两种内容共用居中容器。
+     * 这里**不**在容器上设 opacity；emoji 子元素自己挂半透明，PNG
+     * 插画保持原色（自带柔和阴影/渐变，再叠透明会泛灰）。
+     */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.tdoc-empty-state__icon-img {
+  /*
+     * figma 插画自带柔和阴影 / 渐变，已经是「成品图」，不要叠 opacity，
+     * 否则会泛灰看起来像加载中。这里用宽度控制视觉尺寸，高度自适应。
+     */
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+.tdoc-empty-state__icon-emoji {
+  /* emoji 走原来的半透明视觉（与历史保持一致） */
+  display: inline-block;
+  opacity: 0.5;
+}
+.tdoc-empty-state__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wb-color-text-secondary);
+}
+.tdoc-empty-state__desc {
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+}
+.tdoc-empty-state__actions {
+  /*
+     * CTA 按钮组：水平居中、按钮间距 12px。
+     * 复用 .tencent-docs-panel__create-btn / .tencent-docs-panel__upload-btn
+     * 的视觉，所以这里只负责布局。
+     * Popover 是 position:absolute，放在按钮 wrapper 内部，不会影响按钮组对齐。
+     */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.tdoc-empty-state--with-actions {
+  gap: 12px;
+  padding: 56px 24px 64px;
+}
+.tdoc-empty-state--with-actions .tdoc-empty-state__icon {
+  font-size: 72px;
+  margin-bottom: 4px;
+}
+.tdoc-empty-state--with-actions .tdoc-empty-state__icon-emoji {
+  /* 增强版下 emoji（仅 no-results 路径用得到）也提一下不透明度 */
+  opacity: 0.85;
+}
+.tdoc-empty-state--with-actions .tdoc-empty-state__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.tdoc-empty-state--with-actions .tdoc-empty-state__desc {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+}
+/* ---- Skeleton ---- */
+.tdoc-file-list-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+.tdoc-file-list-skeleton__header {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 40px;
+  border-bottom: 1px solid var(--wb-border-default);
+}
+.tdoc-file-list-skeleton__header-cell {
+  padding: 0 8px;
+}
+.tdoc-file-list-skeleton__row {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 57px;
+  border-bottom: 1px solid var(--wb-border-default);
+}
+.tdoc-file-list-skeleton__cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+}
+.tdoc-file-list-skeleton__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--wb-bg-skeleton);
+  animation: tdoc-skeleton-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.tdoc-file-list-skeleton__bar {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--wb-bg-skeleton);
+  animation: tdoc-skeleton-pulse 1.5s ease-in-out infinite;
+}
+.tdoc-file-list-skeleton__bar--short {
+  width: 40px;
+}
+.tdoc-file-list-skeleton__bar--medium {
+  width: 60px;
+}
+.tdoc-file-list-skeleton__bar--long {
+  width: 120px;
+}
+@keyframes tdoc-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+/* ---- Panel skeleton (checking 阶段顶部按钮 / Tab / 搜索框占位) ----
+ * 形状/尺寸贴近真实组件，避免 checking → connected 切换时出现位移：
+ *   - 主按钮 / 次按钮 高度对齐 .tencent-docs-panel__create-btn (34px)
+ *   - 搜索框宽度对齐 .tencent-docs-search-bar (260px)
+ *   - Tab 占位与真实 Tab 高度（≈40px 含底边距）对齐
+ */
+.tdoc-skeleton-btn {
+  width: 88px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--wb-bg-skeleton);
+  animation: tdoc-skeleton-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.tdoc-skeleton-btn--primary {
+  width: 96px;
+}
+.tdoc-skeleton-search {
+  width: 260px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--wb-bg-skeleton);
+  animation: tdoc-skeleton-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.tdoc-skeleton-tab {
+  width: 40px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--wb-bg-skeleton);
+  animation: tdoc-skeleton-pulse 1.5s ease-in-out infinite;
+  margin-bottom: 12px;
+}
+.tdoc-skeleton-tab--active {
+  width: 32px;
+}
+/* ---- More Actions Dropdown ---- */
+.tdoc-more-actions {
+  position: relative;
+  display: inline-flex;
+}
+/* ---- Inline Rename Input ---- */
+.tdoc-rename-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-popover-strong);
+  border-radius: 4px;
+  outline: none;
+}
+.tdoc-rename-input:focus {
+  border-color: var(--wb-border-popover-strong);
+}
+.tencent-docs-panel__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  color: var(--wb-color-text-secondary);
+}
+.tencent-docs-auth-guide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+}
+.tencent-docs-auth-guide__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: 520px;
+  gap: 20px;
+}
+/* ---- 顶部品牌图标区：WB  >>>  腾讯文档 ---- */
+.tencent-docs-auth-guide__brands {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tencent-docs-auth-guide__brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.tencent-docs-auth-guide__brand-icon img,
+.tencent-docs-auth-guide__brand-icon svg {
+  display: block;
+}
+.tencent-docs-auth-guide__brand-icon--wb {
+  background: var(--wb-brand-primary-subtle);
+  padding: 8px;
+}
+.tencent-docs-auth-guide__brand-icon--wb img {
+  width: 40px;
+  height: 40px;
+}
+.tencent-docs-auth-guide__brand-icon--tdoc {
+  background: var(--wb-bg-info);
+  padding: 8px;
+}
+.tencent-docs-auth-guide__brand-icon--tdoc img {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+.tencent-docs-auth-guide__connect-arrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--wb-color-text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 600;
+  user-select: none;
+}
+.tencent-docs-auth-guide__connect-arrow {
+  display: inline-block;
+  line-height: 1;
+  opacity: 0.25;
+  animation: tdoc-auth-arrow-flow 1.6s ease-in-out infinite;
+}
+.tencent-docs-auth-guide__connect-arrow--1 {
+  animation-delay: 0s;
+}
+.tencent-docs-auth-guide__connect-arrow--2 {
+  animation-delay: 0.2s;
+}
+.tencent-docs-auth-guide__connect-arrow--3 {
+  animation-delay: 0.4s;
+}
+@keyframes tdoc-auth-arrow-flow {
+  0% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+    color: var(--wb-color-text-tertiary);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(0);
+    color: var(--wb-brand-bright);
+  }
+  70% {
+    opacity: 0.5;
+    transform: translateX(1px);
+    color: var(--wb-brand-soft);
+  }
+  100% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+    color: var(--wb-color-text-tertiary);
+  }
+}
+/* ---- 标题 ---- */
+.tencent-docs-auth-guide__title {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--wb-color-text-primary);
+}
+/* ---- 描述文案 ---- */
+.tencent-docs-auth-guide__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--wb-color-text-secondary);
+  max-width: 440px;
+}
+.tencent-docs-auth-guide__desc strong {
+  color: inherit;
+  font-weight: inherit;
+}
+/* ---- 权限卡片 ---- */
+.tencent-docs-auth-guide__permissions {
+  width: 100%;
+  padding: 20px 24px;
+  border-radius: 6px;
+  background: var(--wb-bg-secondary);
+  border: none;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tencent-docs-auth-guide__permissions-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--wb-color-text-tertiary);
+  line-height: 1.4;
+}
+.tencent-docs-auth-guide__permissions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tencent-docs-auth-guide__permission-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.tencent-docs-auth-guide__permission-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--wb-color-text-primary);
+  margin-top: 2px;
+}
+.tencent-docs-auth-guide__permission-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tencent-docs-auth-guide__permission-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--wb-color-text-primary);
+  line-height: 1.4;
+}
+.tencent-docs-auth-guide__permission-desc {
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+  line-height: 1.5;
+}
+/* ---- 错误提示 ---- */
+.tencent-docs-auth-guide__error {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--wb-bg-error-subtle);
+  color: var(--wb-status-error);
+  font-size: 12px;
+  line-height: 1.4;
+  width: 100%;
+}
+/* ---- 主行动按钮（黑色主按钮） ---- */
+.tencent-docs-auth-guide__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+}
+.tencent-docs-auth-guide__btn:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-hover);
+}
+.tencent-docs-auth-guide__btn:active:not(:disabled) {
+  background: var(--wb-button-primary-bg-active);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.tencent-docs-auth-guide__btn-label {
+  line-height: 1;
+}
+.tencent-docs-auth-guide__btn--loading {
+  opacity: 0.75;
+}
+.tencent-docs-auth-guide__btn--loading:hover:not(:disabled) {
+  background: var(--wb-control-selected-bg);
+}
+/* ---- 底部隐私提示 ---- */
+.tencent-docs-auth-guide__footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.tencent-docs-auth-guide__footer svg {
+  color: var(--wb-brand-bright);
+  flex-shrink: 0;
+}
+.tencent-docs-auth-guide__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: tdoc-spin 0.6s linear infinite;
+}
+@keyframes tdoc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* ---- Dark Mode（对齐乐享授权页） ---- */
+.cb-dark,
+.dark {
+  /* 顶部「新建」主按钮：
+   * 亮色下是「黑底白字」与浅色面板反色而醒目；但其底色用的是不随主题翻转的
+   * 裸色值 rgba(0,0,0,0.9)，暗色下仍是黑按钮压在深色面板/浮层上，几乎看不见。
+   * 这里在暗色下翻成「白底深字」（与 auth-guide__btn 同款），保持「与主题反色」
+   * 的语义，hover/active 略降不透明度给出交互反馈。
+   *
+   * 历史上这里同时覆盖了 `.tdoc-selection-bar__btn`，现已随 `SelectionBar`
+   * 组件化迁到 `shared/selection-bar.less` 自带，不再在此处定义。
+   */
+}
+.cb-dark .tencent-docs-auth-guide__title,
+.dark .tencent-docs-auth-guide__title {
+  color: var(--wb-color-text-primary);
+}
+.cb-dark .tencent-docs-auth-guide__permissions,
+.dark .tencent-docs-auth-guide__permissions {
+  background: var(--wb-bg-secondary);
+}
+.cb-dark .tencent-docs-auth-guide__permission-icon,
+.dark .tencent-docs-auth-guide__permission-icon {
+  color: var(--wb-color-text-primary);
+}
+.cb-dark .tencent-docs-auth-guide__permission-label,
+.dark .tencent-docs-auth-guide__permission-label {
+  color: var(--wb-color-text-primary);
+}
+.cb-dark .tencent-docs-auth-guide__btn,
+.dark .tencent-docs-auth-guide__btn {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.cb-dark .tencent-docs-auth-guide__btn:hover:not(:disabled),
+.dark .tencent-docs-auth-guide__btn:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-hover);
+}
+.cb-dark .tencent-docs-auth-guide__btn:active:not(:disabled),
+.dark .tencent-docs-auth-guide__btn:active:not(:disabled) {
+  background: var(--wb-button-primary-bg-active);
+}
+.cb-dark .tencent-docs-auth-guide__btn--loading:hover:not(:disabled),
+.dark .tencent-docs-auth-guide__btn--loading:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-hover);
+}
+.cb-dark .tencent-docs-panel__create-btn,
+.dark .tencent-docs-panel__create-btn {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.cb-dark .tencent-docs-panel__create-btn:hover:not(:disabled),
+.dark .tencent-docs-panel__create-btn:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-active);
+}
+.cb-dark .tencent-docs-panel__create-btn:active:not(:disabled),
+.dark .tencent-docs-panel__create-btn:active:not(:disabled) {
+  background: var(--wb-button-primary-bg-active);
+}
+/* ---- Time Sort Dropdown (recentView column header, using cb-chat-ui Dropdown) ---- */
+.tdoc-time-sort-dropdown {
+  display: inline-flex;
+}
+.tencent-docs-auth-webview-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.tencent-docs-auth-webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.tdoc-time-sort-dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+  font-weight: normal;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.tdoc-time-sort-dropdown__trigger:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+/* ---- Time Sort Header (最近 / 我的文档 两个 tab 共用的时间排序控件) ---- */
+.tdoc-time-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+}
+.tdoc-time-sort-header__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--wb-color-text-secondary);
+  transition: all 0.2s ease;
+}
+.tdoc-time-sort-header__arrow svg {
+  transition: transform 0.2s ease;
+}
+.tdoc-time-sort-header__arrow--asc svg {
+  transform: scaleY(-1);
+}
+.tdoc-time-sort-header__arrow:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.tdoc-time-sort-dropdown [class*="menu"] {
+  border-radius: 8px;
+  padding: 4px;
+  width: auto !important;
+  min-width: 160px !important;
+  max-width: none !important;
+}
+.tdoc-time-sort-dropdown [class*="item"] {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  gap: 8px;
+}
+.tdoc-time-sort-dropdown [class*="item"][class*="selected"] {
+  background-color: transparent;
+  color: var(--wb-color-text-primary);
+}
+.tdoc-time-sort-dropdown [class*="selectedIcon"] {
+  display: none;
+}
+/* ---- Selection Action Bar ----
+ * 已封装为 `shared/SelectionBar` React 组件（see `./shared/selection-bar.tsx`），
+ * 组件文件自带 `./shared/selection-bar.less` 样式 import，调用方只需用组件，
+ * 此 panel.less 不再重复 @import。
+ */
+/* ---- Delete Confirm Checkbox (match list checkbox style) ---- */
+/* 删除确认弹窗已迁到命令式 Modal.confirm（variant='confirm' 自带无分隔线），
+ * 不再需要为外层弹窗 className 单独覆盖 header/footer 边框。 */
+.tdoc-delete-confirm__desc {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--wb-color-text-secondary);
+}
+.tdoc-delete-confirm__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  /* 命令式 Modal.confirm 把 checkbox 内嵌在 content 内（文案下方），
+   * 与文案之间留出 12px 间距让信息层次清晰；旧的 footerExtra 摆放方式不需要这个间距。 */
+  margin-top: 12px;
+}
+.tdoc-delete-confirm__checkbox > span {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  user-select: none;
+}
+/* ============================================================
+ * Tdoc Import Iframe Modal（个人版腾讯文档选择器）
+ * ============================================================ */
+.tdoc-import-iframe-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--wb-bg-overlay);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 16px;
+}
+.tdoc-import-iframe-modal {
+  width: min(880px, 90vw);
+  height: min(620px, 85vh);
+  min-width: 600px;
+  flex-shrink: 0;
+  margin: auto;
+  display: flex;
+  position: relative;
+  transition: width 0.2s ease, height 0.2s ease;
+}
+.tdoc-import-iframe-modal--auth {
+  height: 880px;
+}
+.tdoc-import-iframe-modal__webview {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.tdoc-import-iframe-modal__webview--ready {
+  opacity: 1;
+}
+.tdoc-import-iframe-modal__devtools-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-overlay);
+  border: 1px solid var(--wb-border-card);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tdoc-import-iframe-modal__devtools-btn:hover {
+  background: var(--wb-bg-overlay);
+}
+/* ---- License Banner ----
+ * 列表页顶部许可证状态提示。
+ * 即将过期 -> warning 黄色基调；已过期 / 无许可 -> danger 红色基调。
+ * 仅在异常状态下渲染（normal 状态返回 null，由 React 组件控制）。
+ */
+.tencent-docs-panel__license-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 24px 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+.tencent-docs-panel__license-banner__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.tencent-docs-panel__license-banner__msg {
+  flex: 1;
+  word-break: break-word;
+}
+.tencent-docs-panel__license-banner__cta {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tencent-docs-panel__license-banner__cta:hover {
+  background: var(--wb-bg-hover);
+}
+.tencent-docs-panel__license-banner--warning {
+  color: var(--wb-status-warning);
+  background: var(--wb-bg-warning-subtle);
+  border-color: var(--wb-border-warning-subtle);
+}
+.tencent-docs-panel__license-banner--danger {
+  color: var(--wb-status-error);
+  background: var(--wb-bg-error-subtle);
+  border-color: var(--wb-border-error-subtle);
+}

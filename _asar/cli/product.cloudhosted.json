@@ -1,0 +1,893 @@
+{
+  "agents": [
+    {
+      "name": "cli",
+      "instructions": "cli-agent-prompt",
+      "description": "cli agent",
+      "models": [
+        "auto",
+        "glm-4.7",
+        "deepseek-v3-2-volc",
+        "hunyuan-2.0-instruct",
+        "glm-5.1",
+        "glm-5.0",
+        "minimax-m2.7",
+        "glm-5v-turbo",
+        "glm-5.0-turbo",
+        "kimi-k2.6"
+      ],
+      "modelTags": [
+        "craft"
+      ],
+      "commands": [
+        "init",
+        "compact",
+        "statusline",
+        "insights"
+      ],
+      "tools": [
+        "Agent",
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "PowerShell",
+        "EnterPlanMode",
+        "ExitPlanMode",
+        "TaskCreate",
+        "TaskGet",
+        "TaskUpdate",
+        "TaskList",
+        "WebFetch",
+        "WebSearch",
+        "TaskStop",
+        "TaskOutput",
+        "Skill",
+        "AskUserQuestion",
+        "StructuredOutput",
+        "ToolSearch",
+        "DeferExecuteTool",
+        "SendMessage",
+        "TeamCreate",
+        "TeamDelete",
+        "ImageGen",
+        "DelegateTool",
+        "WeChatReply",
+        "WeComReply",
+        "ListMcpResources",
+        "ReadMcpResource"
+      ],
+      "tags": [
+        "cli",
+        "default",
+        "model:craft"
+      ]
+    },
+    {
+      "name": "general-purpose",
+      "instructions": "cli-agent-prompt",
+      "description": "taskgeneral-purpose agent",
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "PowerShell",
+        "Glob",
+        "Grep",
+        "TaskCreate",
+        "TaskGet",
+        "TaskUpdate",
+        "TaskList",
+        "WebFetch",
+        "WebSearch",
+        "TaskStop",
+        "TaskOutput",
+        "Skill",
+        "AskUserQuestion",
+        "ToolSearch",
+        "DeferExecuteTool",
+        "StructuredOutput",
+        "SendMessage",
+        "NotebookEdit",
+        "LSP",
+        "ComputerUse",
+        "ImageGen",
+        "ImageEdit",
+        "ListMcpResources",
+        "ReadMcpResource",
+        "WaitForMcpServers"
+      ],
+      "tags": [
+        "cli",
+        "general-purpose"
+      ]
+    },
+    {
+      "name": "compact",
+      "instructions": "compact-agent-prompt",
+      "description": "compact agent",
+      "tools": [
+        "Read"
+      ],
+      "commands": [
+        "_compact"
+      ],
+      "tags": [
+        "cli",
+        "compact"
+      ]
+    },
+    {
+      "name": "contextSummary",
+      "instructions": "context-summary-agent-prompt",
+      "description": "Context summary agent for conversation compaction and max-token recovery",
+      "tools": [],
+      "tags": [
+        "cli",
+        "contextSummary"
+      ]
+    },
+    {
+      "name": "contentAnalyzer",
+      "instructions": "content-analyzer-agent-instructions",
+      "description": "content analyzer agent",
+      "tags": [
+        "cli",
+        "content-analyzer"
+      ],
+      "tools": []
+    },
+    {
+      "name": "terminalTitleGenerator",
+      "instructions": "terminal-title-generator-instructions",
+      "description": "Generate terminal window titles from conversation topics.",
+      "tags": [
+        "cli",
+        "terminal-title-generator"
+      ],
+      "tools": []
+    },
+    {
+      "name": "promptSuggestion",
+      "instructions": "prompt-suggestion-instructions",
+      "description": "Suggest the user's next prompt after a conversation turn.",
+      "tags": [
+        "cli",
+        "prompt-suggestion"
+      ],
+      "tools": []
+    },
+    {
+      "name": "memorySelector",
+      "instructions": "memory-selector-instructions",
+      "description": "Select relevant memories for the current query.",
+      "models": [
+        "lite"
+      ],
+      "tags": [
+        "cli",
+        "memory-selector"
+      ],
+      "tools": []
+    },
+    {
+      "name": "summaryGenerator",
+      "instructions": "summary-generator-instructions",
+      "description": "Generate session summaries from conversation content.",
+      "tags": [
+        "cli",
+        "summary-generator"
+      ],
+      "tools": []
+    },
+    {
+      "name": "autoModeClassifier",
+      "instructions": "auto-mode-classifier-instructions",
+      "description": "Classify auto mode tool permission risk.",
+      "tags": [
+        "cli",
+        "auto-mode-classifier"
+      ],
+      "tools": []
+    },
+    {
+      "name": "promptHookEvaluator",
+      "instructions": "prompt-hook-evaluator-instructions",
+      "description": "Evaluates prompt hooks using LLM to determine if conditions are met",
+      "models": [
+        "lite"
+      ],
+      "tags": [
+        "cli",
+        "prompt-hook-evaluator"
+      ],
+      "tools": []
+    },
+    {
+      "name": "insightsAnalyzer",
+      "instructions": "base-agent-instructions",
+      "description": "Analyzes user usage data facets for the /insights command",
+      "tags": [
+        "cli",
+        "insights-analyzer"
+      ],
+      "tools": []
+    },
+    {
+      "name": "agentInstructions",
+      "instructions": "agent-instructions",
+      "description": "generating agent instructions",
+      "tags": [
+        "cli",
+        "agent-instructions"
+      ],
+      "tools": []
+    },
+    {
+      "name": "statusline-setup",
+      "instructions": "agent-statusline-instructions",
+      "description": "Use this agent to configure the user's Codebuddy Code status line setting.",
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "ToolSearch",
+        "DeferExecuteTool"
+      ],
+      "asTool": true,
+      "tags": [
+        "cli",
+        "sub-agent"
+      ]
+    },
+    {
+      "name": "Explore",
+      "instructions": "agent-explore-instructions",
+      "description": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions.",
+      "models": [
+        "lite"
+      ],
+      "tools": [
+        "Read",
+        "Bash",
+        "PowerShell",
+        "Glob",
+        "Grep",
+        "TaskCreate",
+        "TaskGet",
+        "TaskUpdate",
+        "TaskList",
+        "WebFetch",
+        "WebSearch",
+        "Skill",
+        "SendMessage",
+        "ToolSearch",
+        "DeferExecuteTool"
+      ],
+      "asTool": true,
+      "tags": [
+        "cli",
+        "sub-agent"
+      ]
+    },
+    {
+      "name": "Plan",
+      "instructions": "agent-plan-instructions",
+      "description": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions. (Tools: All tools)",
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "PowerShell",
+        "Glob",
+        "Grep",
+        "TaskCreate",
+        "TaskGet",
+        "TaskUpdate",
+        "TaskList",
+        "WebFetch",
+        "WebSearch",
+        "Skill",
+        "ToolSearch",
+        "DeferExecuteTool",
+        "TeamCreate",
+        "TeamDelete",
+        "SendMessage"
+      ],
+      "asTool": true,
+      "tags": [
+        "cli",
+        "sub-agent"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "default",
+      "credits": "x2.00 credits",
+      "name": "Default",
+      "vendor": "v",
+      "maxOutputTokens": 24000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "maxAllowedSize": 56000,
+      "relatedModels": {
+        "lite": "default",
+        "reasoning": "default"
+      }
+    },
+    {
+      "credits": "x0.29 credits",
+      "id": "deepseek-v3-2-volc",
+      "name": "DeepSeek-V3.2",
+      "vendor": "f",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 96000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "disabledMultimodal": false,
+      "maxAllowedSize": 96000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "deepseek-v3-2-volc",
+        "reasoning": "deepseek-v3-2-volc"
+      },
+      "descriptionEn": "DeepSeek-V3.2, good for daily use",
+      "descriptionZh": "DeepSeek-V3.2 模型，适合日常使用"
+    },
+    {
+      "credits": "x0.23 credits",
+      "id": "glm-4.7",
+      "name": "GLM-4.7",
+      "vendor": "f",
+      "maxOutputTokens": 48000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "disabledMultimodal": false,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "temperature": 1,
+      "relatedModels": {
+        "lite": "glm-4.7",
+        "reasoning": "glm-4.7"
+      },
+      "onlyReasoning": true,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "descriptionEn": "GLM-4.7 model, Well-rounded model for everyday use",
+      "descriptionZh": "GLM-4.7 大模型，能力均衡，适合日常使用"
+    },
+    {
+      "credits": "x0.23 credits",
+      "id": "glm-4.6",
+      "name": "GLM-4.6",
+      "vendor": "f",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 168000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "disabledMultimodal": true,
+      "maxAllowedSize": 168000,
+      "supportsReasoning": true,
+      "temperature": 1,
+      "relatedModels": {
+        "lite": "glm-4.6",
+        "reasoning": "glm-4.6"
+      }
+    },
+    {
+      "credits": "x0.52 credits",
+      "id": "deepseek-v3.1",
+      "name": "DeepSeek-V3.1-Terminus",
+      "vendor": "f",
+      "maxOutputTokens": 8192,
+      "maxInputTokens": 128000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "disabledMultimodal": true,
+      "maxAllowedSize": 56000,
+      "relatedModels": {
+        "lite": "deepseek-v3.1",
+        "reasoning": "deepseek-v3.1"
+      }
+    },
+    {
+      "credits": "x0.10 credits",
+      "id": "hunyuan-chat",
+      "name": "Hunyuan-Turbos",
+      "vendor": "j",
+      "maxOutputTokens": 8192,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "disabledMultimodal": true,
+      "relatedModels": {
+        "lite": "hunyuan-chat",
+        "reasoning": "hunyuan-chat"
+      }
+    },
+    {
+      "credits": "x0.78 credits",
+      "id": "deepseek-v3-0324",
+      "name": "DeepSeek-V3",
+      "vendor": "tencent",
+      "maxOutputTokens": 8192,
+      "maxInputTokens": 128000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "disabledMultimodal": true,
+      "maxAllowedSize": 56000,
+      "relatedModels": {
+        "lite": "deepseek-v3-0324",
+        "reasoning": "deepseek-v3-0324"
+      }
+    },
+    {
+      "credits": "x0.54 credits",
+      "id": "kimi-k2-thinking",
+      "name": "Kimi-K2-Thinking",
+      "vendor": "f",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 164000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "maxAllowedSize": 164000,
+      "relatedModels": {
+        "lite": "kimi-k2-thinking",
+        "reasoning": "kimi-k2-thinking"
+      }
+    },
+    {
+      "credits": "x0.16 credits",
+      "id": "deepseek-v4-pro",
+      "name": "Deepseek-V4-Pro",
+      "vendor": "f",
+      "maxOutputTokens": 50000,
+      "maxInputTokens": 1000000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 1000000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "descriptionEn": "DeepSeek flagship model, supporting 1M context window",
+      "descriptionZh": "DeepSeek 旗舰模型，支持 1M 上下文窗口",
+      "relatedModels": {
+        "lite": "deepseek-v4-pro",
+        "reasoning": "deepseek-v4-pro"
+      }
+    },
+    {
+      "credits": "x0.06 credits",
+      "id": "deepseek-v4-flash",
+      "name": "Deepseek-V4-Flash",
+      "vendor": "f",
+      "maxOutputTokens": 50000,
+      "maxInputTokens": 1000000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 1000000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "descriptionEn": "DeepSeek flagship model, supporting 1M context window",
+      "descriptionZh": "DeepSeek 旗舰模型，支持 1M 上下文窗口",
+      "relatedModels": {
+        "lite": "deepseek-v4-flash",
+        "reasoning": "deepseek-v4-flash"
+      }
+    },
+    {
+      "credits": "x0.18 credits",
+      "id": "minimax-m2.5",
+      "name": "MiniMax-M2.5",
+      "vendor": "e",
+      "maxOutputTokens": 48000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": false,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "minimax-m2.5",
+        "reasoning": "minimax-m2.5"
+      }
+    },
+    {
+      "credits": "x0.26 credits",
+      "id": "minimax-m2.7",
+      "name": "MiniMax-M2.7",
+      "vendor": "f",
+      "maxOutputTokens": 48000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "minimax-m2.7",
+        "reasoning": "minimax-m2.7"
+      },
+      "disabledMultimodal": false,
+      "descriptionEn": "Well-rounded model for everyday use",
+      "descriptionZh": "能力均衡，适合日常使用",
+      "tags": [
+        "craft"
+      ]
+    },
+    {
+      "credits": "x1.06 credits",
+      "id": "glm-5.1",
+      "name": "GLM-5.1",
+      "vendor": "e",
+      "maxOutputTokens": 48000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "glm-5.1",
+        "reasoning": "glm-5.1"
+      },
+      "descriptionEn": "Great for daily use",
+      "descriptionZh": "能力均衡，适合日常使用",
+      "tags": [
+        "craft"
+      ]
+    },
+    {
+      "credits": "",
+      "id": "glm-5.0",
+      "name": "GLM-5.0",
+      "vendor": "f",
+      "maxOutputTokens": 48000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "disabledMultimodal": false,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "temperature": 1,
+      "relatedModels": {
+        "lite": "glm-5.0",
+        "reasoning": "glm-5.0"
+      },
+      "onlyReasoning": true,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "descriptionEn": "Well-rounded model for everyday use",
+      "descriptionZh": "能力均衡，适合日常使用"
+    },
+    {
+      "credits": "x0.95 credits",
+      "id": "glm-5.0-turbo",
+      "name": "GLM-5.0-Turbo",
+      "vendor": "e",
+      "maxOutputTokens": 48000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "glm-5.0-turbo",
+        "reasoning": "glm-5.0-turbo"
+      },
+      "descriptionEn": "Deeply optimized for agent scenario",
+      "descriptionZh": "面向 Agent 场景进行了深度优化",
+      "tags": [
+        "craft"
+      ]
+    },
+    {
+      "credits": "",
+      "id": "glm-5v-turbo",
+      "name": "GLM-5v-Turbo",
+      "vendor": "e",
+      "maxOutputTokens": 38000,
+      "maxInputTokens": 200000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 200000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "glm-5v-turbo",
+        "reasoning": "glm-5v-turbo"
+      },
+      "descriptionEn": "Native Multimodal Model",
+      "descriptionZh": "原生多模态模型"
+    },
+    {
+      "credits": "x0.11 credits",
+      "id": "glm-4.6v",
+      "name": "GLM-4.6V",
+      "vendor": "e",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 128000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "supportsReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "maxAllowedSize": 128000,
+      "relatedModels": {
+        "lite": "glm-4.6v",
+        "reasoning": "glm-4.6v"
+      }
+    },
+    {
+      "credits": "x0.59 credits",
+      "id": "kimi-k2.6",
+      "name": "Kimi-K2.6",
+      "vendor": "f",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 256000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "supportsReasoning": true,
+      "temperature": 1,
+      "onlyReasoning": true,
+      "reasoning": {
+        "effort": "medium",
+        "summary": "auto"
+      },
+      "maxAllowedSize": 256000,
+      "relatedModels": {
+        "lite": "kimi-k2.6",
+        "reasoning": "kimi-k2.6"
+      },
+      "descriptionEn": "A multimodal model, good for daily use.",
+      "descriptionZh": "多模态模型，适合日常任务",
+      "tags": [
+        "craft"
+      ]
+    },
+    {
+      "credits": "x0.45 credits",
+      "id": "kimi-k2.5",
+      "name": "Kimi-K2.5",
+      "vendor": "f",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 164000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "supportsReasoning": true,
+      "temperature": 1,
+      "onlyReasoning": true,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "maxAllowedSize": 164000,
+      "relatedModels": {
+        "lite": "kimi-k2.5",
+        "reasoning": "kimi-k2.5"
+      }
+    },
+    {
+      "credits": "x0.04 credits",
+      "id": "hy3-preview-agent",
+      "name": "Hy3 preview",
+      "vendor": "j",
+      "maxOutputTokens": 64000,
+      "maxInputTokens": 192000,
+      "maxAllowedSize": 192000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "disabledMultimodal": false,
+      "supportsReasoning": true,
+      "temperature": 0.9,
+      "onlyReasoning": true,
+      "top_p": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "hy3-preview-agent",
+        "reasoning": "hy3-preview-agent"
+      }
+    },
+    {
+      "credits": "x0.40 credits",
+      "id": "auto",
+      "name": "Auto",
+      "vendor": "f",
+      "maxOutputTokens": 32000,
+      "maxInputTokens": 168000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "disabledMultimodal": false,
+      "maxAllowedSize": 168000,
+      "isDefault": true,
+      "temperature": 1,
+      "descriptionEn": "Balanced performance and speed",
+      "descriptionZh": "平衡效果与速度",
+      "tags": [
+        "craft"
+      ],
+      "relatedModels": {
+        "lite": "auto",
+        "reasoning": "auto"
+      }
+    },
+    {
+      "credits": "x0.16 credits",
+      "id": "deepseek-v4-pro-exclusive",
+      "name": "Deepseek-V4-Pro",
+      "vendor": "f",
+      "maxOutputTokens": 50000,
+      "maxInputTokens": 1000000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "maxAllowedSize": 1000000,
+      "supportsReasoning": true,
+      "onlyReasoning": true,
+      "temperature": 1,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "descriptionEn": "DeepSeek flagship model, supporting 1M context window",
+      "descriptionZh": "DeepSeek 旗舰模型，支持 1M 上下文窗口",
+      "relatedModels": {
+        "lite": "deepseek-v4-pro-exclusive",
+        "reasoning": "deepseek-v4-pro-exclusive"
+      }
+    },
+    {
+      "credits": "x0.04 credits",
+      "id": "hunyuan-2.0-instruct",
+      "name": "Hunyuan-2.0-Instruct",
+      "vendor": "j",
+      "maxOutputTokens": 16000,
+      "maxInputTokens": 128000,
+      "supportsToolCall": true,
+      "supportsImages": true,
+      "disabledMultimodal": false,
+      "supportsReasoning": true,
+      "temperature": 0.7,
+      "onlyReasoning": true,
+      "top_p": 0.8,
+      "top_k": 20,
+      "repetition_penalty": 1.05,
+      "reasoning": {
+        "effort": "high",
+        "summary": "auto"
+      },
+      "relatedModels": {
+        "lite": "hunyuan-2.0-instruct",
+        "reasoning": "hunyuan-2.0-instruct"
+      }
+    },
+    {
+      "credits": "x5.00 credits",
+      "id": "hunyuan-image-v3.0",
+      "name": "Hunyuan Image V3",
+      "tags": [
+        "text-to-image"
+      ]
+    }
+  ],
+  "links": {
+    "officialWebsite": "https://copilot.tencent.com/cli",
+    "helpDocument": "https://www.codebuddy.cn/docs/workbuddy/Overview",
+    "issueFeedback": "https://cnb.cool/codebuddy/codebuddy-code/-/issues",
+    "issueCreation": "https://cnb.cool/codebuddy/codebuddy-code/-/issues/new",
+    "mcpHelpDocument": "https://copilot.tencent.com/docs/cli/mcp",
+    "hooksHelpDocument": "https://copilot.tencent.com/docs/cli/hooks",
+    "sandboxHelpDocument": "https://copilot.tencent.com/docs/cli/bash-sandboxing",
+    "upgradeUrl": ""
+  },
+  "productFeatures": {
+    "BillingNotice": false,
+    "CodeAdoptionRate": false,
+    "CloudAgentsSmartMerge": true,
+    "CustomModelsJSON": true,
+    "CustomModelIdPrefix": true,
+    "DeferToolLoading": true,
+    "ImageGen": true,
+    "ScheduledTasks": true,
+    "SkillManage": false,
+    "SelectImage": true,
+    "SkipToolCallSupportCheck": false,
+    "ProjectLocalTask": true,
+    "DisableMemoryPersonalization": true,
+    "ChannelWechatKf": true,
+    "WebSearch": false,
+    "Connector": false,
+    "DisableWechatMiniProgramIntegration": true,
+    "DisableLoginLegalLinks": true,
+    "DisableHelpFeedback": true,
+    "DisableYuanbaoChannel": true,
+    "DisableShareFeature": false,
+    "DisableVersionShowName": true,
+    "DisableCreditsEntry": true,
+    "DisableBotWebhookUrl": true,
+    "HtmlPreviewShare": true,
+    "DisablePublishedApps": false,
+    "DisableArchivedTasks": false,
+    "DisableCheckin": false,
+    "DisableActivityBanner": false,
+    "DisableCreditPurchaseGuide": false,
+    "DisableVoiceInput": false,
+    "TencentDocsAiEdit": false,
+    "TencentDocsAiEditEnterprise": false,
+    "TencentDesignX": false,
+    "ChannelSlack": false,
+    "ChannelTelegram": false,
+    "ChannelDiscord": false
+  },
+  "galileo": {
+    "enable": false,
+    "patchName": "workbuddy-cloudhosted"
+  },
+  "commit": "e9991e2be9dcafcce0fad23fc065dd91a7f3efed",
+  "date": "2026-07-30T08:39:10.062Z",
+  "genieVersion": "5.3.8"
+}

@@ -1,0 +1,94 @@
+{
+    "version": 1,
+    "default_action": "deny_write",
+    "recyclebin_backup": true,
+    "auto_grant": true,
+
+    "file_rules": [
+        { "path": "%USERPROFILE%\\.ssh\\**",     "type": "no_access",    "_comment": "protect credentials" },
+        { "path": "%USERPROFILE%\\.gnupg\\**",   "type": "no_access",    "_comment": "protect credentials" },
+
+        { "path": "%LOCALAPPDATA%\\Temp\\**",    "type": "inherit_user", "_comment": "temp" },
+        { "path": "**\\$RECYCLE.BIN\\**", "type": "inherit_user", "_comment": "recycle bin" },
+
+        { "path": "%USERPROFILE%\\.cache\\**",   "type": "inherit_user", "_comment": "generic cache" },
+        { "path": "%USERPROFILE%\\.local\\**",   "type": "inherit_user", "_comment": "XDG local" },
+
+        { "path": "%LOCALAPPDATA%\\npm-cache\\**",       "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%LOCALAPPDATA%\\pnpm\\**",            "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%LOCALAPPDATA%\\Yarn\\**",            "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%LOCALAPPDATA%\\fnm_multishells\\**", "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%APPDATA%\\npm\\**",                  "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%USERPROFILE%\\.npm\\**",             "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%USERPROFILE%\\.yarn\\**",            "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%USERPROFILE%\\.nvm\\**",             "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%USERPROFILE%\\.fnm\\**",             "type": "inherit_user", "_comment": "nodejs" },
+        { "path": "%USERPROFILE%\\.bun\\**",             "type": "inherit_user", "_comment": "nodejs" },
+
+        { "path": "%LOCALAPPDATA%\\pip\\**",             "type": "inherit_user", "_comment": "python" },
+        { "path": "%LOCALAPPDATA%\\conda\\**",           "type": "inherit_user", "_comment": "python" },
+        { "path": "%LOCALAPPDATA%\\uv\\**",              "type": "inherit_user", "_comment": "python" },
+        { "path": "%APPDATA%\\uv\\**",                   "type": "inherit_user", "_comment": "python" },
+        { "path": "%USERPROFILE%\\.pyenv\\**",           "type": "inherit_user", "_comment": "python" },
+        { "path": "%USERPROFILE%\\.conda\\**",           "type": "inherit_user", "_comment": "python" },
+        { "path": "%USERPROFILE%\\miniconda3\\**",       "type": "inherit_user", "_comment": "python" },
+        { "path": "%USERPROFILE%\\miniforge3\\**",       "type": "inherit_user", "_comment": "python" },
+
+        { "path": "%USERPROFILE%\\.rustup\\**",  "type": "inherit_user", "_comment": "rust" },
+        { "path": "%USERPROFILE%\\.cargo\\**",   "type": "inherit_user", "_comment": "rust" },
+
+        { "path": "%LOCALAPPDATA%\\go-build\\**","type": "inherit_user", "_comment": "go" },
+        { "path": "%APPDATA%\\go\\**",           "type": "inherit_user", "_comment": "go" },
+        { "path": "%USERPROFILE%\\go\\**",       "type": "inherit_user", "_comment": "go" },
+
+        { "path": "%USERPROFILE%\\.m2\\**",      "type": "inherit_user", "_comment": "java" },
+        { "path": "%USERPROFILE%\\.gradle\\**",  "type": "inherit_user", "_comment": "java" },
+        { "path": "%USERPROFILE%\\.sdkman\\**",  "type": "inherit_user", "_comment": "java" },
+
+        { "path": "%USERPROFILE%\\.dotnet\\**",  "type": "inherit_user", "_comment": "dotnet" },
+        { "path": "%USERPROFILE%\\.nuget\\**",   "type": "inherit_user", "_comment": "dotnet" },
+        { "path": "%LOCALAPPDATA%\\NuGet\\**",   "type": "inherit_user", "_comment": "dotnet" },
+
+        { "path": "%USERPROFILE%\\.docker\\**",  "type": "inherit_user", "_comment": "docker" },
+        { "path": "%USERPROFILE%\\.asdf\\**",    "type": "inherit_user", "_comment": "version-mgr" },
+
+        { "path": "%APPDATA%\\Code\\**",         "type": "inherit_user", "_comment": "ide" },
+        { "path": "%APPDATA%\\Trae\\**",         "type": "inherit_user", "_comment": "ide" },
+
+        { "path": "%APPDATA%\\Microsoft\\Windows\\PowerShell\\**",  "type": "inherit_user", "_comment": "shell history" },
+        { "path": "%LOCALAPPDATA%\\Microsoft\\Windows\\PowerShell\\**", "type": "inherit_user", "_comment": "shell cache" },
+
+        { "path": "C:\\openclaw\\openclaw\\**",         "type": "inherit_user", "_comment": "openclaw app" },
+        { "path": "%USERPROFILE%\\.openclaw\\**",       "type": "inherit_user", "_comment": "openclaw config" }
+        
+    ],
+
+    "file_rules_user": [
+        { "path": "D:\\openclaw\\proxy-agent\\**", "type": "inherit_user", "_comment": "Add custom file rules here. Same format as file_rules." }
+    ],
+
+    "registry_rules": [],
+    "process_rules": [],
+    "network_rules": [],
+
+    "network_rules_user": [],
+
+    "white_process": [
+        { "path": "**\\msedge.exe",        "_comment": "Microsoft Edge" },
+        { "path": "**\\chrome.exe",        "_comment": "Google Chrome" },
+        { "path": "**\\firefox.exe",       "_comment": "Mozilla Firefox" },
+        { "path": "**\\brave.exe",         "_comment": "Brave Browser" },
+        { "path": "**\\opera.exe",         "_comment": "Opera" },
+        { "path": "**\\360se.exe",         "_comment": "360 安全浏览器" },
+        { "path": "**\\QQBrowser.exe",     "_comment": "QQ 浏览器" },
+        { "path": "**\\SogouExplorer.exe", "_comment": "搜狗浏览器" }
+    ],
+
+    "_comment_network_policy": "network_policy enforces IPv4 connect allowlist via ws2_32 hook; allow_ips empty + default deny blocks all outbound",
+    "network_policy": {
+        "enabled": true,
+        "default": "allow",
+        "deny_ips": [],
+        "deny_domains": []
+    }
+}

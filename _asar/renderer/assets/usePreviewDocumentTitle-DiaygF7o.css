@@ -1,0 +1,52 @@
+/**
+ * ChatWithWorkBuddyButton 样式
+ *
+ * 严格遵循设计稿：距底 40px，padding 12px 50px，圆角 14px，背景 rgba(0,0,0,0.8)，
+ * 文字 14px 苹方 白色。
+ *
+ * 注：position 用 fixed 居中悬浮；z-index 略低于查看产物 FAB（150），避免和右下角
+ * 浮动按钮抢点击区域 —— 它本来就在水平居中位置，互不重叠。
+ */
+.chat-with-workbuddy-btn {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 50px;
+  border: none;
+  border-radius: 14px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'PingFang SC', 'PingFang TC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', sans-serif;
+  cursor: pointer;
+  z-index: 140;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+.chat-with-workbuddy-btn:hover {
+  opacity: 0.92;
+}
+.chat-with-workbuddy-btn:active {
+  transform: translateX(-50%) scale(0.97);
+  opacity: 0.85;
+}
+.chat-with-workbuddy-btn:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+.chat-with-workbuddy-icon {
+  display: block;
+  flex-shrink: 0;
+}
+.chat-with-workbuddy-icon--light {
+  display: block;
+}
+.chat-with-workbuddy-icon--dark {
+  display: none;
+}

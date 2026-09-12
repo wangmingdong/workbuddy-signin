@@ -1,0 +1,274 @@
+/**
+ * 意见反馈弹框样式
+ */
+.feedback-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--wb-color-mask-color);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.feedback-modal {
+  width: 560px;
+  background: var(--wb-bg-primary);
+  border-radius: var(--wb-radius-4xl, 24px);
+  box-shadow: var(--wb-shadow-dialog);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: feedbackModalIn 0.2s ease-out;
+}
+@keyframes feedbackModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.feedback-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+.feedback-modal__title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+  margin: 0;
+}
+.feedback-modal__close-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+  color: var(--wb-color-text-tertiary);
+}
+.feedback-modal__close-btn:hover {
+  background-color: var(--wb-bg-hover);
+  color: var(--wb-color-text-secondary);
+}
+.feedback-modal__close-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+.feedback-modal__body {
+  padding: 20px 24px;
+  flex: 1;
+}
+.feedback-modal__textarea-wrap {
+  background: transparent;
+  border-radius: 12px;
+  border: 1px solid var(--wb-color-border-secondary);
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+.feedback-modal__textarea-wrap:focus-within {
+  border-color: var(--wb-color-text-tertiary);
+}
+.feedback-modal__textarea {
+  width: 100%;
+  height: 200px;
+  padding: 16px 18px 8px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--wb-color-text-primary);
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  line-height: 1.6;
+}
+.feedback-modal__textarea::placeholder {
+  color: var(--wb-color-text-tertiary);
+}
+.feedback-modal__image-preview {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px 0;
+  flex-wrap: wrap;
+}
+.feedback-modal__image-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.feedback-modal__image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.feedback-modal__image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wb-color-mask-color);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.feedback-modal__image-remove:hover {
+  background: var(--wb-color-mask-strong);
+}
+.feedback-modal__image-remove svg {
+  width: 10px;
+  height: 10px;
+  stroke: var(--wb-text-white);
+  fill: none;
+  stroke-width: 2.5;
+}
+.feedback-modal__textarea-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 12px;
+}
+.feedback-modal__upload-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.feedback-modal__upload-btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-color-text-tertiary);
+}
+.feedback-modal__upload-btn--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.feedback-modal__upload-btn--disabled:hover {
+  background: var(--wb-bg-secondary);
+  border-color: var(--wb-border-default);
+}
+.feedback-modal__upload-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--wb-color-text-tertiary);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.feedback-modal__char-count {
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+  user-select: none;
+}
+.feedback-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px 20px;
+}
+.feedback-modal__log-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  max-width: 390px;
+}
+.feedback-modal__log-checkbox input[type="checkbox"] {
+  display: none;
+}
+.feedback-modal__custom-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--wb-checkbox-border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  background: var(--wb-checkbox-bg-default);
+}
+.feedback-modal__custom-checkbox svg {
+  width: 12px;
+  height: 12px;
+  stroke: var(--wb-check-checkmark);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+input:hover + .feedback-modal__custom-checkbox {
+  border-color: var(--wb-checkbox-border-hover);
+}
+input:checked + .feedback-modal__custom-checkbox {
+  background: var(--wb-bg-inverse);
+  border-color: var(--wb-checkbox-border-hover);
+}
+input:checked + .feedback-modal__custom-checkbox svg {
+  opacity: 1;
+}
+.feedback-modal__log-label {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+}
+.feedback-modal__privacy-link {
+  color: var(--wb-color-text-link-default);
+  text-decoration: none;
+  cursor: pointer;
+}
+.feedback-modal__privacy-link:hover {
+  color: var(--wb-color-text-link-hover);
+  text-decoration: underline;
+}
+.feedback-modal__submit-btn {
+  padding: 10px 32px;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.feedback-modal__submit-btn:not(:disabled):hover {
+  background: var(--wb-button-primary-bg-hover);
+}
+.feedback-modal__submit-btn:not(:disabled):active {
+  background: var(--wb-button-primary-bg-active);
+}
+.feedback-modal__submit-btn:disabled,
+.feedback-modal__submit-btn--disabled {
+  background: var(--wb-button-primary-bg-disabled);
+  color: var(--wb-button-primary-fg-disabled);
+  cursor: not-allowed;
+  pointer-events: none;
+}

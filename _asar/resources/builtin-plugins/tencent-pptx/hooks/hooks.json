@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CODEBUDDY_PLUGIN_ROOT}/bin/run-node\"  \"${CODEBUDDY_PLUGIN_ROOT}/scripts/ensure-runtime.mjs\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

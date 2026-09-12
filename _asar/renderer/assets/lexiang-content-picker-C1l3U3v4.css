@@ -1,0 +1,266 @@
+/* LexiangContentPicker 专属样式
+ *
+ * Figma 256:6549：右栏容器由 KbListView 承担，section 标题 28 高 / 12/400 / #4C000000
+ * 底部"已选 N 项"按钮：12/400 / #E5000000；旁 16×16 箭头；展开面板保持原逻辑
+ */
+.lexiang-content-picker__auth {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  min-height: 300px;
+}
+.lexiang-content-picker__sectioned-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--wb-kb-card-bg);
+  border: 1px solid var(--wb-kb-card-border);
+  border-radius: 6px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.lexiang-content-picker__sectioned-list::-webkit-scrollbar {
+  width: 5px;
+}
+.lexiang-content-picker__sectioned-list::-webkit-scrollbar-thumb {
+  background: var(--wb-kb-card-border);
+  border-radius: 3px;
+}
+.lexiang-content-picker__section-header {
+  display: flex;
+  align-items: flex-end;
+  min-height: 28px;
+  padding: 8px 8px 0;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-muted);
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.lexiang-content-picker__section-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--wb-kb-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.lexiang-content-picker__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.lexiang-content-picker__expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.lexiang-content-picker__expand-btn:hover {
+  background: var(--wb-kb-row-hover-bg);
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-content-picker__expand-arrow {
+  display: inline-block;
+  font-size: 12px;
+  transition: transform 200ms ease;
+  transform: rotate(-90deg);
+}
+.lexiang-content-picker__expand-arrow--up {
+  transform: rotate(90deg);
+}
+.lexiang-content-picker__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 40px 24px;
+  text-align: center;
+  gap: 8px;
+}
+.lexiang-content-picker__empty-icon {
+  width: 80px;
+  height: 80px;
+}
+.lexiang-content-picker__load-more-sentinel {
+  height: 1px;
+}
+.lexiang-content-picker__load-more-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+.lexiang-content-picker__load-more-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--wb-kb-text-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: lexiang-content-picker-spin 0.6s linear infinite;
+}
+@keyframes lexiang-content-picker-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lexiang-content-picker__footer-selected {
+  position: static;
+  width: auto;
+  flex: 0 0 auto;
+}
+.lexiang-content-picker__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--wb-kb-text-primary);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 6px 8px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.lexiang-content-picker__summary:hover {
+  background: var(--wb-kb-row-hover-bg);
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-content-picker__chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  transition: transform 200ms ease;
+}
+.lexiang-content-picker__chevron--up {
+  transform: rotate(180deg);
+}
+.lexiang-content-picker__selected-panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  width: auto;
+  max-height: 280px;
+  background: var(--wb-kb-dialog-bg);
+  border: 1px solid var(--wb-kb-dialog-border);
+  border-radius: 6px;
+  box-shadow: var(--wb-kb-dialog-shadow);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  overflow: hidden;
+}
+.lexiang-content-picker__selected-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--wb-kb-dialog-divider);
+  flex-shrink: 0;
+}
+.lexiang-content-picker__selected-panel-title {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-content-picker__selected-panel-clear {
+  border: none;
+  background: transparent;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.lexiang-content-picker__selected-panel-clear:hover {
+  background: var(--wb-kb-row-hover-bg);
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-content-picker__selected-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.lexiang-content-picker__selected-panel-list::-webkit-scrollbar {
+  width: 5px;
+}
+.lexiang-content-picker__selected-panel-list::-webkit-scrollbar-thumb {
+  background: var(--wb-kb-card-border);
+  border-radius: 3px;
+}
+.lexiang-content-picker__selected-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  transition: background-color 120ms ease;
+}
+.lexiang-content-picker__selected-panel-item:hover {
+  background: var(--wb-kb-row-hover-bg);
+}
+.lexiang-content-picker__selected-panel-item:hover .lexiang-content-picker__selected-panel-remove {
+  opacity: 1;
+}
+.lexiang-content-picker__selected-panel-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+.lexiang-content-picker__selected-panel-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+}
+.lexiang-content-picker__selected-panel-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lexiang-content-picker__selected-panel-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--wb-kb-text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.lexiang-content-picker__selected-panel-remove:hover {
+  background: var(--wb-kb-row-hover-bg);
+  color: var(--wb-kb-text-primary);
+}

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>file_doc_16</title>
+    <defs>
+        <linearGradient x1="100%" y1="29.7818714%" x2="83.6208606%" y2="29.7818714%" id="linearGradient-1">
+            <stop stop-color="#1E6FFF" offset="0%"></stop>
+            <stop stop-color="#144DEB" offset="100%"></stop>
+        </linearGradient>
+        <radialGradient cx="76.9874855%" cy="0%" fx="76.9874855%" fy="0%" r="135.344165%" gradientTransform="translate(0.769875,0.000000),scale(1.000000,0.924953),rotate(122.041388),translate(-0.769875,-0.000000)" id="radialGradient-2">
+            <stop stop-color="#34A4FF" offset="0%"></stop>
+            <stop stop-color="#1E6FFF" offset="99.9234586%"></stop>
+        </radialGradient>
+        <path d="M11.1894016,0 C11.6490157,-8.44297257e-17 12.0216064,0.37259078 12.0216064,0.8322048 L12.0216064,14 L0.8322048,14 C0.37259078,14 -3.87802726e-16,13.6274092 0,13.1677952 L0,0.8322048 C-5.62864838e-17,0.37259078 0.37259078,4.17496633e-16 0.8322048,0 L11.1894016,0 Z M12.034289,13.0738462 C12.034289,13.5816256 12.4429308,13.9939616 12.9492946,13.9999343 L12.9493408,14 L12.023187,14 L12.023187,13.0738462 L12.034289,13.0738462 L12.034289,13.0738462 Z" id="path-3"></path>
+        <filter x="-7.7%" y="-7.1%" width="115.4%" height="114.3%" filterUnits="objectBoundingBox" id="filter-4">
+            <feGaussianBlur stdDeviation="0.5" in="SourceAlpha" result="shadowBlurInner1"></feGaussianBlur>
+            <feOffset dx="0" dy="1" in="shadowBlurInner1" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 1   0 0 0 0 1   0 0 0 0 1  0 0 0 0.24 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+        <polygon id="path-5" points="2.24998047 10.0825293 9.51118164 10.0825293 9.51118164 11.7597949 2.24998047 11.7597949"></polygon>
+        <filter x="-13.8%" y="-59.6%" width="155.1%" height="338.5%" filterUnits="objectBoundingBox" id="filter-6">
+            <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0.0901960784   0 0 0 0 0.360784314   0 0 0 0 0.921568627  0 0 0 0.801491477 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+        <polygon id="path-7" points="2.24998047 7.28581055 9.51118164 7.28581055 9.51118164 8.96581055 2.24998047 8.96581055"></polygon>
+        <filter x="-13.8%" y="-59.5%" width="155.1%" height="338.1%" filterUnits="objectBoundingBox" id="filter-8">
+            <feOffset dx="1" dy="1" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="0.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.2 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="品类图标库" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="腾讯文档品类图标切图库" transform="translate(-1231.000000, -375.000000)">
+            <g id="file_doc_16" transform="translate(1231.000000, 375.000000)">
+                <rect id="bg" fill="#FFFFFF" opacity="0" x="0" y="0" width="16" height="16"></rect>
+                <g id="编组" transform="translate(1.000000, 1.000000)">
+                    <path d="M3.39227449,3.01965332 L13.1677952,3.01965332 C13.6274092,3.01965332 14,3.3922441 14,3.85185812 L14,13.1677952 C14,13.6274092 13.6274092,14 13.1677952,14 L3.39227449,14 C2.93266048,14 2.56006969,13.6274092 2.56006969,13.1677952 L2.56006969,3.85185812 C2.56006969,3.3922441 2.93266048,3.01965332 3.39227449,3.01965332 Z" id="背景板" fill="url(#linearGradient-1)"></path>
+                    <g id="前景板">
+                        <use fill="url(#radialGradient-2)" fill-rule="evenodd" xlink:href="#path-3"></use>
+                        <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
+                    </g>
+                    <g id="形状2">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
+                        <use fill="#B3D9FF" fill-rule="evenodd" xlink:href="#path-5"></use>
+                    </g>
+                    <g id="形状1">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-8)" xlink:href="#path-7"></use>
+                        <use fill="#D3F3FF" fill-rule="evenodd" xlink:href="#path-7"></use>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

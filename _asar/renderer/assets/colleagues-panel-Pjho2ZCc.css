@@ -1,0 +1,578 @@
+.assistant-quota-limit-modal .assistant-quota-limit-modal__content {
+  color: var(--wb-text-secondary, #595959);
+  font-size: 14px;
+  line-height: 22px;
+}
+/**
+ * Sidebar rail（左侧助理/同事列表）样式 —— 设计稿对齐说明：
+ *
+ * 小窗（默认形态）对齐 152:1473 / 152:1348：
+ *   - sidebar 总宽 174，padding 12（由 .colleagues-chat-float__sidebar 控制），rail 内宽 150
+ * 大窗 (.is-wide) 对齐 175:191 / 175:290：
+ *   - sidebar 总宽 220，padding 16，rail 内宽 188
+ *
+ * 项规格（小窗、大窗一致，rail 项随 sidebar 内宽自适应宽度）：
+ *   - rail 项之间间距 6px
+ *   - 项高 44，圆角 8
+ *   - 助理头像 32x32 圆角 8（带渐变底）；同事头像 34x34 圆角 8 白底带描边
+ *   - 名字 PingFang SC Medium 12/20；角色 Regular 10/18 透明度 0.5
+ *   - 激活底色 #EFEFEF；未激活透明
+ *   - chevron 16x16，仅在「该项有历史会话」时渲染
+ */
+.colleagues-chat-float__expert-rail {
+  min-height: 0;
+  /* 由 sidebar 控制 padding，rail 内不再额外 padding */
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-right: 0;
+  background: transparent;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.colleagues-chat-float__expert-pin {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.colleagues-chat-float__expert-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cb-text-primary) 22%, transparent) transparent;
+}
+.colleagues-chat-float__expert-list::-webkit-scrollbar {
+  width: 6px;
+}
+.colleagues-chat-float__expert-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.colleagues-chat-float__expert-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cb-text-primary) 22%, transparent);
+}
+.colleagues-chat-float__expert-page {
+  min-height: 0;
+  width: 100%;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+/**
+ * 助理（云助理）与第一个普通同事之间的分隔线（设计稿 175:334 Vector 7818）：
+ * 横跨 sidebar 内容宽度（188），1px，颜色 #E6E6E6。
+ * 由于 expert-rail flex column 之间已有 6px gap，divider 不需要额外 margin。
+ */
+.colleagues-chat-float__expert-divider {
+  width: 100%;
+  height: 1px;
+  flex: 0 0 auto;
+  background: #E6E6E6;
+  margin: 0;
+}
+.colleagues-chat-float__expert-group {
+  min-width: 0;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/**
+ * 单个 rail 项（设计稿 175:311 / 175:322 / 175:301 / 175:342 / 175:291）
+ * 项高 44，整体只在水平方向有 6px 内 padding，垂直由 align-items 居中
+ */
+.colleagues-chat-float__expert-item {
+  width: 100%;
+  min-width: 0;
+  /* 设计稿项高 44，内部内容居中 */
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cb-text-primary);
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+  box-sizing: border-box;
+}
+.colleagues-chat-float__expert-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+/* 设计稿激活底色：#EFEFEF（rgb 239,239,239） */
+.colleagues-chat-float__expert-item.is-active {
+  background: #EFEFEF;
+}
+/**
+ * 头像
+ *   - 助理（kind="assistant"）：32x32，渐变底色（云助理图标）
+ *   - 同事（kind="colleague"）：34x34，白底 1px 灰描边
+ */
+.colleagues-chat-float__expert-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  object-fit: cover;
+  overflow: hidden;
+}
+.colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar {
+  width: 34px;
+  height: 34px;
+  background: #FFFFFF;
+  border: 1px solid #EBEBEB;
+  box-sizing: border-box;
+}
+/**
+ * 助理（云助理）头像：与 cloud-assistant-upgrade-banner__icon 视觉对齐 ——
+ * 薄荷绿底 + 透明 PNG 人物居底显示。
+ * 1. 通过 padding + object-fit:contain + object-position:bottom 让透明 PNG 在 img
+ *    元素内居底缩放，padding 区域露出 background-color 做底色。
+ * 2. 必须显式 box-sizing:border-box，否则 padding 会把头像撑大破坏 rail 布局。
+ * 3. object-fit/object-position 仅在 img 元素上有效；非图片头像（initials 兜底）
+ *    走 colleague-card-avatar--N 类，不会命中此规则。
+ */
+.colleagues-chat-float__expert-item[data-kind='assistant'] .colleagues-chat-float__expert-avatar.colleague-card-avatar--image {
+  background: var(--wb-palette-brand-3);
+  box-sizing: border-box;
+  object-fit: contain;
+  object-position: center bottom;
+}
+.colleagues-chat-float__expert-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+  text-align: left;
+}
+.colleagues-chat-float__expert-meta strong,
+.colleagues-chat-float__expert-role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 名字：PingFang SC Medium 12/20 黑 0.9 */
+.colleagues-chat-float__expert-meta strong {
+  color: rgba(0, 0, 0, 0.9);
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+}
+/* 角色：PingFang SC Regular 10/18 黑 0.5 */
+.colleagues-chat-float__expert-role {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 9px;
+  line-height: 18px;
+  font-weight: 400;
+}
+/**
+ * Chevron（16x16，下箭头）
+ * 仅在「该项有历史会话」时渲染（由 React 条件渲染控制）
+ * 展开态（is-expanded）旋转 180°
+ */
+.colleagues-chat-float__expert-chevron {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  color: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  border-radius: 4px;
+  transition: transform 0.15s ease, background-color 0.12s ease;
+}
+.colleagues-chat-float__expert-chevron::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translate(-50%, -75%) rotate(45deg);
+}
+.colleagues-chat-float__expert-chevron:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.colleagues-chat-float__expert-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+/**
+ * 头像下展开的会话列表（嵌入的 ColleaguesChatFloatTaskList）
+ * 设计稿规格（175:335）：每条会话项 高 28，圆角 8，灰底 #EFEFEF，
+ * 左侧状态点 10x10（绿色 #0CBF5B 圆 + 白对勾），
+ * 文字 PingFang SC Regular 11/20 黑 0.7，右侧操作按钮 wb-ellipsis 16x16
+ */
+.colleagues-chat-float__expert-tasks {
+  min-width: 0;
+  margin-top: 4px;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list {
+  min-height: 0;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+  overflow: visible;
+}
+/* 嵌入态隐藏「+ 新建」按钮和「会话」分组标题，让列表干净只剩条目 */
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-new,
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-title {
+  display: none;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-scroll {
+  flex: 0 0 auto;
+  gap: 4px;
+  /**
+     * 限制助理任务列表的最大高度，避免任务过多时把同事区域挤窄。
+     * 160px ≈ 5 条任务卡（每条 28px + gap 4px）。超出走内部滚动。
+     */
+  max-height: 160px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cb-text-primary) 22%, transparent) transparent;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cb-text-primary) 22%, transparent);
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty {
+  min-height: 28px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #EFEFEF;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item {
+  min-height: 28px;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  background: #EFEFEF;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-main,
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-meta {
+  min-height: 28px;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-main {
+  gap: 6px;
+}
+/* 会话状态点（设计稿 175:337/338）：绿色圆 10x10 + 白色对勾 */
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-status {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #0CBF5B;
+  color: #FFFFFF;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-status::before {
+  content: '';
+  width: 4px;
+  height: 2px;
+  border-bottom: 1.2px solid currentColor;
+  border-left: 1.2px solid currentColor;
+  transform: translateY(-1px) rotate(-45deg);
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item[data-status='running'] .colleagues-chat-float__task-list-item-status {
+  background: #3B82F6;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item[data-status='running'] .colleagues-chat-float__task-list-item-status::before {
+  width: 4px;
+  height: 4px;
+  border: 1.2px solid currentColor;
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: none;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item[data-status='failed'] .colleagues-chat-float__task-list-item-status,
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item[data-status='unknown'] .colleagues-chat-float__task-list-item-status {
+  background: #F59E0B;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item[data-status='failed'] .colleagues-chat-float__task-list-item-status::before,
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item[data-status='unknown'] .colleagues-chat-float__task-list-item-status::before {
+  width: 1.5px;
+  height: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: currentColor;
+  transform: none;
+}
+/* 会话标题：PingFang SC Regular 11/20 黑 0.7 */
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title {
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 11px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-time {
+  display: none;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-delete {
+  opacity: 1;
+  pointer-events: auto;
+  color: rgba(0, 0, 0, 0.45);
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 2;
+  min-width: 96px;
+  padding: 4px;
+  border: 1px solid var(--cb-border-subtle);
+  border-radius: 8px;
+  background: var(--cb-panel-bg-primary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--cb-text-primary) 14%, transparent);
+}
+/**
+ * Portal 渲染（脱离 task-list-scroll 的 overflow:auto 容器，挂到 body 上）
+ * 用 fixed 定位，坐标由 React 端按触发按钮的 getBoundingClientRect 算出。
+ * 必须重置 .colleagues-chat-float__expert-tasks 作用域里写死的 absolute 定位。
+ */
+.colleagues-chat-float__task-list-item-menu--portal,
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-menu--portal {
+  position: fixed;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: 1000;
+  min-width: 96px;
+  padding: 4px;
+  border: 1px solid var(--cb-border-subtle);
+  border-radius: 8px;
+  background: var(--cb-panel-bg-primary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--cb-text-primary) 14%, transparent);
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-menu-action,
+.colleagues-chat-float__task-list-item-menu--portal .colleagues-chat-float__task-list-item-menu-action {
+  width: 100%;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cb-error-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-menu-action:hover,
+.colleagues-chat-float__task-list-item-menu--portal .colleagues-chat-float__task-list-item-menu-action:hover {
+  background: color-mix(in srgb, var(--cb-error-foreground) 10%, transparent);
+}
+/* 分页器 */
+.colleagues-chat-float__expert-pager {
+  width: 100%;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cb-text-tertiary);
+}
+.colleagues-chat-float__expert-pager-btn {
+  width: 24px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.colleagues-chat-float__expert-pager-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--cb-text-secondary);
+}
+.colleagues-chat-float__expert-pager-btn:focus-visible {
+  outline: 2px solid var(--wb-colleague-brand);
+  outline-offset: 1px;
+}
+.colleagues-chat-float__expert-pager-btn:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+.colleagues-chat-float__expert-pager-chevron {
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+}
+.colleagues-chat-float__expert-pager-chevron.is-up {
+  transform: translateY(2px) rotate(45deg);
+}
+.colleagues-chat-float__expert-pager-chevron.is-down {
+  transform: translateY(-2px) rotate(225deg);
+}
+.colleagues-chat-float__expert-pager-status {
+  color: var(--cb-text-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .colleagues-chat-float__expert-list,
+  .colleagues-chat-float__expert-page {
+    gap: 4px;
+  }
+  .colleagues-chat-float__expert-pager-status {
+    font-size: 10px;
+    line-height: 14px;
+  }
+}
+/**
+ * Issue #45939：暗色主题下 rail 的文字色 / hover / active 底色覆盖。
+ * 默认（light）样式按设计稿保留固定值（#EFEFEF active / rgba(0,0,0,*) 文本）；
+ * 暗色下走 wb token 维持可读性，selector 与 colleagues-panel.less 末尾保持一致。
+ */
+[data-theme="dark"] .colleagues-chat-float__expert-item,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-item,
+body.vscode-dark .colleagues-chat-float__expert-item,
+.vscode-dark .colleagues-chat-float__expert-item,
+body.dark .colleagues-chat-float__expert-item,
+.dark .colleagues-chat-float__expert-item {
+  color: var(--wb-color-text-primary);
+  /* 同事头像（kind="colleague"）默认是白底 + 浅灰描边，暗色下需切深色避免突兀 */
+}
+[data-theme="dark"] .colleagues-chat-float__expert-item:hover,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-item:hover,
+body.vscode-dark .colleagues-chat-float__expert-item:hover,
+.vscode-dark .colleagues-chat-float__expert-item:hover,
+body.dark .colleagues-chat-float__expert-item:hover,
+.dark .colleagues-chat-float__expert-item:hover {
+  background: var(--wb-bg-hover);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-item.is-active,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-item.is-active,
+body.vscode-dark .colleagues-chat-float__expert-item.is-active,
+.vscode-dark .colleagues-chat-float__expert-item.is-active,
+body.dark .colleagues-chat-float__expert-item.is-active,
+.dark .colleagues-chat-float__expert-item.is-active {
+  background: var(--wb-bg-active);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar,
+body.vscode-dark .colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar,
+.vscode-dark .colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar,
+body.dark .colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar,
+.dark .colleagues-chat-float__expert-item[data-kind='colleague'] .colleagues-chat-float__expert-avatar {
+  background: var(--wb-bg-tertiary);
+  border-color: var(--wb-border-subtle);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-meta strong,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-meta strong,
+body.vscode-dark .colleagues-chat-float__expert-meta strong,
+.vscode-dark .colleagues-chat-float__expert-meta strong,
+body.dark .colleagues-chat-float__expert-meta strong,
+.dark .colleagues-chat-float__expert-meta strong {
+  color: var(--wb-color-text-primary);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-role,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-role,
+body.vscode-dark .colleagues-chat-float__expert-role,
+.vscode-dark .colleagues-chat-float__expert-role,
+body.dark .colleagues-chat-float__expert-role,
+.dark .colleagues-chat-float__expert-role {
+  color: var(--wb-color-text-tertiary);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-chevron,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-chevron,
+body.vscode-dark .colleagues-chat-float__expert-chevron,
+.vscode-dark .colleagues-chat-float__expert-chevron,
+body.dark .colleagues-chat-float__expert-chevron,
+.dark .colleagues-chat-float__expert-chevron {
+  color: var(--wb-color-text-secondary);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-chevron:hover,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-chevron:hover,
+body.vscode-dark .colleagues-chat-float__expert-chevron:hover,
+.vscode-dark .colleagues-chat-float__expert-chevron:hover,
+body.dark .colleagues-chat-float__expert-chevron:hover,
+.dark .colleagues-chat-float__expert-chevron:hover {
+  background: var(--wb-bg-hover);
+}
+/**
+ * 助理任务列表：嵌入式 task-list-item / empty 都写死 #EFEFEF 底色 + rgba(0,0,0,0.5/0.7) 文本，
+ * 暗色下需统一覆盖为深色底 + 亮色文本。
+ */
+[data-theme="dark"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item,
+body.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item,
+.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item,
+body.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item,
+.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item,
+[data-theme="dark"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+body.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+body.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty {
+  background: var(--wb-bg-tertiary);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title,
+body.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title,
+.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title,
+body.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title,
+.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-item-title {
+  color: var(--wb-color-text-secondary);
+}
+[data-theme="dark"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+body[data-vscode-theme-name="IDE Night"] .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+body.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+.vscode-dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+body.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty,
+.dark .colleagues-chat-float__expert-tasks .colleagues-chat-float__task-list-empty {
+  color: var(--wb-color-text-tertiary);
+}

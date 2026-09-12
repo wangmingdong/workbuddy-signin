@@ -1,0 +1,179 @@
+._thumbnailContainer_hhaih_1 {
+  position: relative;
+  display: inline-block;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  transition: all 0.2s ease-in-out;
+}
+._thumbnailContainer_hhaih_1:hover {
+  box-shadow: var(--wb-shadow-lg);
+  transform: translateY(-2px);
+}
+
+._thumbnailContent_hhaih_15 {
+  cursor: zoom-in;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+._thumbnailInstance_hhaih_25 {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  max-width: 100%;
+  max-height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+._zoomIcon_hhaih_36 {
+  width: 32px;
+  height: 32px;
+  color: var(--wb-button-primary-fg);
+}
+
+._previewOverlayMask_hhaih_42 {
+  position: absolute;
+  inset: 0;
+  background-color: var(--wb-bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-in;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  z-index: 10;
+}
+._thumbnailContent_hhaih_15:hover ._previewOverlayMask_hhaih_42 {
+  opacity: 1;
+}
+
+._previewOverlay_hhaih_42 {
+  --image-preview-motion-duration: 180ms;
+  --image-preview-motion-curve: cubic-bezier(0.2, 0, 0, 1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--wb-bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10100;
+  animation: _imagePreviewOverlayIn_hhaih_1 var(--image-preview-motion-duration) var(--image-preview-motion-curve) both;
+  -webkit-app-region: no-drag;
+}
+
+._previewOverlayClosing_hhaih_75 {
+  pointer-events: none;
+  animation-name: _imagePreviewOverlayOut_hhaih_1;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+._previewStage_hhaih_81 {
+  transform-origin: center center;
+  will-change: transform, opacity;
+  animation: _imagePreviewStageIn_hhaih_1 var(--image-preview-motion-duration) var(--image-preview-motion-curve) both;
+}
+
+._previewStageClosing_hhaih_87 {
+  animation-name: _imagePreviewStageOut_hhaih_1;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+._previewCloseActionArea_hhaih_92 {
+  top: 14px;
+  right: 14px;
+  padding: 0;
+  gap: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body[data-electron-desktop="true"][data-platform="windows"] ._previewCloseActionArea_hhaih_92,
+body[data-electron-desktop="true"]:not([data-platform="mac"]):not([data-platform="windows"]) ._previewCloseActionArea_hhaih_92 {
+  top: 44px;
+  right: 14px;
+}
+
+body[data-electron-desktop="true"][data-platform="mac"] ._previewCloseActionArea_hhaih_92 {
+  top: 50px;
+  right: 14px;
+}
+
+._previewCloseButton_hhaih_114 {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-color-text-primary);
+  box-shadow: none;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+._previewCloseButton_hhaih_114:hover {
+  background: var(--wb-bg-primary);
+  border-color: var(--wb-border-hover);
+  color: var(--wb-color-text-primary);
+}
+._previewCloseButton_hhaih_114:active {
+  background: var(--wb-bg-primary);
+}
+._previewCloseButton_hhaih_114 svg {
+  width: 14px;
+  height: 14px;
+}
+
+._previewCloseIcon_hhaih_139 {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes _imagePreviewOverlayIn_hhaih_1 {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes _imagePreviewOverlayOut_hhaih_1 {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes _imagePreviewStageIn_hhaih_1 {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes _imagePreviewStageOut_hhaih_1 {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}

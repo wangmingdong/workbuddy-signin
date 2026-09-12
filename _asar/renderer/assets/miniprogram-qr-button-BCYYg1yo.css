@@ -1,0 +1,56 @@
+.miniprogram-qr-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.miniprogram-qr-trigger:hover {
+  background-color: var(--cb-hover-bg, #282828);
+}
+.miniprogram-qr-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: transparent;
+}
+.miniprogram-qr-popup {
+  z-index: 1000;
+  background-color: var(--cb-vscode-dropdown-background, var(--vscode-dropdown-background, #212234));
+  border: 1px solid var(--cb-vscode-widget-border, var(--vscode-widget-border, #313248));
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 220px;
+}
+.miniprogram-qr-popup-title {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cb-text-primary, #d2d3e0);
+  margin-bottom: 12px;
+}
+.miniprogram-qr-popup-body {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.miniprogram-qr-popup-image {
+  width: 180px;
+  height: 180px;
+  border-radius: 8px;
+  background-color: var(--cb-panel-bg-primary);
+  border: 1px solid var(--cb-vscode-panel-border, #3c3c3c);
+}
+.miniprogram-qr-popup-desc {
+  text-align: center;
+  font-size: 12px;
+  color: var(--cb-text-secondary, #858699);
+  line-height: 1.6;
+}

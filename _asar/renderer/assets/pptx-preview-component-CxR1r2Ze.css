@@ -1,0 +1,49 @@
+._previewWithActionArea_1jvhh_1 {
+  box-sizing: border-box;
+  padding-top: 50px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+._previewContainer_1jvhh_9 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+._pptxPreviewInstance_1jvhh_15 {
+  border-radius: 8px;
+  width: 960px;
+  margin: 0 auto;
+}
+
+._pptxScrollWrapper_1jvhh_21 {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  position: relative;
+  scrollbar-color: var(--wb-scrollbar-thumb) transparent;
+}
+
+._loadingContainer_1jvhh_29,
+._errorContainer_1jvhh_30 {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--wb-color-text-primary);
+  font-size: 14px;
+  z-index: 10;
+  padding: 16px 24px;
+  background-color: var(--wb-bg-primary);
+  border-radius: 8px;
+}
+
+._errorContainer_1jvhh_30 {
+  color: var(--wb-error-foreground);
+}
+
+.pptx-preview-wrapper {
+  background: transparent !important;
+}

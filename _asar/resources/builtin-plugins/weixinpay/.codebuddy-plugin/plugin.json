@@ -1,0 +1,10 @@
+{
+  "name": "weixinpay",
+  "version": "1.6.107",
+  "description": "WeixinPay (AI支付) — Weixin Pay integration for CodeBuddy Code.",
+  "author": {
+    "name": "Tencent ClawPay Team"
+  },
+  "keywords": ["wechat", "payment", "claw", "pay"],
+  "category": "支付"
+}

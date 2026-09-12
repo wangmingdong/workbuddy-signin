@@ -1,0 +1,393 @@
+.file-version-management-panel {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--cb-text-color, #1f1f1f);
+  background-color: var(--cb-bg-color, transparent);
+}
+.file-version-management-panel *,
+.file-version-management-panel *::before,
+.file-version-management-panel *::after {
+  box-sizing: border-box;
+}
+.file-version-management-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 6px 6px;
+  border-bottom: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.06));
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.file-version-management-panel__title {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-version-management-panel__refresh {
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cb-text-color-secondary, #666);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.file-version-management-panel__refresh:hover:not(:disabled) {
+  background-color: var(--cb-bg-color-hover, rgba(0, 0, 0, 0.04));
+  color: var(--cb-text-color, #1f1f1f);
+}
+.file-version-management-panel__refresh:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.file-version-management-panel__body {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.file-version-management-panel__empty {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--cb-text-color-secondary, #888);
+  font-size: 12px;
+  word-break: break-word;
+}
+.file-version-management-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-version-commit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.04));
+  font-size: 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  min-width: 0;
+}
+.file-version-commit-row:hover {
+  background-color: var(--cb-bg-color-hover, rgba(0, 0, 0, 0.02));
+}
+.file-version-commit-row--selected {
+  background-color: var(--cb-bg-color-active, rgba(24, 144, 255, 0.06));
+  border-left-color: var(--cb-color-primary, #1890ff);
+}
+.file-version-commit-row--selected:hover {
+  background-color: var(--cb-bg-color-active, rgba(24, 144, 255, 0.08));
+}
+.file-version-commit-row__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--cb-text-color-secondary, #666);
+  min-width: 0;
+}
+.file-version-commit-row__id {
+  flex: 0 0 auto;
+  font-family: var(--cb-mono-font, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 600;
+  color: var(--cb-text-color, #1f1f1f);
+}
+.file-version-commit-row__time {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cb-text-color-secondary, #888);
+}
+.file-version-commit-row__op {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background-color: var(--cb-tag-bg, rgba(0, 0, 0, 0.04));
+  color: var(--cb-text-color-secondary, #666);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.file-version-commit-row__message {
+  font-size: 13px;
+  color: var(--cb-text-color, #1f1f1f);
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-version-commit-row__summary {
+  color: var(--cb-text-color-secondary, #888);
+  font-size: 11px;
+}
+.file-version-commit-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  min-width: 0;
+}
+.file-version-commit-row__head-badge {
+  margin-top: 4px;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: var(--cb-bg-color-info, rgba(22, 119, 255, 0.08));
+  color: var(--cb-color-primary, #1677ff);
+  font-size: 11px;
+  line-height: 16px;
+}
+.file-version-commit-row__btn {
+  padding: 3px 10px;
+  border: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.12));
+  background: transparent;
+  color: var(--cb-text-color, #1f1f1f);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 18px;
+}
+.file-version-commit-row__btn:hover:not(:disabled) {
+  background-color: var(--cb-bg-color-hover, rgba(0, 0, 0, 0.04));
+}
+.file-version-commit-row__btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.file-version-commit-row__btn--danger {
+  color: var(--cb-color-danger, #d4380d);
+  border-color: rgba(212, 56, 13, 0.3);
+}
+.file-version-commit-row__btn--danger:hover:not(:disabled) {
+  background-color: rgba(212, 56, 13, 0.06);
+}
+
+.file-version-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cb-text-color, #1f1f1f);
+  background-color: var(--cb-bg-color, transparent);
+}
+.file-version-detail__empty {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--cb-text-color-secondary, #888);
+  font-size: 12px;
+  word-break: break-word;
+}
+.file-version-detail__header {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.06));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.file-version-detail__head-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--cb-text-color-secondary, #666);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.file-version-detail__id {
+  flex: 0 0 auto;
+  font-family: var(--cb-mono-font, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-weight: 600;
+  color: var(--cb-text-color, #1f1f1f);
+}
+.file-version-detail__time {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cb-text-color-secondary, #888);
+}
+.file-version-detail__op {
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background-color: var(--cb-tag-bg, rgba(0, 0, 0, 0.04));
+  color: var(--cb-text-color-secondary, #666);
+  font-size: 10px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.file-version-detail__message {
+  font-size: 12px;
+  line-height: 17px;
+  word-break: break-word;
+  color: var(--cb-text-color, #1f1f1f);
+}
+.file-version-detail__summary {
+  font-size: 11px;
+  color: var(--cb-text-color-secondary, #888);
+}
+.file-version-detail__files {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.file-version-detail-file {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  line-height: 18px;
+  border-bottom: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.04));
+}
+.file-version-detail-file--expanded {
+  background-color: var(--cb-bg-color-hover, rgba(0, 0, 0, 0.02));
+}
+.file-version-detail-file__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+.file-version-detail-file__head:hover {
+  background-color: var(--cb-bg-color-hover, rgba(0, 0, 0, 0.02));
+}
+.file-version-detail-file__head:focus-visible {
+  outline: 2px solid var(--cb-color-primary, #1890ff);
+  outline-offset: -2px;
+}
+.file-version-detail-file__chevron {
+  flex: 0 0 auto;
+  width: 12px;
+  color: var(--cb-text-color-secondary, #888);
+  font-size: 10px;
+  text-align: center;
+}
+.file-version-detail-file__diff {
+  padding: 6px 12px 10px;
+  border-top: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.06));
+  background-color: var(--cb-bg-color, transparent);
+}
+.file-version-detail-file__diff-body {
+  max-height: 480px;
+  overflow: auto;
+  border: 1px solid var(--cb-border-color, rgba(0, 0, 0, 0.06));
+  border-radius: 4px;
+}
+.file-version-detail-file__diff-msg {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--cb-text-color-secondary, #888);
+  font-style: italic;
+}
+.file-version-detail-file__badge {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--cb-mono-font, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 3px;
+  color: #fff;
+}
+.file-version-detail-file__badge--added {
+  background-color: var(--cb-color-success, #52c41a);
+}
+.file-version-detail-file__badge--modified {
+  background-color: var(--cb-color-warning, #faad14);
+}
+.file-version-detail-file__badge--deleted {
+  background-color: var(--cb-color-danger, #ff4d4f);
+}
+.file-version-detail-file__badge--renamed {
+  background-color: var(--cb-color-info, #1890ff);
+}
+.file-version-detail-file__badge--unknown {
+  background-color: var(--cb-text-color-secondary, #888);
+}
+.file-version-detail-file__path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--cb-mono-font, ui-monospace, SFMono-Regular, Menlo, monospace);
+  word-break: break-all;
+}
+.file-version-detail-file__old {
+  color: var(--cb-text-color-secondary, #888);
+  text-decoration: line-through;
+}
+.file-version-detail-file__arrow {
+  color: var(--cb-text-color-secondary, #888);
+  margin: 0 4px;
+}/**
+ * EnterpriseDocsWebviewBody styles —— 企业版腾讯文档链接的嵌入式 webview 容器。
+ *
+ * 通过 `DetailPanel` 的 `detailMainOverlay` slot 挂载到 `.detail-main__body`
+ * 末尾，绝对定位铺满整个产物面板主区域，叠加在默认 BrowserPreview 之上。
+ */
+.tdoc-embed-webview {
+  position: absolute;
+  inset: 0;
+  background: var(--cb-bg-primary);
+  z-index: 5;
+  display: flex;
+  overflow: hidden;
+}
+.tdoc-embed-webview__webview {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--cb-bg-primary);
+}
+.tdoc-embed-webview__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cb-text-secondary);
+  font-size: 13px;
+}

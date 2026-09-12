@@ -1,0 +1,18 @@
+#!/bin/bash
+# safe-delete rm entrypoint.
+# Shared implementation lives in safe-delete-common.sh.
+
+set -o pipefail
+
+REAL_RM="${SAFE_DELETE_REAL_RM:-/bin/rm}"
+[ -x "$REAL_RM" ] || REAL_RM="/usr/bin/rm"
+
+# Zero-overhead: no sandbox session → pass through immediately
+[ -z "$CODEBUDDY_SESSION_ID" ] && [ -z "$CLAUDE_SESSION_ID" ] && exec "$REAL_RM" "$@"
+
+SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "${SELF_DIR}/safe-delete-common.sh"
+
+safe_delete_main rm "$@"
+exit $?

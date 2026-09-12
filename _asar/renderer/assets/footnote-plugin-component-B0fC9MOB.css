@@ -1,0 +1,234 @@
+/**
+ * 脚注轻量浮窗 —— 替代之前的 modal。
+ *
+ * 复用同一组件支持两种模式：
+ * - mode='insert'：从 slash 触发，锚点是 caret rect；输入新内容或选择已有脚注
+ * - mode='edit'：从 hover card 「修改」触发，锚点是 sup 元素；编辑现有内容
+ *
+ * 通过 useOverlayPosition 自动定位：container=null 走 fixed 模式，portal 到 document.body，
+ * 不依赖 EditorOverlayContext（行内 atom 跨树渲染场景）。
+ */
+.sc-footnote-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 320px;
+  background: var(--sc-ui-surface);
+  border: 1px solid var(--sc-ui-surface-border);
+  border-radius: var(--sc-ui-radius-lg, 8px);
+  box-shadow: var(--sc-ui-surface-shadow-1), var(--sc-ui-surface-shadow-2);
+  padding: 10px;
+  font-size: 13px;
+  color: var(--sc-ui-text);
+  user-select: none;
+}
+.sc-footnote-popover__textarea {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  max-height: 120px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--sc-ui-text);
+  background: var(--sc-ui-bg-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--sc-ui-radius-md, 6px);
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  user-select: text;
+}
+.sc-footnote-popover__textarea::placeholder {
+  color: var(--sc-ui-text-muted);
+}
+.sc-footnote-popover__textarea:focus {
+  border-color: var(--sc-ui-primary);
+  background: var(--sc-ui-surface);
+  box-shadow: 0 0 0 3px var(--sc-ui-focus-ring);
+}
+.sc-footnote-popover__hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--sc-ui-text-muted);
+}
+.sc-footnote-popover__divider {
+  height: 1px;
+  background: var(--sc-ui-separator);
+  margin: 10px -10px;
+}
+.sc-footnote-popover__choose {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--sc-ui-text-muted);
+  text-align: left;
+}
+.sc-footnote-popover__choose:hover {
+  color: var(--sc-ui-text);
+}
+.sc-footnote-popover__choose__chevron {
+  font-size: 12px;
+  color: var(--sc-ui-text-muted);
+}
+.sc-footnote-popover__list {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 4px;
+  border: 1px solid var(--sc-ui-border);
+  border-radius: var(--sc-ui-radius-md, 6px);
+}
+.sc-footnote-popover__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--sc-ui-text);
+  border-bottom: 1px solid var(--sc-ui-separator);
+}
+.sc-footnote-popover__item:last-child {
+  border-bottom: none;
+}
+.sc-footnote-popover__item:hover {
+  background: var(--sc-ui-hover);
+}
+.sc-footnote-popover__item__num {
+  flex-shrink: 0;
+  color: var(--sc-ui-text-muted);
+  font-weight: 500;
+}
+.sc-footnote-popover__item__preview {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--sc-ui-text-muted);
+}
+.sc-footnote-popover__empty {
+  padding: 12px 8px;
+  text-align: center;
+  color: var(--sc-ui-text-muted);
+  font-size: 12px;
+}
+.sc-footnote-popover__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+.sc-footnote-popover__btn {
+  height: 26px;
+  padding: 0 12px;
+  font-size: 12px;
+  font: inherit;
+  border-radius: var(--sc-ui-radius-sm, 4px);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sc-footnote-popover__btn--ghost {
+  background: transparent;
+  border-color: var(--sc-ui-border);
+  color: var(--sc-ui-text-muted);
+}
+.sc-footnote-popover__btn--ghost:hover {
+  color: var(--sc-ui-text);
+  background: var(--sc-ui-hover);
+}
+.sc-footnote-popover__btn--primary {
+  background: var(--sc-ui-primary);
+  color: var(--sc-ui-text-on-primary);
+}
+.sc-footnote-popover__btn--primary:hover {
+  background: var(--sc-ui-primary-hover);
+}
+.sc-footnote-popover__btn--primary:active {
+  background: var(--sc-ui-primary-active);
+}
+.sc-footnote-popover__btn--primary:disabled {
+  opacity: var(--sc-ui-disabled-opacity, 0.5);
+  cursor: not-allowed;
+  background: var(--sc-ui-primary);
+}
+/**
+ * 脚注列表挂载点：plugin 自己 createElement + appendChild 到
+ * editor 提供的 .sc-page-bottom 常驻 slot 内。
+ *
+ * .sc-page-bottom 已与 .sc-page-body 同宽居中，这里不再额外控制宽度，
+ * 只控制 list 内部样式与上下间距。
+ */
+.sc-footnote-list-mount {
+  display: block;
+  width: 100%;
+}
+.sc-footnote-list {
+  /* 与正文之间留出明显的视觉距离 */
+  margin-top: 64px;
+  padding: 20px 0 8px;
+  border-top: 1px solid var(--sc-ui-separator);
+}
+.sc-footnote-list__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sc-ui-text-muted);
+  margin: 0 0 12px;
+}
+.sc-footnote-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: none;
+  font-size: 13px;
+  color: var(--sc-ui-text);
+}
+.sc-footnote-list__item {
+  display: flex;
+  gap: 6px;
+  padding: 6px 0;
+  line-height: 1.5;
+  transition: background-color 0.4s ease;
+  border-radius: var(--sc-ui-radius-sm, 4px);
+  padding-left: 8px;
+}
+.sc-footnote-list__item--flash {
+  background-color: var(--sc-ui-active);
+}
+.sc-footnote-list__item__num {
+  flex-shrink: 0;
+  color: var(--sc-ui-text-muted);
+  min-width: 20px;
+}
+.sc-footnote-list__item__content {
+  flex: 1;
+  word-break: break-word;
+}
+.sc-footnote-list__item__back {
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--sc-ui-text-muted);
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-size: 12px;
+  align-self: flex-start;
+}
+.sc-footnote-list__item__back:hover {
+  color: var(--sc-ui-primary);
+}
+.sc-footnote-list__item__back:disabled {
+  opacity: var(--sc-ui-disabled-opacity, 0.4);
+  cursor: not-allowed;
+}

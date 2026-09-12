@@ -1,0 +1,114 @@
+/**
+ * TopProgressBanner 样式 — 窗口顶部全局进度条
+ *
+ * 视觉参考腾讯文档：固定在整个窗口顶部居中位置，胶囊形 + 阴影 + 半透明背景，
+ * z-index 高于所有 modal 和遮罩。
+ * 颜色已迁移为 --wb-* 体系。
+ */
+.cb-top-progress-banner {
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100000;
+  -webkit-app-region: no-drag;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(480px, calc(100vw - 40px));
+  max-width: calc(100vw - 40px);
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--wb-bg-secondary, rgba(248, 248, 250, 0.95));
+  border: 1px solid var(--wb-border-default, #e5e5ea);
+  box-shadow: 0 2px 12px var(--wb-palette-black-10);
+  backdrop-filter: blur(4px);
+  animation: cb-top-progress-banner-slide-in 0.2s ease-out;
+}
+.cb-top-progress-banner__icon {
+  flex-shrink: 0;
+  color: var(--wb-button-primary-bg, #000000);
+  animation: cb-top-progress-banner-spin 1s linear infinite;
+}
+.cb-top-progress-banner__icon-done {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--wb-status-success, #07C160);
+}
+.cb-top-progress-banner__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.7));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cb-top-progress-banner__percent {
+  display: inline-block;
+  min-width: 36px;
+  margin-left: 4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cb-top-progress-banner__track {
+  flex-shrink: 0;
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--wb-border-default, #e8e8e8);
+  overflow: hidden;
+}
+.cb-top-progress-banner__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--wb-button-primary-bg, #000000);
+  transition: width 0.3s ease;
+}
+.cb-top-progress-banner__cancel {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 2px;
+  color: var(--wb-text-weak, #999);
+  pointer-events: auto;
+}
+.cb-top-progress-banner__cancel:hover {
+  color: var(--wb-text-strong, #333);
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.06));
+}
+@keyframes cb-top-progress-banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes cb-top-progress-banner-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+:root .cb-dark .cb-top-progress-banner,
+body[data-vscode-theme-kind="vscode-dark"] .cb-top-progress-banner,
+body[data-vscode-theme-name="IDE Night"] .cb-top-progress-banner,
+body.vscode-dark .cb-top-progress-banner,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .cb-top-progress-banner {
+  background: var(--wb-bg-primary, rgba(40, 40, 50, 0.95));
+  border-color: var(--wb-border-default, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 2px 12px var(--wb-palette-black-40);
+}

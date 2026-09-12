@@ -1,0 +1,275 @@
+/* AuthGuide 授权引导样式（对齐 tencent-docs 形态） */
+.lexiang-auth-guide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+}
+.lexiang-auth-guide__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: 520px;
+  gap: 20px;
+}
+/* ---- 顶部品牌图标区：WB  >>>  乐享 ---- */
+.lexiang-auth-guide__brands {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.lexiang-auth-guide__brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+.lexiang-auth-guide__brand-icon img,
+.lexiang-auth-guide__brand-icon svg {
+  display: block;
+}
+.lexiang-auth-guide__brand-icon--wb {
+  background: var(--wb-onboarding-brand-bg-green);
+  padding: 8px;
+}
+.lexiang-auth-guide__brand-icon--wb img {
+  width: 40px;
+  height: 40px;
+}
+.lexiang-auth-guide__brand-icon--lexiang {
+  background: var(--wb-onboarding-brand-bg-blue);
+  padding: 8px;
+}
+.lexiang-auth-guide__brand-icon--lexiang img {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.lexiang-auth-guide__connect-arrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--wb-color-text-placeholder);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 600;
+  user-select: none;
+}
+.lexiang-auth-guide__connect-arrow {
+  display: inline-block;
+  line-height: 1;
+  opacity: 0.25;
+  animation: lexiang-auth-arrow-flow 1.6s ease-in-out infinite;
+}
+.lexiang-auth-guide__connect-arrow--1 {
+  animation-delay: 0s;
+}
+.lexiang-auth-guide__connect-arrow--2 {
+  animation-delay: 0.2s;
+}
+.lexiang-auth-guide__connect-arrow--3 {
+  animation-delay: 0.4s;
+}
+@keyframes lexiang-auth-arrow-flow {
+  0% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+    color: var(--wb-color-text-placeholder);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(0);
+    color: var(--wb-brand-bright);
+  }
+  70% {
+    opacity: 0.5;
+    transform: translateX(1px);
+    color: var(--wb-brand-soft);
+  }
+  100% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+    color: var(--wb-color-text-placeholder);
+  }
+}
+/* ---- 标题 ---- */
+.lexiang-auth-guide__title {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--wb-text-strong, #111);
+}
+/* ---- 描述文案 ---- */
+.lexiang-auth-guide__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--wb-text-medium, #6b6d7b);
+  max-width: 440px;
+}
+.lexiang-auth-guide__desc strong {
+  color: inherit;
+  font-weight: inherit;
+}
+/* ---- 权限卡片 ---- */
+.lexiang-auth-guide__permissions {
+  width: 100%;
+  padding: 20px 24px;
+  border-radius: 6px;
+  background: var(--wb-bg-secondary, #f7f8fa);
+  border: none;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lexiang-auth-guide__permissions-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--wb-text-weak, #8b8d98);
+  line-height: 1.4;
+}
+.lexiang-auth-guide__permissions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lexiang-auth-guide__permission-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.lexiang-auth-guide__permission-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--wb-text-strong);
+  margin-top: 2px;
+}
+.lexiang-auth-guide__permission-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lexiang-auth-guide__permission-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--wb-text-strong, #111);
+  line-height: 1.4;
+}
+.lexiang-auth-guide__permission-desc {
+  font-size: 12px;
+  color: var(--wb-text-weak, #8b8d98);
+  line-height: 1.5;
+}
+/* ---- 主行动按钮（乐享黑色主按钮） ---- */
+.lexiang-auth-guide__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--wb-kb-btn-primary-bg, #1a1a1a);
+  color: var(--wb-kb-btn-primary-fg);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+}
+.lexiang-auth-guide__btn:hover:not(:disabled) {
+  background: var(--wb-kb-btn-primary-bg-hover, #000000);
+}
+.lexiang-auth-guide__btn:active:not(:disabled) {
+  background: var(--wb-kb-btn-primary-bg-hover, #000000);
+}
+.lexiang-auth-guide__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.lexiang-auth-guide__btn-label {
+  line-height: 1;
+}
+.lexiang-auth-guide__btn--loading {
+  opacity: 0.75;
+}
+.lexiang-auth-guide__btn--loading:hover:not(:disabled) {
+  background: var(--wb-kb-btn-primary-bg);
+}
+/* ---- 底部隐私提示 ---- */
+.lexiang-auth-guide__footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-text-weak, #8b8d98);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.lexiang-auth-guide__footer svg {
+  color: var(--wb-brand-bright);
+  flex-shrink: 0;
+}
+.lexiang-auth-guide__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: lexiang-auth-spin 0.6s linear infinite;
+}
+@keyframes lexiang-auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lexiang-auth-webview-container {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.lexiang-auth-webview {
+  width: 100%;
+  height: 100%;
+  min-height: 530px;
+  border: none;
+}
+/* Dark Mode */
+.dark .lexiang-auth-guide__title {
+  color: var(--wb-text-strong, #d2d3e0);
+}
+.dark .lexiang-auth-guide__permissions {
+  background: var(--wb-bg-secondary, #25262b);
+}
+.dark .lexiang-auth-guide__permission-icon {
+  color: var(--wb-text-strong);
+}
+.dark .lexiang-auth-guide__permission-label {
+  color: var(--wb-text-strong, #d2d3e0);
+}

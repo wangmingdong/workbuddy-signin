@@ -1,0 +1,295 @@
+/* 公式编辑弹窗样式 */
+/* Dialog 基础（overlay + 居中定位）由 @tencent/smart-doc-ui Dialog 组件提供 */
+/* --sc-ui-* token 由 @tencent/smart-doc-ui 注入 :root，无需 @import 即可直接使用 */
+.sc-equation-modal {
+  display: flex;
+  flex-direction: column;
+  width: 900px;
+  max-width: calc(100vw - 64px);
+  height: 600px;
+  max-height: calc(100vh - 64px);
+  background: var(--sc-ui-surface, #fff);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 20px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  /* 简单模式（移动端） */
+}
+.sc-equation-modal--simple {
+  width: calc(100vw - 32px);
+  max-width: 400px;
+  height: auto;
+  max-height: calc(100vh - 64px);
+  transform: translate(-50%, -100%);
+}
+.sc-equation-modal--simple .sc-equation-modal-editor {
+  border-right: none;
+  padding: 12px 16px;
+}
+.sc-equation-modal--simple .sc-equation-modal-header {
+  padding: 10px 20px;
+}
+.sc-equation-modal--simple .sc-equation-modal-textarea {
+  min-height: 80px;
+}
+.sc-equation-modal--simple .sc-equation-modal-footer {
+  justify-content: flex-end;
+}
+/* ── 头部 ── */
+.sc-equation-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  flex-shrink: 0;
+}
+.sc-equation-modal-header__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sc-ui-text, #1a1a1a);
+}
+.sc-equation-modal-header__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--sc-ui-text-muted, #999);
+  transition: background 0.15s, color 0.15s;
+}
+.sc-equation-modal-header__close:hover {
+  background: var(--sc-ui-hover, rgba(0, 0, 0, 0.05));
+  color: var(--sc-ui-text, #1a1a1a);
+}
+/* ── 主体 ── */
+.sc-equation-modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* ── 左侧编辑区 ── */
+.sc-equation-modal-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 3;
+  padding: 16px 20px;
+  border-right: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  min-width: 0;
+}
+.sc-equation-modal-editor__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sc-ui-text-muted, #666);
+  margin-bottom: 8px;
+}
+.sc-equation-modal-textarea {
+  flex: 1;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  border-radius: 8px;
+  resize: none;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sc-ui-text, #1a1a1a);
+  background: var(--sc-ui-surface-raised, #fafafa);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.sc-equation-modal-textarea:focus {
+  border-color: var(--sc-ui-primary, #1677ff);
+}
+.sc-equation-modal-textarea::placeholder {
+  color: var(--sc-ui-text-muted, #bbb);
+}
+.sc-equation-modal-preview {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  border-radius: 8px;
+  min-height: 80px;
+  max-height: 200px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sc-ui-surface, #fff);
+}
+.sc-equation-modal-preview__content {
+  width: 100%;
+  text-align: center;
+  overflow-x: auto;
+}
+.sc-equation-modal-preview__content .katex-display {
+  margin: 0;
+}
+.sc-equation-modal-preview__placeholder {
+  color: var(--sc-ui-text-muted, #ccc);
+  font-size: 14px;
+}
+/* ── 右侧快速输入 ── */
+.sc-equation-modal-quick-input {
+  display: flex;
+  flex-direction: column;
+  flex: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.sc-equation-modal-quick-input__header {
+  padding: 16px 16px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sc-ui-text-muted, #666);
+  flex-shrink: 0;
+}
+/* Tabs 容器需要 flex 布局以占满剩余空间 */
+.sc-equation-modal-quick-input__tabs-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* Tabs List 覆盖 */
+.sc-equation-modal-quick-input__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  flex-shrink: 0;
+}
+.sc-equation-modal-quick-input__tab {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--sc-ui-text-muted, #999);
+  border-bottom: 2px solid transparent;
+  border-radius: 4px 4px 0 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sc-equation-modal-quick-input__tab:hover {
+  color: var(--sc-ui-text, #1a1a1a);
+}
+.sc-equation-modal-quick-input__tab[data-state='active'] {
+  color: var(--sc-ui-primary, #1677ff);
+}
+.sc-equation-modal-quick-input__tab[data-state='active']::after {
+  background: var(--sc-ui-primary, #1677ff);
+}
+.sc-equation-modal-quick-input__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  min-height: 0;
+}
+.sc-equation-modal-quick-input__content[data-state='inactive'] {
+  display: none;
+}
+/* ── 符号面板 ── */
+.sc-equation-modal-symbols-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sc-equation-modal-symbol-section__title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sc-ui-text-muted, #999);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.sc-equation-modal-symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 4px;
+}
+.sc-equation-modal-symbol-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 4px;
+  border: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  border-radius: 6px;
+  background: var(--sc-ui-surface, #fff);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  overflow: hidden;
+}
+.sc-equation-modal-symbol-btn:hover {
+  background: var(--sc-ui-hover, rgba(0, 0, 0, 0.04));
+  border-color: var(--sc-ui-primary, #1677ff);
+}
+.sc-equation-modal-symbol-btn .katex {
+  font-size: 0.85em;
+}
+/* ── 示例卡片 ── */
+.sc-equation-modal-examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sc-equation-modal-example-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  border-radius: 8px;
+  background: var(--sc-ui-surface, #fff);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.1s, border-color 0.1s;
+}
+.sc-equation-modal-example-card:hover {
+  background: var(--sc-ui-hover, rgba(0, 0, 0, 0.03));
+  border-color: var(--sc-ui-primary, #1677ff);
+}
+.sc-equation-modal-example-card__formula {
+  overflow: hidden;
+}
+.sc-equation-modal-example-card__formula .katex-display {
+  margin: 0;
+  text-align: left;
+}
+.sc-equation-modal-example-card__formula .katex {
+  font-size: 0.9em;
+}
+.sc-equation-modal-example-card__desc {
+  font-size: 11px;
+  color: var(--sc-ui-text-muted, #999);
+}
+/* ── 底部 ── */
+.sc-equation-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid var(--sc-ui-surface-border, #e5e5e5);
+  flex-shrink: 0;
+}
+.sc-equation-modal-footer__help {
+  font-size: 12px;
+  color: var(--sc-ui-text-muted, #999);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.sc-equation-modal-footer__help:hover {
+  color: var(--sc-ui-primary, #1677ff);
+}
+.sc-equation-modal-footer__actions {
+  display: flex;
+  gap: 8px;
+}

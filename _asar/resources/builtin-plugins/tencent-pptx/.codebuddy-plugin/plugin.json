@@ -1,0 +1,15 @@
+{
+  "name": "tencent-pptx",
+  "version": "v20260712",
+  "description": "由腾讯文档团队出品的演示文稿智能助手，支持通过自然语言创建、编辑与排版幻灯片",
+  "author": {
+    "name": "Tencent Docs Slide Team"
+  },
+  "keywords": [
+    "presentation",
+    "slide",
+    "pptx"
+  ],
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json"
+}

@@ -1,0 +1,36 @@
+@charset "UTF-8";
+/* Foundation Icon —— 基座样式，按 wb-* token 走 */
+.wb-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* 旋转动画 —— 节奏与 Loading spinner 一致（1.2s/圈，linear infinite），
+   保证 AssistantSpinnerIcon 等收编后视觉无差异 */
+.wb-icon--spin {
+  animation: wb-icon-spin 1.2s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes wb-icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* themable：单色品牌资源在 dark 下反相，亮主题保持原色。
+   依赖 wb 主题 root 上的 .wb-theme--dark / [data-theme="dark"] / .dark 三种约定，
+   尽量覆盖 agent-ui 当前消费方的 dark 标记（详见 useTheme） */
+.wb-icon--themable {
+  filter: none;
+  transition: filter var(--wb-motion-duration-fast, 160ms) var(--wb-motion-easing-standard, ease);
+}
+
+.dark .wb-icon--themable,
+[data-theme=dark] .wb-icon--themable,
+.wb-theme--dark .wb-icon--themable {
+  filter: brightness(0) invert(1);
+}

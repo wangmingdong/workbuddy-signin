@@ -1,0 +1,3295 @@
+/* TODO: 此样式文件已超过 400 行，后续按 header/card/modal/detail 区域拆分。 */
+/* ================================================
+   Skills Panel – WorkBuddy V2 Design System
+   ================================================ */
+/* ================================================
+   公共 CategoryChip 组件样式
+   ================================================ */
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-tertiary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.category-chip:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-secondary);
+}
+.category-chip--active {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+}
+.category-chip--active:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.category-chip-label {
+  flex: 1;
+}
+.category-chip-loading {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--wb-color-text-tertiary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: category-chip-spin 0.8s linear infinite;
+}
+@keyframes category-chip-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.category-chip-more {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.category-chip-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  margin-right: -4px;
+  border-radius: 4px;
+  color: var(--wb-color-text-tertiary);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.category-chip-more-btn:hover {
+  background: var(--wb-bg-hover-light);
+  color: var(--wb-color-text-primary);
+}
+.category-chip-more-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.category-chip-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 100px;
+  padding: 4px;
+  background: var(--wb-bg-popover);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  box-shadow: var(--wb-shadow-dialog-md);
+  z-index: 1000;
+}
+.category-chip-dropdown-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--wb-color-text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.category-chip-dropdown-item:hover {
+  background: var(--wb-bg-hover);
+}
+.category-chip-dropdown-item--danger {
+  color: var(--wb-error-foreground);
+}
+.category-chip-dropdown-item--danger:hover {
+  background: color-mix(in srgb, var(--wb-error-foreground) 10%, transparent);
+}
+/* ================================================ */
+.skills-view {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--wb-home-bg-secondary);
+  /* 统一市场顶栏：承接 UnifiedMarketPage 注入的 tabs / 搜索 / 操作按钮。
+	   单行布局：搜索框固定宽度；窄屏由 JS 把按钮切 iconOnly 腾空间（见 skills.tsx）。 */
+  /* 顶栏按钮（含 iconOnly 32×32）不可被 flex 压扁，
+	   空间不够时先压搜索框而不是把按钮压成半宽。 */
+  /* 搜索框默认 200px；窄屏（<980，与 skills.tsx iconOnly 阈值一致）允许缩到 120px，
+	   避免 iconOnly 按钮切换后搜索框仍占死 200px 把按钮挤出容器右边界。 */
+}
+@media (max-width: 600px) {
+  .skills-view {
+    padding: 0 16px;
+  }
+}
+.skills-view .workbuddy-topbar.ec-topbar {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 24px;
+  flex-shrink: 0;
+  background: var(--wb-home-bg-secondary);
+  -webkit-app-region: drag;
+}
+.skills-view .ec-topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+.skills-view .ec-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  /* min-width:0 让右侧组能在 iconOnly 切换的临界宽度让路，
+		   避免英文 locale 下按钮 + 200px 搜索框把容器撑破、搜索框右边界视觉裁切。 */
+  min-width: 0;
+  flex-shrink: 1;
+  -webkit-app-region: no-drag;
+}
+.skills-view .ec-topbar__right > .wb-button {
+  flex: 0 0 auto;
+}
+.skills-view .ec-search-wrapper {
+  position: relative;
+  width: 200px;
+  min-width: 120px;
+  flex: 0 1 200px;
+}
+.skills-view .ec-topbar--subpage .ec-topbar__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+.skills-view .ec-topbar--subpage .ec-topbar__back:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skills-view .ec-topbar--subpage .ec-topbar__back svg {
+  flex-shrink: 0;
+}
+.skills-view .ec-subpage-title {
+  margin: 0;
+  padding: 12px 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+@media (max-width: 540px) {
+  .skills-view .ec-search-wrapper {
+    width: 100%;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+}
+/* ================================================
+   统一市场详情态外壳
+   ------------------------------------------------
+   统一市场（UnifiedMarketPage）下进入 skill / plugin 详情时，
+   外层套一个与「我安装的」子页面同款的 ec-topbar--subpage 顶栏，
+   保证从任意详情都能一键返回；详情视图自身的返回按钮在此作用域下隐藏。
+   ================================================ */
+.skills-view--detail {
+  overflow: hidden;
+  /* 详情内容自身处理滚动，外层 wrapper 不再裁剪。 */
+  /* 隐藏详情视图自带的「‹ 技能 / ‹ 全部技能」按钮，统一由 ec-topbar 接管。 */
+}
+.skills-view--detail .skill-detail-view,
+.skills-view--detail .cb-plugin-detail {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.skills-view--detail .skill-detail-back,
+.skills-view--detail .cb-plugin-detail-back {
+  display: none !important;
+}
+/* ---------- Header ---------- */
+.skills-view-header {
+  padding: 7px 24px 16px;
+  flex-shrink: 0;
+}
+.skills-view-header h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.33;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.skills-view-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  line-height: 1.5;
+}
+.skills-view-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.skills-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.skills-header-actions .cb-search-input {
+  width: 220px;
+  min-width: 120px;
+  flex-shrink: 1;
+  min-height: 36px;
+  border-radius: 6px;
+  border-color: var(--wb-border-subtle);
+  background-color: var(--wb-bg-secondary);
+  border: none;
+}
+.skills-header-actions .cb-search-input:focus-within {
+  border-color: transparent;
+  background-color: var(--wb-bg-secondary);
+}
+.skills-header-actions .cb-search-input .cb-search-input__input {
+  height: 34px;
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .skills-header-actions {
+    width: 100%;
+  }
+  .skills-header-actions .cb-search-input {
+    flex: 1;
+    width: auto;
+  }
+}
+.skills-upload-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.skills-upload-btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-color-text-secondary);
+}
+.skills-upload-btn:active {
+  transform: scale(0.97);
+}
+body.vscode-light .skills-upload-btn,
+body[data-vscode-theme-kind="vscode-light"] .skills-upload-btn {
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+body.vscode-light .skills-upload-btn:hover,
+body[data-vscode-theme-kind="vscode-light"] .skills-upload-btn:hover {
+  background: var(--wb-bg-hover);
+}
+/* ---------- Level-1 Tabs (技能市场 / 已安装) ---------- */
+.skills-l1-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--wb-border-subtle);
+  flex-shrink: 0;
+}
+.skills-l1-tab {
+  padding: 6px 16px 10px;
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.12s;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.skills-l1-tab:hover {
+  color: var(--wb-color-text-secondary);
+}
+.skills-l1-tab--active {
+  color: var(--wb-color-text-primary);
+  border-bottom-color: var(--wb-color-text-primary);
+}
+.skills-l1-tab--active:hover {
+  color: var(--wb-color-text-primary);
+}
+.skills-l1-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--wb-border-subtle) 60%, transparent);
+  color: var(--wb-text-weak);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.skills-l1-tab--active .skills-l1-tab-badge {
+  color: var(--wb-color-text-secondary);
+}
+/* 「我安装的 N」胶囊按钮内的数字徽标（顶栏右侧）；搜索结果 segment 的 tab 数字也复用此 class */
+.skills-installed-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--wb-color-text-tertiary) 20%, transparent);
+  color: var(--wb-color-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0;
+}
+/* 「我安装的」子页面：返回按钮已上移至宿主层 `ec-topbar--subpage`，
+   此处只剩「我安装的 N + 批量管理」一行标题区。 */
+.skills-installed-subpage {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 0;
+}
+.skills-installed-subpage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 12px;
+}
+.skills-installed-subpage-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--wb-color-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.skills-installed-subpage-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--wb-text-weak) 20%, transparent);
+  color: var(--wb-text-weak);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+}
+.skills-installed-batch-manage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.skills-installed-batch-manage:hover {
+  color: var(--wb-color-text-primary);
+}
+/* ---------- Segment Bar (二级 Tab: 推荐/SkillHub/套件/Knot) ---------- */
+.skills-segment-bar {
+  display: flex;
+  align-items: center;
+  padding: 16px 0 12px;
+  gap: 16px;
+}
+/* 「仅展示未安装」checkbox：靠右对齐，字号与二级 tab 一致（12px） */
+.skills-hide-installed-checkbox {
+  margin-left: auto;
+  gap: 6px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  /* 未选中态方框边框：复用「我安装的批量操作」卡片 checkbox 同款 token (--cb-input-border-color)
+	   foundation 默认用的 --wb-border-default 在 dark theme 下被 SSOT 标记为「可能不可见」，
+	   这里在业务 scope 里覆盖到 cb-chat-ui 同主题适配的 token，保持 light/dark 两端可见
+	   （选中态保持 foundation 默认的「中性强调面」填充，不动） */
+  /* 选中态 hover 时方框默认会切到 --wb-color-bg-primary-hover（项目里渲染成绿色），
+	   这里在本地 scope 里强制锁回选中态默认的 --wb-color-bg-primary-default（黑），
+	   保持 hover 前后方框颜色一致，仅靠 label 颜色变化体现 hover */
+}
+.skills-hide-installed-checkbox .wb-checkbox__label {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--wb-color-text-secondary);
+  transition: color 0.15s ease;
+}
+.skills-hide-installed-checkbox .wb-checkbox__input:not(:checked) + .wb-checkbox__box {
+  border-color: var(--wb-border-default);
+}
+.skills-hide-installed-checkbox:hover .wb-checkbox__label {
+  color: var(--wb-color-text-primary);
+}
+.skills-hide-installed-checkbox:hover .wb-checkbox__input:checked:not(:disabled) + .wb-checkbox__box,
+.skills-hide-installed-checkbox.wb-checkbox--indeterminate:hover .wb-checkbox__input:not(:disabled) + .wb-checkbox__box {
+  background: var(--wb-color-bg-primary-default);
+  border-color: var(--wb-color-bg-primary-default);
+}
+.skills-segment-group {
+  display: inline-flex;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  /* 走查 #57102：一级 tab 之间的间距 20px。 */
+  gap: 20px;
+}
+.skills-segment-item {
+  padding: 0 0 4px;
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--wb-color-text-tertiary);
+  cursor: pointer;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  transition: color 0.12s ease;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.skills-segment-item:hover {
+  color: var(--wb-color-text-secondary);
+  background: transparent;
+}
+.skills-segment-item--active {
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  box-shadow: none;
+}
+.skills-segment-item--active:hover {
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+/* NEW 红点（用于「企业 Skill」Tab，Issue #35325） */
+.skills-segment-item {
+  position: relative;
+}
+.skills-segment-item .skills-segment-badge-new {
+  position: absolute;
+  top: -2px;
+  right: -8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wb-status-error);
+  pointer-events: none;
+}
+/* ---------- Tab Bar (legacy, kept for backward compat) ---------- */
+.skills-tab-bar-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  flex-shrink: 0;
+}
+.skills-tab-bar {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.skills-mcp-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.skills-mcp-btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-focus);
+}
+.skills-mcp-btn:active {
+  transform: scale(0.97);
+}
+.skills-mcp-btn svg {
+  flex-shrink: 0;
+}
+.skills-tab-item {
+  position: relative;
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.skills-tab-item:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.skills-tab-item--active {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+  font-weight: 600;
+}
+.skills-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-border-subtle) 60%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--wb-color-text-secondary);
+}
+/* ---------- Content ---------- */
+.skills-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0px 24px 20px;
+  scrollbar-width: thin;
+}
+/* ---------- Installed Section ---------- */
+.skills-installed-section {
+  flex-shrink: 0;
+  padding-bottom: 16px;
+}
+.skills-enabled-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--wb-warning-soft);
+  color: var(--wb-status-warning);
+  font-size: 12px;
+  line-height: 18px;
+  margin-bottom: 12px;
+}
+.skills-enabled-warning-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.skills-enabled-warning-text {
+  flex: 1;
+}
+.skills-enabled-warning-dismiss {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wb-status-warning);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+}
+.skills-enabled-warning-dismiss:hover {
+  opacity: 1;
+}
+.skills-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+/* ---------- Installed Section More Menu ---------- */
+.skills-installed-more {
+  position: relative;
+}
+.skills-installed-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--wb-border-default);
+  background: none;
+  cursor: pointer;
+  color: var(--wb-color-text-secondary);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+.skills-installed-more-btn:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.skills-installed-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  padding: 4px 0;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px var(--wb-border-default);
+  z-index: 1000;
+  animation: skill-dropdown-in 0.15s ease;
+}
+.skills-installed-dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-radius: 6px;
+  margin: 0 4px;
+  white-space: nowrap;
+}
+.skills-installed-dropdown-item:hover {
+  background: var(--wb-bg-hover);
+}
+/* ---------- Batch Operation Header ---------- */
+.skills-batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 4px 0;
+  background: transparent;
+  border: none;
+}
+.skills-batch-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.skills-batch-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.skills-batch-selected {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  white-space: nowrap;
+}
+.skills-batch-select-all {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+.skills-batch-select-all:hover {
+  opacity: 0.8;
+}
+.skills-batch-select-all:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.skills-batch-action-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: none;
+  background: var(--wb-button-grey-bg);
+  color: var(--wb-button-grey-fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.skills-batch-action-btn svg {
+  flex-shrink: 0;
+}
+.skills-batch-action-btn:hover:not(:disabled) {
+  background: var(--wb-button-grey-bg-hover);
+  color: var(--wb-button-grey-fg);
+}
+.skills-batch-action-btn:active:not(:disabled) {
+  background: var(--wb-button-grey-bg-active);
+}
+.skills-batch-action-btn:disabled {
+  background: var(--wb-button-grey-bg-disabled);
+  color: var(--wb-button-grey-fg-disabled);
+  cursor: not-allowed;
+}
+.skills-batch-action-btn--danger {
+  /* 历史上批量「卸载」按钮用 --cb-error-foreground 强调危险语义；
+		   按当前设计要求与其他批量操作按钮（启用/禁用）保持一致的中性色，
+		   这里不再覆盖颜色，让其继承 .skills-batch-action-btn 的 grey 配色。
+		   className 保留以兼容未来差异化钩子。*/
+}
+.skills-batch-action-btn--cancel {
+  background: transparent;
+  color: var(--wb-text-weak);
+}
+.skills-batch-action-btn--cancel:hover:not(:disabled) {
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+.skills-batch-action-btn--cancel:active:not(:disabled) {
+  background: transparent;
+}
+.skills-batch-action-btn--cancel:disabled {
+  background: transparent;
+}
+/* ---------- Checkbox for Batch Mode ---------- */
+.skill-checkbox {
+  position: absolute;
+  top: 19px;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.skill-checkbox input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.skill-checkbox-mark {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  border: 1.5px solid var(--wb-color-border-secondary);
+  background: var(--wb-bg-primary);
+  transition: all 0.15s ease;
+}
+.skill-checkbox-mark::after {
+  content: '';
+  position: absolute;
+  display: none;
+  left: 50%;
+  top: 45%;
+  width: 5px;
+  height: 8px;
+  border: solid var(--wb-bg-primary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.skill-checkbox input:checked + .skill-checkbox-mark {
+  background: var(--wb-color-text-primary);
+  border: 1.5px solid var(--wb-color-text-primary);
+}
+.skill-checkbox input:checked + .skill-checkbox-mark::after {
+  display: block;
+}
+/* ---------- Grid ---------- */
+.skills-grid {
+  display: grid;
+  /* 窄窗口允许列宽收缩到父级宽度，避免 262px 硬底线撑出横向裁切。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(262px, 100%), 1fr));
+  gap: 12px;
+}
+/* ---------- Skill Card ---------- */
+.skill-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  border-radius: 16px;
+  /* 基态 border 透明占位，避免 hover 加描边时布局位移。 */
+  border: 0.5px solid transparent;
+  background: var(--wb-bg-card);
+  box-shadow: var(--wb-shadow-card-soft);
+  transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  min-height: 84px;
+  max-height: fit-content;
+  /* min-width 由父级 .skills-grid 的列宽兜底；窄窗口允许卡片收缩到容器宽度。 */
+  min-width: 0;
+  position: relative;
+  /* 保留 visible：.skill-card-menu 需要以下拉方式突破卡片边界。 */
+  overflow: visible;
+}
+.skill-card:hover {
+  background: var(--wb-bg-card-hover);
+  box-shadow: var(--wb-shadow-card-soft);
+  /* 走查 #57102：hover 时增加 #000000 8% / 0.5px 描边。 */
+  border-color: rgba(0, 0, 0, 0.08);
+}
+.skill-card--disabled .skill-card-icon {
+  opacity: 0.35;
+}
+.skill-card--disabled .skill-card-name {
+  color: var(--wb-color-text-secondary);
+  opacity: 0.55;
+}
+.skill-card--disabled .skill-card-desc {
+  color: var(--wb-color-text-tertiary);
+  opacity: 0.55;
+}
+.skill-card--disabled .skill-card-meta {
+  opacity: 0.55;
+}
+.skill-card--batch-mode {
+  cursor: pointer;
+  padding-left: 34px;
+}
+.skill-card--batch-mode .skill-card-body {
+  cursor: pointer;
+}
+.skill-card--batch-mode .skill-checkbox {
+  pointer-events: none;
+}
+/* ---------- Skill Card Content Row ---------- */
+.skill-card-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1;
+  gap: 12px;
+  min-width: 0;
+  /* Allow trailing operation slot (skill-status / skill-add-btn) to escape
+	   width clamping issues caused by absolute positioning legacy. */
+}
+/* ---------- Skill Card Badge (套件标记) ---------- */
+.skill-card-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.skill-card-badge--plugin {
+  background: color-mix(in srgb, var(--wb-accent-purple) 20%, transparent);
+  color: var(--wb-accent-purple);
+}
+/* ---------- Skill Card Name Status Icon (API Key) ---------- */
+.skill-card-name-status-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+.skill-card-name-status-icon--api-key {
+  color: currentColor;
+}
+/* ---------- Plugin Feature Tags ---------- */
+.skill-card-feature-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.skill-card-feature-tag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--wb-border-subtle) 40%, transparent);
+  color: var(--wb-color-text-tertiary);
+  white-space: nowrap;
+}
+.skill-card-feature-tag--skills {
+  background: color-mix(in srgb, var(--wb-status-success) 15%, transparent);
+  color: var(--wb-status-success);
+}
+.skill-card-feature-tag--commands {
+  background: color-mix(in srgb, var(--wb-accent-blue) 15%, transparent);
+  color: var(--wb-accent-blue);
+}
+.skill-card-feature-tag--mcp {
+  background: color-mix(in srgb, var(--wb-status-warning) 15%, transparent);
+  color: var(--wb-status-warning);
+}
+.skill-card-feature-tag--agents {
+  background: color-mix(in srgb, var(--wb-accent-pink) 15%, transparent);
+  color: var(--wb-accent-pink);
+}
+.skill-card-feature-tag--hooks {
+  background: color-mix(in srgb, var(--wb-accent-purple) 15%, transparent);
+  color: var(--wb-accent-purple);
+}
+.skill-card-feature-tag--rules {
+  background: color-mix(in srgb, var(--wb-accent-teal) 15%, transparent);
+  color: var(--wb-accent-teal);
+}
+.skill-card-main-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* ---------- Floating Update Button (常驻显示，绿色柔和 chip 风格) ---------- */
+.skill-update-float {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  height: 30px;
+  border: none;
+  background: color-mix(in srgb, var(--wb-status-success) 8%, transparent);
+  color: var(--wb-status-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wb-status-success) 22%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  z-index: 3;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.skill-update-float svg {
+  width: 12px;
+  height: 12px;
+}
+.skill-update-float:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-status-success) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wb-status-success) 32%, transparent);
+}
+.skill-update-float--updating {
+  color: var(--wb-color-text-secondary);
+  box-shadow: inset 0 0 0 1px var(--wb-color-text-secondary);
+  cursor: default;
+}
+body.vscode-dark .skill-update-float,
+body[data-vscode-theme-kind="vscode-dark"] .skill-update-float {
+  background: color-mix(in srgb, var(--wb-status-success) 10%, transparent);
+  color: var(--wb-status-success);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wb-status-success) 28%, transparent);
+}
+body.vscode-dark .skill-update-float:hover,
+body[data-vscode-theme-kind="vscode-dark"] .skill-update-float:hover {
+  background: color-mix(in srgb, var(--wb-status-success) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wb-status-success) 40%, transparent);
+}
+.skill-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-color-text-secondary);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.skill-card-icon img {
+  width: 28px;
+  height: 28px;
+  border-radius: 28px;
+}
+.skill-card-body {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.skill-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin-bottom: 2px;
+}
+.skill-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skill-risk-badge__icon {
+  width: 14px;
+  height: 14px;
+}
+.skill-risk-badge--low {
+  color: var(--wb-accent-blue);
+  background: color-mix(in srgb, var(--wb-accent-blue) 18%, transparent);
+}
+.skill-risk-badge--medium {
+  color: var(--wb-accent-orange);
+  background: color-mix(in srgb, var(--wb-accent-orange) 20%, transparent);
+}
+.skill-risk-badge--high {
+  color: var(--wb-status-error);
+  background: color-mix(in srgb, var(--wb-status-error) 20%, transparent);
+}
+.skill-card-name {
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--wb-color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.4;
+}
+.skill-card-source {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--wb-color-text-secondary);
+  background: var(--wb-bg-hover);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.skill-card-desc {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  min-height: 38px;
+  /* Span full card width: ignore left icon column when promoted to second row */
+  align-self: stretch;
+}
+.skill-card-desc--two-lines {
+  -webkit-line-clamp: 2;
+}
+.skill-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.skill-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--wb-color-text-secondary);
+}
+.skill-card-stat svg {
+  opacity: 0.7;
+}
+/* ---------- Toggle ---------- */
+.skill-toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  align-self: center;
+}
+.skill-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.skill-toggle-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary);
+  cursor: pointer;
+  transition: background 0.25s ease;
+}
+.skill-toggle-slider::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--wb-text-on-primary);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px var(--wb-border-default);
+}
+.skill-toggle input:checked + .skill-toggle-slider {
+  background: var(--wb-status-success);
+}
+.skill-toggle input:checked + .skill-toggle-slider::before {
+  transform: translateX(16px);
+}
+/* ---------- Installed Card: Status Dot + ⋯ Menu (wbdg style) ---------- */
+.skill-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  margin-left: 8px;
+  align-self: flex-start;
+  /* Sit on the title row visually; small offset compensates the icon column's vertical centering */
+  margin-top: 2px;
+}
+/* 已安装态卡片右上角的勾选标记（与 ⋯ 菜单按钮并列）。
+   设计要求：与 ⋯ 菜单按钮视觉权重一致 —— 无背景、无圆形容器，纯描边图标。
+   颜色用次要文字色（与 ⋯ 同），不使用绿色，避免抢标题视觉。
+   actionable 修饰符：hover 时切到「去试试」icon，点击触发 onTryNow。 */
+.skill-card-installed-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--wb-text-weak);
+  flex-shrink: 0;
+}
+.skill-card-installed-check svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+button.skill-card-installed-check {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+}
+button.skill-card-installed-check:hover {
+  color: var(--wb-color-text-primary);
+}
+button.skill-card-installed-check:focus-visible {
+  outline: 2px solid var(--wb-border-focus);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.skill-card-installed-check__default,
+.skill-card-installed-check__hover {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 120ms ease;
+  pointer-events: none;
+}
+.skill-card-installed-check__default {
+  opacity: 1;
+}
+.skill-card-installed-check__hover {
+  opacity: 0;
+}
+button.skill-card-installed-check:hover .skill-card-installed-check__default {
+  opacity: 0;
+}
+button.skill-card-installed-check:hover .skill-card-installed-check__hover {
+  opacity: 1;
+}
+/* Lift the whole card above neighbors when its dropdown is open,
+   so the menu doesn't render behind the next card's icon/status. */
+.skill-card:has(.skill-card-menu) {
+  z-index: 50;
+}
+.skill-card:has(.skill-card-menu) .skill-status {
+  z-index: 60;
+}
+.skill-card-menu-wrap {
+  position: relative;
+  /* 作为 .skill-status 内的 flex item，显式 inline-flex 居中 —— 让 22px button
+	   与 16px switch wrap、20px ✓ 等不同高度子元素共享同一中线，避免 inline-block
+	   baseline 漂移导致的"竖向对不齐" */
+  display: inline-flex;
+  align-items: center;
+}
+/* ──────────────────────────────────────────────────────────────────────
+   已安装卡片右上角操作槽位（仅在 installed=true 时存在）—— v2 三件套布局
+   ──────────────────────────────────────────────────────────────────────
+   顺序：[⋯] [pin] [switch]
+   显隐规则（来自截图 + 用户确认）：
+     - ⋯ (.skill-card-menu-wrap):   默认 opacity:0；卡片 hover 显示；菜单已打开时常驻
+     - pin (.skill-card-pin):       默认 opacity:0；卡片 hover 显示；已置顶（.--active）常驻
+     - switch (.skill-card-switch-wrap): 永远常驻（启用/禁用状态可见即操作），位于最右
+   批量模式下规则不变 —— 用户明确："批量操作时右上角操作不受影响"。
+   visibility: 用 opacity 控制而不是 display，避免 layout shift（保留位置） */
+/* 默认隐藏的元素：pin（未置顶时） + ⋯ —— 仅作用于「我安装的」InstalledSection 浏览态卡片
+   （.skill-card--installed-list-mode），避免影响搜索结果 / 市场各 tab / 详情页推荐里
+   走旧形态的已安装卡片（旧形态 ⋯ 应常驻、且不渲染 pin/switch）
+
+   非 hover 时不仅淡出，还要折叠宽度（width:0 + margin 收 gap），
+   把这~54px 让给左侧 name，避免"股票综合分析器"这种 7-8 字标题被过早 ellipsis。
+   hover / 已置顶 / 菜单已展开时恢复真实宽度 22px。 */
+.skill-card--installed-list-mode .skill-card-pin,
+.skill-card--installed-list-mode .skill-card-menu-wrap {
+  opacity: 0;
+  width: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease, width 120ms ease;
+}
+/* 卡片 hover：所有"hover 显示"元素淡入 + 恢复宽度 —— 同样限定到新形态 */
+.skill-card--installed-list-mode:hover .skill-card-pin,
+.skill-card--installed-list-mode:hover .skill-card-menu-wrap {
+  opacity: 1;
+  width: 22px;
+  min-width: 22px;
+  padding: initial;
+  pointer-events: auto;
+  /* 恢复 overflow：默认态用 hidden 做宽度折叠动画，弹菜单时必须放开否则 .skill-card-menu 会被 22×22 wrap 裁掉 */
+  overflow: visible;
+}
+/* 已置顶 pin：常驻（无视卡片 hover 状态） */
+.skill-card--installed-list-mode .skill-card-pin.skill-card-pin--active {
+  opacity: 1;
+  width: 22px;
+  min-width: 22px;
+  padding: initial;
+  pointer-events: auto;
+}
+/* ⋯ 菜单已展开：⋯ 按钮常驻（用 :has 让父级感知子级 .skill-card-menu 的存在） */
+.skill-card--installed-list-mode .skill-card-menu-wrap:has(.skill-card-menu) {
+  opacity: 1;
+  width: 22px;
+  min-width: 22px;
+  padding: initial;
+  pointer-events: auto;
+  /* 与 hover 分支同源：菜单弹出必须 overflow:visible */
+  overflow: visible;
+}
+/* pin 按钮本体：22×22 与 ⋯ 同尺寸，避免 switch 上下漂移 */
+.skill-card-pin {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wb-text-weak);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 120ms ease;
+  /* 已置顶态：图标用主文字色（不再灰），表达"已生效"状态 */
+}
+.skill-card-pin svg {
+  width: 14px;
+  height: 14px;
+}
+.skill-card-pin:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-card-pin:focus-visible {
+  outline: 2px solid var(--wb-border-focus);
+  outline-offset: 1px;
+}
+.skill-card-pin--active {
+  color: var(--wb-color-text-primary);
+}
+/* Switch 包装器：常驻、不参与 hover 切换；
+   宽度依赖 cb-switch size=small 的实测尺寸（40×20），但 skill-card 场景需要 26×16 严格尺寸，
+   下方对 .cb-switch--small 子元素进行局部覆盖（scope 仅限 .skill-card-switch-wrap，不影响其它消费方） */
+.skill-card-switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  /* 让 cb-chat-ui 的 .cb-switch 默认垂直居中到三件套同一基线 */
+  line-height: 0;
+  /* —— 局部尺寸覆盖：26×16（用户指定）——
+	   原 small：track 40×20，thumb 16×16(top:2 left:2)，checked 位移 +20px
+	   现 26×16：track 26×16，thumb 12×12(top:2 left:2)，checked 位移 +10px
+	     · 左侧间距 2px（left:2）
+	     · 右侧间距 2px（26 - 12 - 2 = 12，从 left:2 起算 → translateX = 12 - 2 = 10）
+	   icon 14×14 在 16 高内会溢出，缩到 10×10 */
+  /* 暗色主题下 checked track 用更深的青绿（--wb-brand-primary-deep），
+	   避免 cb-bridge 桥接的 --wb-brand-primary（dark=brand-7 偏亮）在深色背景下过于刺眼。
+	   scope 仅限 skill-card，不影响其它 cb-switch 消费方。 */
+}
+.skill-card-switch-wrap .cb-switch--small .cb-switch__track {
+  width: 26px;
+  height: 16px;
+  padding: 0;
+}
+.skill-card-switch-wrap .cb-switch--small .cb-switch__thumb {
+  width: 12px;
+  height: 12px;
+  top: 2px;
+  left: 2px;
+  /* 圆点固定白色（不分主题）—— cb-switch 默认 thumb 用 --cb-panel-bg-primary，
+			   dark 主题下落到深色面板色，圆点几乎"溶进"轨道。这里 scope 锁死白色保持反差。 */
+  background: var(--wb-text-on-primary);
+}
+.skill-card-switch-wrap .cb-switch--small.cb-switch--checked .cb-switch__thumb {
+  transform: translateX(10px);
+}
+.skill-card-switch-wrap .cb-switch--small .cb-switch__icon {
+  width: 10px;
+  height: 10px;
+}
+body.vscode-dark .skill-card-switch-wrap .cb-switch--small.cb-switch--checked .cb-switch__track,
+body[data-vscode-theme-kind="vscode-dark"] .skill-card-switch-wrap .cb-switch--small.cb-switch--checked .cb-switch__track {
+  background: var(--wb-brand-primary-deep);
+}
+.skill-card-menu-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-weak);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s;
+}
+.skill-card-menu-btn:hover,
+.skill-card-menu-btn.is-open {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-card-menu-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.skill-card-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 108px;
+  padding: 4px;
+  background: var(--wb-bg-popover);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--wb-border-default);
+  z-index: 100;
+}
+.skill-card-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.skill-card-menu-item svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.skill-card-menu-item:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-card-menu-item--danger {
+  /* 历史上"卸载"项用 --cb-error-foreground 强调危险语义；
+		   按当前设计要求与其他菜单项保持一致的中性色，这里不再覆盖颜色。
+		   className 保留以兼容埋点 (data-track-name="卸载技能") 和未来如果再需要差异化时的钩子。*/
+}
+/* Allow overflow when menu is open so dropdown isn't clipped */
+.skill-card:has(.skill-card-menu) {
+  overflow: visible;
+}
+/* ---------- Right-side Add/Use Button (wbdg style) ---------- */
+.skill-add-btn {
+  flex-shrink: 0;
+  margin-left: 8px;
+  align-self: flex-start;
+  margin-top: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+.skill-add-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+.skill-add-btn:hover {
+  background: var(--wb-border-default);
+}
+.skill-add-btn--loading {
+  pointer-events: none;
+}
+/* Light mode */
+body.vscode-light .skill-add-btn,
+body[data-vscode-theme-kind="vscode-light"] .skill-add-btn {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+body.vscode-light .skill-add-btn:hover,
+body[data-vscode-theme-kind="vscode-light"] .skill-add-btn:hover {
+  background: var(--wb-bg-hover);
+}
+/* Installed → chat icon (\"在对话中使用\") */
+.skill-use-btn {
+  color: var(--wb-color-text-primary);
+}
+/* ---------- Inline Update Icon (green dot, expands on hover — wbdg style) ---------- */
+.skill-update-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 16px;
+  padding: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--wb-status-success);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  overflow: hidden;
+  max-width: 8px;
+  transition: max-width 0.25s ease, padding 0.25s ease, background 0.25s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 4px;
+  border: none;
+  margin-top: -2px;
+}
+.skill-update-icon::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wb-status-success);
+  flex-shrink: 0;
+}
+.skill-update-icon__label {
+  margin-left: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 10px;
+  font-weight: 500;
+}
+.skill-update-icon:hover {
+  max-width: 70px;
+  padding: 0 6px 0 4px;
+  background: color-mix(in srgb, var(--wb-status-success) 6%, transparent);
+}
+.skill-update-icon:hover .skill-update-icon__label {
+  opacity: 1;
+}
+.skill-update-icon--updating {
+  /* Keep green, expand to show "更新中" text, pulse the dot */
+  max-width: 70px;
+  padding: 0 6px 0 4px;
+  background: color-mix(in srgb, var(--wb-status-success) 6%, transparent);
+  pointer-events: none;
+  cursor: default;
+}
+.skill-update-icon--updating::before {
+  animation: skill-update-pulse 1.2s ease-in-out infinite;
+}
+.skill-update-icon--updating .skill-update-icon__label {
+  opacity: 1;
+}
+@keyframes skill-update-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+/* Dark mode update icon */
+body.vscode-dark .skill-update-icon,
+body[data-vscode-theme-kind="vscode-dark"] .skill-update-icon {
+  color: var(--wb-status-success);
+}
+body.vscode-dark .skill-update-icon::before,
+body[data-vscode-theme-kind="vscode-dark"] .skill-update-icon::before {
+  background: var(--wb-status-success);
+}
+body.vscode-dark .skill-update-icon:hover,
+body[data-vscode-theme-kind="vscode-dark"] .skill-update-icon:hover {
+  background: color-mix(in srgb, var(--wb-status-success) 8%, transparent);
+}
+body.vscode-dark .skill-update-icon.skill-update-icon--updating,
+body[data-vscode-theme-kind="vscode-dark"] .skill-update-icon.skill-update-icon--updating {
+  background: color-mix(in srgb, var(--wb-status-success) 8%, transparent);
+}
+/* ---------- Floating Install Button (hover 滑入) — LEGACY ---------- */
+.skill-install-float {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  height: 30px;
+  border: none;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(calc(100% + 10px));
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+.skill-install-float svg {
+  width: 12px;
+  height: 12px;
+}
+.skill-install-float--loading {
+  opacity: 1;
+  transform: translateY(0);
+}
+body.vscode-dark .skill-install-float,
+body[data-vscode-theme-kind="vscode-dark"] .skill-install-float {
+  background: var(--wb-bg-secondary);
+  color: var(--wb-color-text-primary);
+}
+.skill-card:hover .skill-install-float {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* "试一试" button variant for installed skills */
+.skill-install-float--try-now {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  box-shadow: none;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(calc(100% + 10px));
+}
+.skill-install-float--try-now svg {
+  opacity: 0.7;
+}
+body.vscode-light .skill-install-float--try-now,
+body[data-vscode-theme-kind="vscode-light"] .skill-install-float--try-now {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-card:hover .skill-install-float--try-now {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* ---------- Skill Card Top Row ---------- */
+.skill-card-top {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 0;
+}
+/* ---------- Skill Card Reason Label (Featured) ---------- */
+.skill-card-reason {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 2;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0px 8px 0px 10px;
+  background: var(--wb-brand-primary-subtle);
+  border: none;
+  border-radius: 16px 0 8px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 24px);
+  color: var(--wb-brand-primary-deep);
+}
+.skill-card-reason::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  background-color: currentColor;
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path transform='matrix(1 0 0 1 0.999974 0.5)' d='M0 5.7L0 5.6727Q0 4.8316 0.0412 4.5297Q0.119 3.9597 0.4394 3.6393Q0.7597 3.319 1.3298 3.2412Q1.6316 3.2 2.4727 3.2L2.6535 3.2L3.4226 1.1492Q3.617 0.6307 4.0721 0.3154Q4.5272 0 5.0808 0Q5.8722 0 6.4001 0.5895Q6.9281 1.179 6.8412 1.9655L6.7045 3.2023Q7.3412 3.2083 7.6128 3.2295Q8.2529 3.2794 8.6392 3.4806Q9.6283 3.9957 9.9078 5.0753Q10.0169 5.4969 9.9217 6.1319Q9.8653 6.5073 9.6207 7.5672L9.6207 7.5673L9.5686 7.7932Q9.2248 9.2828 8.9033 9.7078Q8.5159 10.2199 7.9297 10.4823Q7.4433 10.7 5.9146 10.7L2.4727 10.7Q1.6316 10.7 1.3298 10.6588Q0.7597 10.581 0.4394 10.2606Q0.119 9.9403 0.0412 9.3703Q0 9.0684 0 8.2273L0 5.7ZM1 5.7L1 8.2273Q1 9.4071 1.1465 9.5536Q1.2884 9.6955 2.3999 9.6999L2.3999 4.2002Q1.2884 4.2045 1.1465 4.3464Q1 4.4929 1 5.6727L1 5.7ZM3.3999 4.0029L3.3999 9.7L5.9146 9.7Q7.2298 9.7 7.5211 9.5696Q7.8732 9.412 8.1059 9.1044Q8.2985 8.8498 8.5942 7.5683L8.6463 7.3424L8.6463 7.3424Q9.0306 5.6771 8.9397 5.3259Q8.7718 4.6771 8.1774 4.3676Q7.8555 4.2 6.1465 4.2Q5.9369 4.206 5.793 4.0535Q5.6405 3.9095 5.6465 3.6999Q5.6465 3.6862 5.6473 3.6725Q5.648 3.6587 5.6495 3.645L5.8472 1.8557Q5.885 1.5133 5.6552 1.2566Q5.4254 1 5.0808 1Q4.5465 1 4.3589 1.5003L3.4682 3.8755Q3.4428 3.946 3.3999 4.0029Z' fill-rule='evenodd' fill='black'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path transform='matrix(1 0 0 1 0.999974 0.5)' d='M0 5.7L0 5.6727Q0 4.8316 0.0412 4.5297Q0.119 3.9597 0.4394 3.6393Q0.7597 3.319 1.3298 3.2412Q1.6316 3.2 2.4727 3.2L2.6535 3.2L3.4226 1.1492Q3.617 0.6307 4.0721 0.3154Q4.5272 0 5.0808 0Q5.8722 0 6.4001 0.5895Q6.9281 1.179 6.8412 1.9655L6.7045 3.2023Q7.3412 3.2083 7.6128 3.2295Q8.2529 3.2794 8.6392 3.4806Q9.6283 3.9957 9.9078 5.0753Q10.0169 5.4969 9.9217 6.1319Q9.8653 6.5073 9.6207 7.5672L9.6207 7.5673L9.5686 7.7932Q9.2248 9.2828 8.9033 9.7078Q8.5159 10.2199 7.9297 10.4823Q7.4433 10.7 5.9146 10.7L2.4727 10.7Q1.6316 10.7 1.3298 10.6588Q0.7597 10.581 0.4394 10.2606Q0.119 9.9403 0.0412 9.3703Q0 9.0684 0 8.2273L0 5.7ZM1 5.7L1 8.2273Q1 9.4071 1.1465 9.5536Q1.2884 9.6955 2.3999 9.6999L2.3999 4.2002Q1.2884 4.2045 1.1465 4.3464Q1 4.4929 1 5.6727L1 5.7ZM3.3999 4.0029L3.3999 9.7L5.9146 9.7Q7.2298 9.7 7.5211 9.5696Q7.8732 9.412 8.1059 9.1044Q8.2985 8.8498 8.5942 7.5683L8.6463 7.3424L8.6463 7.3424Q9.0306 5.6771 8.9397 5.3259Q8.7718 4.6771 8.1774 4.3676Q7.8555 4.2 6.1465 4.2Q5.9369 4.206 5.793 4.0535Q5.6405 3.9095 5.6465 3.6999Q5.6465 3.6862 5.6473 3.6725Q5.648 3.6587 5.6495 3.645L5.8472 1.8557Q5.885 1.5133 5.6552 1.2566Q5.4254 1 5.0808 1Q4.5465 1 4.3589 1.5003L3.4682 3.8755Q3.4428 3.946 3.3999 4.0029Z' fill-rule='evenodd' fill='black'/></svg>");
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+}
+/* Dark mode: 背景调暗，文字保持可读对比度 */
+body.vscode-dark .skill-card-reason,
+body[data-vscode-theme-kind="vscode-dark"] .skill-card-reason {
+  background: color-mix(in srgb, var(--wb-brand-primary) 18%, transparent);
+  color: var(--wb-brand-primary);
+}
+/* ---------- Install Button (Recommended) ---------- */
+.skill-install-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, opacity 0.15s ease;
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.skill-install-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  border-color: var(--wb-border-focus);
+  transform: scale(1.08);
+}
+.skill-install-btn:active {
+  transform: scale(0.95);
+}
+.skill-install-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.skill-install-btn:disabled:hover {
+  transform: none;
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-secondary);
+  border-color: var(--wb-border-default);
+}
+.skill-install-btn--loading {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.skill-install-loading {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--wb-color-text-tertiary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: skill-install-spin 0.6s linear infinite;
+  display: inline-block;
+}
+@keyframes skill-install-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.skill-card:hover .skill-install-btn {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+/* ---------- SkillHub Install Button ---------- */
+.skillhub-install-btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-strong);
+  background: transparent;
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.skillhub-install-btn:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-color-text-secondary);
+}
+.skillhub-install-btn:active {
+  transform: scale(0.97);
+}
+.skillhub-install-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.skillhub-install-btn--installed {
+  color: var(--wb-color-text-secondary);
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+  opacity: 1;
+}
+.skillhub-install-btn--installed:hover {
+  background: transparent;
+  border-color: transparent;
+}
+.skillhub-install-btn--installing {
+  color: var(--wb-color-text-secondary);
+  border-color: var(--wb-border-default);
+  opacity: 0.8;
+}
+.skillhub-install-btn--update {
+  background: transparent;
+  border-color: var(--wb-status-success);
+  color: var(--wb-status-success);
+}
+.skillhub-install-btn--update:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-status-success) 10%, transparent);
+}
+/* ---------- Scroll Load Sentinel ---------- */
+.skills-scroll-sentinel {
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
+}
+/* ---------- Discover / Recommended Section ---------- */
+.skills-discover-section {
+  flex-shrink: 0;
+  min-height: 1000px;
+}
+.skills-discover-section--ready {
+  min-height: 0;
+}
+.skills-discover-section > h3 {
+  margin: 16px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.skills-discover-content {
+  padding-bottom: 8px;
+}
+/* ---------- Featured Section ---------- */
+.skills-featured-section {
+  padding-bottom: 20px;
+  /* 4 张里至少有 1 张会渲染推荐语：统一给所有 card 留出 padding-top，保证 4 张高度一致 */
+}
+.skills-featured-section .skill-card {
+  min-height: 109px;
+}
+.skills-featured-section--has-reasons .skill-card {
+  padding: 36px 20px 16px 20px;
+}
+.skills-featured-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.skills-featured-title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wb-color-text-primary);
+}
+body.vscode-dark .skills-featured-title,
+body[data-vscode-theme-kind="vscode-dark"] .skills-featured-title {
+  color: var(--wb-color-text-primary);
+}
+.skills-featured-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  height: 24px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-color-text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.12s ease, background-color 0.12s ease;
+  font-family: inherit;
+}
+.skills-featured-refresh-btn:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.skills-featured-refresh-btn:hover svg {
+  transform: rotate(90deg);
+}
+.skills-featured-refresh-btn:active {
+  opacity: 0.7;
+}
+.skills-featured-refresh-btn svg {
+  width: 13px;
+  height: 13px;
+  color: currentColor;
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.skills-search-result-title {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  padding: 4px 0 12px;
+}
+.skills-empty {
+  padding: 32px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+}
+.skills-partial-fail {
+  padding: 8px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+  opacity: 0.8;
+}
+/* ================================================
+   SkillHub Section
+   ================================================ */
+.skillhub-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 1000px;
+}
+.skillhub-section--ready {
+  min-height: 0;
+}
+/* ---------- Filter Bar ---------- */
+.skillhub-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 0;
+  margin-bottom: 12px;
+  border-bottom: none;
+  flex-shrink: 0;
+}
+.skillhub-categories {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.skillhub-categories-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.skillhub-category-chip {
+  height: 28px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-weak);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.skillhub-category-chip:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-secondary);
+}
+.skillhub-category-chip--active {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+}
+.skillhub-category-chip--active:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skillhub-sort {
+  display: flex;
+  gap: 4px;
+}
+.skillhub-sort-btn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.skillhub-sort-btn:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.skillhub-sort-btn--active {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.skillhub-categories-spacer {
+  flex: 1;
+}
+/* ---------- Hub Link ---------- */
+.skillhub-hub-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--wb-color-text-tertiary);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 4px 0 4px 10px;
+  transition: color 0.12s;
+  cursor: pointer;
+}
+.skillhub-hub-link:hover {
+  color: var(--wb-color-text-secondary);
+}
+/* ---------- Sort Dropdown ---------- */
+.skillhub-sort-dropdown {
+  position: relative;
+  flex-shrink: 0;
+}
+.skillhub-sort-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--wb-text-weak);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.skillhub-sort-dropdown-btn:hover {
+  border-color: var(--wb-color-text-tertiary);
+  color: var(--wb-color-text-secondary);
+}
+.skillhub-sort-dropdown-btn svg {
+  flex-shrink: 0;
+}
+.skillhub-sort-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--wb-border-default);
+  z-index: 100;
+  min-width: 120px;
+  padding: 4px;
+  animation: skill-dropdown-in 0.15s ease;
+}
+.skillhub-sort-dropdown-option {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+.skillhub-sort-dropdown-option:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skillhub-sort-dropdown-option--active {
+  color: var(--wb-color-text-primary);
+  font-weight: 600;
+}
+/* ---------- SkillHub Error & Loading ---------- */
+.skillhub-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  gap: 12px;
+}
+.skillhub-error p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--wb-color-text-secondary);
+}
+.skillhub-retry-btn {
+  height: 34px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.skillhub-retry-btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-focus);
+}
+/* issue #63313：有 cache 时的顶栏错误提示条，配合 rawSkills.length>0 时的降级路径。 */
+.skillhub-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+}
+.skillhub-error-banner-retry {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.skillhub-error-banner-retry:hover {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-focus);
+}
+.skillhub-loading-more {
+  padding: 12px 0;
+  display: flex;
+  justify-content: center;
+}
+.skillhub-scroll-sentinel {
+  height: 1px;
+  width: 100%;
+  flex-shrink: 0;
+}
+/* ---------- Skeleton / Loading ---------- */
+.skill-card--skeleton {
+  cursor: default;
+  pointer-events: none;
+}
+.skill-card--skeleton .skill-card-skeleton-block {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 25%, var(--wb-bg-hover) 50%, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 75%);
+  background-size: 200% 100%;
+  animation: skill-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.skill-card-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 25%, var(--wb-bg-hover) 50%, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 75%);
+  background-size: 200% 100%;
+  animation: skill-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.skill-card-skeleton-line--name {
+  width: 60%;
+  height: 14px;
+}
+.skill-card-skeleton-line--desc {
+  width: 90%;
+  margin-top: 6px;
+}
+.skill-card-skeleton-toggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 25%, var(--wb-bg-hover) 50%, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 75%);
+  background-size: 200% 100%;
+  animation: skill-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes skill-skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+/* ================================================
+   Skill Detail View
+   ================================================ */
+.skill-detail-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px 24px 24px;
+}
+@media (max-width: 600px) {
+  .skill-detail-view {
+    padding: 16px;
+  }
+}
+.skill-detail-back {
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  margin-bottom: 14px;
+  -webkit-app-region: no-drag;
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s ease;
+}
+.skill-detail-back:hover {
+  color: var(--wb-color-text-primary);
+}
+.skill-detail-header {
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--wb-border-subtle);
+  /* header 中 h2 / actions / stats 保持自然高度，长描述通过 <p> 自身滚动来限制。 */
+  flex-shrink: 0;
+}
+.skill-detail-header p {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--wb-color-text-primary);
+  /* 描述超长时在描述块内滚动（约 6 行），避免撑爆 header 把下方工具栏挤到不可见。 */
+  max-height: calc(1.6em * 6);
+  overflow-y: auto;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.skill-detail-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.skill-detail-header-main h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.skill-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skill-detail-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.skill-detail-more {
+  position: relative;
+}
+.skill-detail-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--wb-color-text-secondary);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+.skill-detail-more-btn:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+.skill-detail-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 160px;
+  margin-top: 4px;
+  padding: 4px 0;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px var(--wb-border-default);
+  z-index: 1000;
+  animation: skill-dropdown-in 0.15s ease;
+}
+@keyframes skill-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.skill-detail-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-radius: 6px;
+  margin: 0 4px;
+}
+.skill-detail-dropdown-item:hover {
+  background: var(--wb-bg-hover);
+}
+.skill-detail-dropdown-item--danger {
+  color: var(--wb-error-foreground);
+}
+.skill-detail-dropdown-item--danger:hover {
+  color: var(--wb-error-foreground);
+}
+.skill-detail-content-box {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 16px;
+  background: var(--wb-bg-primary);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.skill-detail-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 9px 16px 0;
+  gap: 4px;
+}
+.skill-detail-toolbar button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.skill-detail-toolbar button:hover {
+  background: var(--wb-bg-hover);
+}
+.skill-detail-toolbar button.active {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-detail-preview,
+.skill-detail-code {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 8px 24px 24px;
+  scrollbar-width: thin;
+}
+.skill-detail-meta-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.skill-detail-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.skill-detail-meta-label {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+}
+.skill-detail-meta-value {
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+}
+.skill-detail-code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.7;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  color: var(--wb-color-text-primary);
+}
+/* ---------- Detail Loading Skeleton ---------- */
+.skill-detail-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 24px 24px;
+}
+.skill-detail-skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 25%, var(--wb-bg-hover) 50%, color-mix(in srgb, var(--wb-border-subtle) 50%, transparent) 75%);
+  background-size: 200% 100%;
+  animation: skill-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.skill-detail-skeleton-line--title {
+  width: 40%;
+  height: 20px;
+  margin-bottom: 6px;
+}
+.skill-detail-skeleton-line--full {
+  width: 100%;
+}
+.skill-detail-skeleton-line--medium {
+  width: 72%;
+}
+.skill-detail-skeleton-line--short {
+  width: 45%;
+}
+/* ---------- Back to Top ---------- */
+.skills-back-to-top {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s ease;
+  opacity: 0.85;
+}
+.skills-back-to-top:hover {
+  opacity: 1;
+  color: var(--wb-color-text-primary);
+  border-color: var(--wb-color-text-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+.skills-back-to-top:active {
+  transform: scale(0.92);
+}
+/* ================================================
+   Add Skill Dropdown
+   ================================================ */
+.skills-add-btn-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.skills-add-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 100%;
+  padding: 4px 0;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  animation: skill-dropdown-in 0.15s ease;
+}
+@keyframes skill-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.skills-add-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-radius: 6px;
+  margin: 0 4px;
+  white-space: nowrap;
+}
+.skills-add-dropdown-item:hover {
+  background: var(--wb-bg-hover);
+}
+/* ---------- Installed Empty State ---------- */
+.skills-installed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 24px 16px 32px;
+  text-align: center;
+}
+.skills-installed-empty-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.skills-installed-empty-title {
+  font-size: 15px;
+  color: var(--wb-color-text-primary);
+}
+.skills-installed-empty-desc {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  line-height: 1.65;
+  max-width: 260px;
+  margin-bottom: 24px;
+}
+/* ================================================
+   Upload Skill Modal — 已抽到 upload-modal.less（跟随组件 import）
+   ================================================ */
+/**
+ * upload-modal.less — UploadModal 的独立样式
+ *
+ * 因为 UploadModal 通过 ReactDOM.createPortal 挂到 document.body，
+ * 而触发入口可能在 SkillSelector（聊天输入框）等非 skills 页面的组件中，
+ * 必须让样式跟随组件自身 import，不能依赖 skills.less 被加载。
+ */
+.skill-upload-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+  animation: skill-modal-fade-in 0.15s ease;
+}
+@keyframes skill-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.skill-upload-modal {
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  background: var(--wb-bg-popover);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: skill-modal-slide-in 0.18s ease;
+}
+@keyframes skill-modal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.skill-upload-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.skill-upload-modal-header span {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.skill-upload-modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--wb-color-text-secondary);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.skill-upload-modal-close:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-upload-drop-zone {
+  border: 1.5px dashed var(--wb-border-subtle);
+  border-radius: 10px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  background: color-mix(in srgb, var(--wb-border-subtle) 15%, transparent);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.skill-upload-drop-zone:hover {
+  border-color: var(--wb-color-text-secondary);
+  background: color-mix(in srgb, var(--wb-border-subtle) 22%, transparent);
+}
+.skill-upload-drop-zone--dragging {
+  border-color: var(--wb-color-text-brand-default);
+  border-style: solid;
+  background: color-mix(in srgb, var(--wb-color-text-brand-default) 8%, transparent);
+}
+.skill-upload-drop-zone--dragging .skill-upload-drop-title {
+  color: var(--wb-color-text-brand-default);
+}
+.skill-upload-drop-zone--disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+/* ---------- Upload Overlay ---------- */
+.skill-upload-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--wb-bg-popover);
+  border-radius: 10px;
+  animation: skill-modal-fade-in 0.2s ease;
+}
+.skill-upload-overlay-icon {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+}
+.skill-upload-overlay-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid color-mix(in srgb, var(--wb-color-text-secondary) 40%, transparent);
+  border-top-color: var(--wb-color-text-brand-default);
+  border-radius: 50%;
+  animation: skill-upload-spin 0.8s linear infinite;
+}
+.skill-upload-overlay-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+}
+.skill-upload-overlay-desc {
+  max-width: 280px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--wb-color-text-secondary);
+  text-align: center;
+}
+@keyframes skill-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.skill-upload-drop-icon {
+  color: var(--wb-color-text-secondary);
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.skill-upload-drop-title {
+  font-size: 14px;
+  color: var(--wb-color-text-primary);
+}
+.skill-upload-requirements {
+  padding: 0 2px;
+}
+.skill-upload-requirements-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+  margin-bottom: 8px;
+}
+.skill-upload-requirements-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skill-upload-requirements-list li {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  line-height: 1.5;
+}
+.skill-upload-requirements-list-item {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  line-height: 1.5;
+}
+.skill-upload-pick-zip-link {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--wb-color-text-link, var(--wb-color-brand-primary));
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.skill-upload-pick-zip-link:hover {
+  opacity: 0.85;
+}
+.skill-upload-type-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 2px;
+}
+.skill-upload-type-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: var(--wb-bg-tertiary);
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+}
+/* ================================================
+   Plugins Section (套件 Tab)
+   ================================================ */
+.plugins-section .skills-discover-content {
+  display: flex;
+  flex-direction: column;
+}
+.plugins-section .skills-grid {
+  min-height: 200px;
+}
+/* ---------- Plugins Section Title ---------- */
+.plugins-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+  margin: 0 0 12px 0;
+}
+/* ---------- Plugins Installed Section ---------- */
+.plugins-installed-section {
+  display: flex;
+  flex-direction: column;
+}
+/* ---------- Plugins Marketplace Section ---------- */
+.plugins-marketplace-section {
+  display: flex;
+  flex-direction: column;
+}
+/* ---------- Plugins Marketplace Tabs (参考 SkillHub 分类样式) ---------- */
+.plugins-marketplace-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.plugins-marketplace-tabs-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.plugins-marketplace-tab {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.plugins-marketplace-tab:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.plugins-marketplace-tab--active {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+  border-color: var(--wb-color-text-primary);
+}
+.plugins-marketplace-tab--active:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+/* ---------- Plugins Marketplace Header ---------- */
+.plugins-marketplace-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.plugins-marketplace-tab-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 2px;
+}
+.plugins-marketplace-more {
+  display: none;
+  position: relative;
+}
+.plugins-marketplace-more--visible {
+  display: flex;
+}
+.plugins-marketplace-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+.plugins-marketplace-more-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.plugins-marketplace-more-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.plugins-marketplace-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 120px;
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+.plugins-marketplace-dropdown-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.plugins-marketplace-dropdown-item:hover {
+  background: var(--wb-bg-hover);
+}
+.plugins-marketplace-dropdown-item--danger {
+  color: var(--wb-error-foreground);
+}
+.plugins-marketplace-dropdown-item--danger:hover {
+  background: color-mix(in srgb, var(--wb-error-foreground) 10%, transparent);
+}
+.plugins-marketplace-refreshing {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.plugins-add-marketplace-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px dashed var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+.plugins-add-marketplace-btn:hover {
+  border-color: var(--wb-border-focus);
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.plugins-add-marketplace-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.plugins-add-marketplace-btn--inline {
+  margin-left: 0;
+}
+/* ================================================
+   Plugin Detail Overrides (for PluginDetail component from cb-chat-ui)
+   ================================================ */
+.cb-plugin-detail {
+  padding: 20px 24px 24px;
+}
+.cb-plugin-detail-back {
+  color: var(--wb-color-text-secondary);
+  margin-bottom: 14px;
+  transition: color 0.2s ease;
+}
+.cb-plugin-detail-back:hover {
+  opacity: 1;
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-title {
+  font-size: 18px;
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-description {
+  color: var(--wb-color-text-primary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.cb-plugin-detail-update-btn,
+.cb-plugin-detail-install-btn {
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-update-btn:hover:not(:disabled),
+.cb-plugin-detail-install-btn:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-border-focus);
+}
+.cb-plugin-detail-update-btn:active,
+.cb-plugin-detail-install-btn:active {
+  transform: scale(0.97);
+}
+.cb-plugin-detail-toggle-slider {
+  background-color: var(--wb-bg-tertiary);
+  border: none;
+}
+.cb-plugin-detail-toggle-slider::before {
+  background-color: var(--wb-text-on-primary);
+}
+.cb-plugin-detail input:checked + .cb-plugin-detail-toggle-slider {
+  background-color: var(--wb-status-success);
+  border-color: var(--wb-status-success);
+}
+.cb-plugin-detail input:checked + .cb-plugin-detail-toggle-slider::before {
+  background-color: white;
+}
+.cb-plugin-detail-more-btn {
+  color: var(--wb-color-text-secondary);
+  border-radius: 8px;
+}
+.cb-plugin-detail-more-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-dropdown {
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.cb-plugin-detail-dropdown-item {
+  border-radius: 6px;
+  margin: 0 4px;
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-dropdown-item:hover {
+  background: var(--wb-bg-hover);
+}
+.cb-plugin-detail-dropdown-item--danger {
+  color: var(--wb-error-foreground);
+}
+.cb-plugin-detail-source-label {
+  color: var(--wb-color-text-secondary);
+}
+.cb-plugin-detail-source-link {
+  color: var(--wb-border-focus);
+}
+.cb-plugin-detail-section-title {
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-section-desc {
+  color: var(--wb-color-text-secondary);
+}
+.cb-plugin-detail-card {
+  border-color: var(--wb-border-subtle);
+  border-radius: 12px;
+}
+.cb-plugin-detail-card:hover {
+  border-color: var(--wb-border-focus);
+}
+.cb-plugin-detail-card-title {
+  color: var(--wb-color-text-primary);
+}
+.cb-plugin-detail-card-subtitle {
+  color: var(--wb-color-text-secondary);
+}
+/* ================================================
+   Security Warning Block (Upload Modal)
+   ================================================ */
+.skill-security-warning {
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: skill-modal-slide-in 0.18s ease;
+}
+.skill-security-warning--safe {
+  background: color-mix(in srgb, var(--wb-status-success) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-status-success) 30%, transparent);
+}
+.skill-security-warning--low {
+  background: color-mix(in srgb, var(--wb-accent-blue) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent-blue) 30%, transparent);
+}
+.skill-security-warning--medium {
+  background: color-mix(in srgb, var(--wb-accent-orange) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent-orange) 30%, transparent);
+}
+.skill-security-warning--high {
+  background: color-mix(in srgb, var(--wb-status-error) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-status-error) 30%, transparent);
+}
+.skill-security-warning--suspicious {
+  background: color-mix(in srgb, var(--wb-accent-orange) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent-orange) 30%, transparent);
+}
+.skill-security-warning--pending-async {
+  background: color-mix(in srgb, var(--wb-accent-orange) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent-orange) 30%, transparent);
+}
+.skill-security-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.skill-security-warning-icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: var(--wb-status-error);
+}
+.skill-security-warning--suspicious .skill-security-warning-icon {
+  color: var(--wb-accent-orange);
+}
+.skill-security-warning-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.skill-security-warning-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--wb-color-text-secondary);
+}
+.skill-security-warning-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.skill-security-warning-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-color-text-secondary);
+  background: color-mix(in srgb, var(--wb-border-subtle) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-border-subtle) 60%, transparent);
+}
+.skill-security-warning--high .skill-security-warning-tag {
+  color: var(--wb-status-error);
+  background: color-mix(in srgb, var(--wb-status-error) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-status-error) 25%, transparent);
+}
+.skill-security-warning--medium .skill-security-warning-tag {
+  color: var(--wb-accent-orange);
+  background: color-mix(in srgb, var(--wb-accent-orange) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-accent-orange) 25%, transparent);
+}
+.skill-security-warning--low .skill-security-warning-tag {
+  color: var(--wb-accent-blue);
+  background: color-mix(in srgb, var(--wb-accent-blue) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-accent-blue) 25%, transparent);
+}
+.skill-security-warning--suspicious .skill-security-warning-tag {
+  color: var(--wb-accent-orange);
+  background: color-mix(in srgb, var(--wb-accent-orange) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-accent-orange) 25%, transparent);
+}
+.skill-security-warning-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.skill-security-warning-actions--center {
+  justify-content: center;
+}
+.skill-security-warning-btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.skill-security-warning-btn--cancel {
+  border: 1px solid var(--wb-button-primary-bg);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.skill-security-warning-btn--cancel:hover {
+  opacity: 0.85;
+}
+.skill-security-warning-btn--confirm,
+.skill-security-warning-btn--skip {
+  border: 1px solid var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-color-text-primary);
+}
+.skill-security-warning-btn--confirm:hover:not(:disabled),
+.skill-security-warning-btn--skip:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+  border-color: var(--wb-color-text-secondary);
+}
+.skill-security-warning-btn--confirm:disabled,
+.skill-security-warning-btn--skip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* ================================================
+   Batch Update Modal
+   ================================================ */
+.skill-batch-update-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--wb-bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: skill-modal-fade-in 0.15s ease;
+}
+.skill-batch-update-modal {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--wb-palette-black-100) 20%, transparent);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: skill-modal-slide-in 0.18s ease;
+}
+.skill-batch-update-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.skill-batch-update-modal-header span {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+}
+.skill-batch-update-modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--wb-color-text-secondary);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.skill-batch-update-modal-close:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.skill-batch-update-modal-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.skill-batch-update-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.skill-batch-update-description {
+  font-size: 13px;
+  color: var(--wb-color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+.skill-batch-update-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 179px;
+  overflow-y: auto;
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--wb-border-subtle) 10%, transparent);
+}
+.skill-batch-update-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--wb-border-subtle);
+}
+.skill-batch-update-item:last-child {
+  border-bottom: none;
+}
+.skill-batch-update-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-batch-update-item-version {
+  font-size: 12px;
+  color: var(--wb-color-text-tertiary);
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.skill-batch-update-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+  /* 对齐登出弹框：一白一黑 —— primary（确认）白底黑字，secondary（取消）黑底白字
+	   通过 cb-* 变量桥接 cb-chat-ui Button，使用 Button 组件 token 不随主题反色冲突 */
+  --cb-button-primary: var(--wb-button-secondary-bg);
+  --cb-button-primary-foreground: var(--wb-button-secondary-fg);
+  --cb-input-button-background: var(--wb-button-primary-bg);
+  --cb-input-button-foreground: var(--wb-button-primary-fg);
+}
+/* 深色模式：卡片 hover 用 white 混入，与专家卡片一致 */
+body.vscode-dark .skill-card:hover,
+body[data-vscode-theme-kind="vscode-dark"] .skill-card:hover {
+  background: var(--wb-color-bg-card-hover);
+  border-color: var(--wb-border-subtle);
+}
+/* issue: #57374 主题切换时禁用 background transition，避免闪烁 */
+:root.theme-switching .skill-card,
+body.theme-switching .skill-card {
+  transition: none;
+}

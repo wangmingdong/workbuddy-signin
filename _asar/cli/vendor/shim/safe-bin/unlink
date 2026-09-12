@@ -1,0 +1,18 @@
+#!/bin/bash
+# safe-delete unlink entrypoint.
+# Shared implementation lives in safe-delete-common.sh.
+
+set -o pipefail
+
+REAL_UNLINK="${SAFE_DELETE_REAL_UNLINK:-/usr/bin/unlink}"
+[ -x "$REAL_UNLINK" ] || REAL_UNLINK="/bin/unlink"
+
+# Zero-overhead: no sandbox session → pass through immediately
+[ -z "$CODEBUDDY_SESSION_ID" ] && [ -z "$CLAUDE_SESSION_ID" ] && exec "$REAL_UNLINK" "$@"
+
+SELF_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "${SELF_DIR}/safe-delete-common.sh"
+
+safe_delete_main unlink "$@"
+exit $?

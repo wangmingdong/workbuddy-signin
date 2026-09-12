@@ -1,0 +1,261 @@
+@charset "UTF-8";
+._overlayIcon_1rd12_2 {
+  width: 24px;
+  height: 24px;
+}
+
+._previewWithActionArea_1rd12_7 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 80px;
+  padding-bottom: 20px;
+}
+
+._previewContainer_1rd12_19 {
+  position: relative;
+  width: calc(100% - 40px);
+  height: calc(100% - 120px);
+  max-width: none;
+  max-height: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 80px;
+  margin-bottom: 20px;
+}
+
+._plainPreviewContainer_1rd12_32 {
+  background-color: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  width: 100%;
+  height: 100%;
+  padding: 36px 72px;
+  overflow: auto;
+}
+
+._loadMoreContainer_1rd12_41 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  border-top: 1px solid var(--wb-border-default);
+}
+
+._loadMoreInfo_1rd12_50 {
+  font-size: 12px;
+  color: var(--wb-color-text-secondary);
+}
+
+._loadMoreButton_1rd12_55 {
+  padding: 6px 16px;
+  font-size: 13px;
+  color: var(--wb-button-primary-fg);
+  background-color: var(--wb-button-primary-bg);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+._loadMoreButton_1rd12_55:hover {
+  opacity: 0.9;
+}
+
+._codePreviewContainer_1rd12_68 {
+  background-color: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  width: 100%;
+  height: 100%;
+  padding: 36px 0;
+}
+
+._overlayButton_1rd12_76 svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes _fadeIn_1rd12_1 {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+._previewInstance_1rd12_89 {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  min-width: 320px;
+  min-height: 240px;
+}
+
+audio._previewInstance_1rd12_89 {
+  min-height: inherit;
+}
+
+._topRightActionArea_1rd12_102 {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  background-color: var(--wb-bg-primary);
+  backdrop-filter: blur(10px);
+  gap: 8px;
+  z-index: 1001;
+  border-radius: 8px;
+  padding: 6px;
+  border: 1px solid var(--wb-border-default);
+  box-shadow: var(--wb-shadow-lg);
+}
+
+body[data-electron-desktop="true"][data-platform="windows"] ._topRightActionArea_1rd12_102,
+body[data-electron-desktop="true"]:not([data-platform="mac"]):not([data-platform="windows"]) ._topRightActionArea_1rd12_102 {
+  top: 40px;
+  right: 148px;
+}
+
+body[data-electron-desktop="true"][data-platform="mac"] ._topRightActionArea_1rd12_102 {
+  top: 46px;
+}
+
+._topCenterActionArea_1rd12_128 {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1001;
+  background-color: var(--wb-bg-primary);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-color-text-primary);
+  box-shadow: var(--wb-shadow-lg);
+}
+._topCenterActionArea_1rd12_128 ._actionAreaContent_1rd12_145 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+._topCenterActionArea_1rd12_128 ._actionAreaContent_1rd12_145 ._artifactNameArea_1rd12_150 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+  border-right: 1px solid var(--wb-border-default);
+}
+._topCenterActionArea_1rd12_128 ._actionAreaContent_1rd12_145 ._artifactNameArea_1rd12_150 ._artifactName_1rd12_150 {
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+._topCenterActionArea_1rd12_128 ._actionAreaContent_1rd12_145 ._actionButtonsArea_1rd12_165 {
+  display: flex;
+  color: var(--wb-color-text-primary);
+  align-items: center;
+  gap: 8px;
+}
+._topCenterActionArea_1rd12_128 ._actionAreaContent_1rd12_145 ._actionButtonsArea_1rd12_165._searchBarArea_1rd12_171 {
+  border-left: 1px solid var(--wb-border-default);
+  padding-left: 16px;
+}
+._topCenterActionArea_1rd12_128 ._actionAreaContent_1rd12_145 ._actionButtonsArea_1rd12_165 > * {
+  flex-shrink: 0;
+}
+._topCenterActionArea_1rd12_128 ._scalePercentage_1rd12_178 {
+  color: var(--wb-color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 60px;
+  text-align: center;
+}
+._topCenterActionArea_1rd12_128 ._pageControl_1rd12_185 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+._topCenterActionArea_1rd12_128 ._pageControl_1rd12_185 ._pageControlNumber_1rd12_190 {
+  padding: 0 8px;
+}
+._topCenterActionArea_1rd12_128 ._pageControl_1rd12_185 ._pageControlSplit_1rd12_193 {
+  padding: 0 4px;
+}
+._topCenterActionArea_1rd12_128 ._pageControl_1rd12_185 input {
+  width: 48px;
+  font-size: 16px;
+  text-align: center;
+  border: 1px solid var(--wb-border-default);
+  outline: none;
+  background-color: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-family: auto;
+  /* 隐藏浏览器内置箭头 */
+  -moz-appearance: textfield;
+}
+._topCenterActionArea_1rd12_128 ._pageControl_1rd12_185 input::-webkit-outer-spin-button, ._topCenterActionArea_1rd12_128 ._pageControl_1rd12_185 input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+body[data-electron-desktop="true"][data-platform="windows"] ._topCenterActionArea_1rd12_128,
+body[data-electron-desktop="true"]:not([data-platform="mac"]):not([data-platform="windows"]) ._topCenterActionArea_1rd12_128 {
+  top: 40px;
+  max-width: calc(100vw - 296px);
+}
+
+body[data-electron-desktop="true"][data-platform="mac"] ._topCenterActionArea_1rd12_128 {
+  top: 46px;
+  max-width: calc(100vw - 200px);
+}
+
+._fullSizeFrame_1rd12_226 {
+  width: 100%;
+  height: 100%;
+}
+
+._errorMessage_1rd12_231 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+._errorMessage_1rd12_231 > span {
+  position: relative;
+  padding: 16px 24px;
+  background-color: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  color: var(--wb-error-foreground);
+  font-size: 14px;
+  text-align: center;
+  box-shadow: 0 4px 12px var(--wb-bg-overlay);
+}
+
+._disclaimerBanner_1rd12_249 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 16px;
+  background-color: var(--wb-bg-secondary);
+}
+._disclaimerBanner_1rd12_249 > span {
+  font-size: 11px;
+  color: var(--wb-color-text-secondary);
+  text-align: center;
+  line-height: 1.4;
+}

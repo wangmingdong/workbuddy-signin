@@ -1,0 +1,35 @@
+.formulaLoadingTips {
+  font-size: 0;
+  display: flex;
+  align-items: center;
+}
+.formulaLoadingTips .loadingIcon {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  animation: turn-around 1.5s linear infinite;
+}
+@keyframes turn-around {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.formulaLoadingTips .text {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--base-gray-100, #10141A);
+}
+.grid-hover-field-tooltips {
+  text-align: center;
+  line-height: 18px;
+}
+.grid-hover-field-tooltips .grid-hover-field-tooltips-sub {
+  color: var(--text-medium, rgba(11, 18, 26, 0.6));
+}
+.grid-hover-field-tooltips .grid-hover-field-tooltips-action {
+  color: var(--accent-blue, #267ef0);
+  margin-left: 8px;
+}

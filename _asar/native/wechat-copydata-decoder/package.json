@@ -1,0 +1,8 @@
+{
+    "name": "wechat-copydata-decoder",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Tiny N-API addon that decodes a Windows COPYDATASTRUCT from an Electron hookWindowMessage lParam pointer buffer.",
+    "main": "index.js",
+    "gypfile": true
+}

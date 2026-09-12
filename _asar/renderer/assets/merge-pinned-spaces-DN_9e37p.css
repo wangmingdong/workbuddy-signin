@@ -1,0 +1,1216 @@
+/**
+ * 腾讯乐享知识库面板 —— 全局 CSS token（浅色 + 深色）
+ *
+ * 该文件只包含 :root 级别的 CSS 变量声明，不含任何业务类样式。
+ * 需要由以下入口分别 import，以保证无论先进入「面板」还是先弹出「Picker」都能拿到 token：
+ *   · tencent-lexiang-panel.less（主面板）
+ *   · components/picker/lexiang-content-picker.tsx（对话里直接拉起的「选择文件」弹窗）
+ *   · components/picker/lexiang-kb-picker.tsx（对话里直接拉起的「选择知识库」弹窗）
+ *
+ * Token 命名规则：--wb-kb-{category}，kb = Knowledge Base；腾讯乐享/腾讯文档/ima 共享。
+ * 引用 --wb-* (foundation/tokens) 作为真源，fallback 为 Figma 设计稿原始值。
+ */
+:root {
+  /* ---- 品牌（仅 preview-resize-handle 使用，其余视觉已弃用） ---- */
+  --wb-kb-brand: #4ecba0;
+  --wb-kb-brand-hover: #3db890;
+  /* ---- 通用文字：Figma #E5/B2/7F/4C 000000 ---- */
+  --wb-kb-text-primary: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+  --wb-kb-text-secondary: var(--wb-text-medium, rgba(0, 0, 0, 0.7));
+  --wb-kb-text-tertiary: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
+  --wb-kb-text-muted: var(--wb-text-muted, rgba(0, 0, 0, 0.3));
+  /* ---- 卡片（列表/Banner/Selection bar） ---- */
+  --wb-kb-card-bg: var(--wb-bg-primary, #ffffff);
+  --wb-kb-card-bg-soft: #f8fafd;
+  --wb-kb-card-border: #f0f4f5;
+  --wb-kb-card-border-soft: #f0f4f5;
+  /* ---- 主按钮（黑底白字，Figma #E5000000） ---- */
+  --wb-kb-btn-primary-bg: var(--wb-button-primary-bg, rgba(0, 0, 0, 0.9));
+  --wb-kb-btn-primary-bg-hover: var(--wb-button-primary-bg-hover, #000000);
+  --wb-kb-btn-primary-fg: var(--wb-button-primary-fg, #ffffff);
+  /* ---- 次按钮（白底深字） ---- */
+  --wb-kb-btn-surface: var(--wb-bg-primary, #ffffff);
+  --wb-kb-btn-surface-hover: var(--wb-bg-hover, #fafafa);
+  --wb-kb-btn-border: var(--wb-border-default, rgba(229, 233, 240, 0.6));
+  --wb-kb-btn-border-hover: rgba(0, 0, 0, 0.2);
+  --wb-kb-btn-text: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+  /* ---- 行 hover / selected ---- */
+  --wb-kb-row-hover-bg: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
+  --wb-kb-row-selected-bg: var(--wb-bg-active, rgba(0, 0, 0, 0.08));
+  /* ---- 视图 Tab 胶囊（外壳 #F4F5F5 + 激活白底 + 细描边 #EBECEC + 阴影） ---- */
+  --wb-kb-tabs-container-bg: #f4f5f5;
+  --wb-kb-tabs-container-border: #ebecec;
+  --wb-kb-tabs-active-bg: var(--wb-bg-primary, #ffffff);
+  --wb-kb-tabs-active-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  --wb-kb-tab-hover-bg: rgba(0, 0, 0, 0.04);
+  /* ---- 弹窗（picker-dialog：选择知识库/文件） ---- */
+  --wb-kb-dialog-bg: var(--wb-bg-popover, #ffffff);
+  --wb-kb-dialog-border: var(--wb-border-default, rgba(229, 233, 240, 0.6));
+  --wb-kb-dialog-divider: var(--wb-border-subtle, rgba(229, 233, 240, 0.5));
+  --wb-kb-dialog-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --wb-kb-dialog-section-label: var(--wb-text-muted, rgba(0, 0, 0, 0.3));
+  /* ---- 搜索框 / 通用输入 ---- */
+  --wb-kb-input-bg: var(--wb-bg-primary, #ffffff);
+  --wb-kb-input-border: var(--wb-border-default, rgba(229, 233, 240, 0.6));
+  --wb-kb-input-placeholder: var(--wb-text-muted, rgba(0, 0, 0, 0.3));
+  --wb-kb-input-icon: #b2b2b2;
+  /* ---- Banner 装饰 ---- */
+  --wb-kb-banner-avatar-bg: #fde68a;
+  /* ---- Checkbox（Figma 设计稿：与黑色主按钮同色 #E5000000；深色模式下反相为白底黑勾） ---- */
+  --wb-kb-checkbox-accent: rgba(0, 0, 0, 0.9);
+  --wb-kb-checkbox-check-color: #ffffff;
+  /* ---- Radio 未选边框（Figma 256:7045：rgba(228, 233, 241, 0.60) 1px） ---- */
+  --wb-kb-radio-border: rgba(228, 233, 241, 0.6);
+}
+:root.dark,
+:root .dark,
+body[data-vscode-theme-kind="vscode-dark"],
+body[data-vscode-theme-name="IDE Night"],
+body.vscode-dark,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+  /* ---- 文字：对齐 --wb-* 深色主题分级 ---- */
+  --wb-kb-text-primary: rgba(255, 255, 255, 0.92);
+  --wb-kb-text-secondary: rgba(255, 255, 255, 0.72);
+  --wb-kb-text-tertiary: rgba(255, 255, 255, 0.5);
+  --wb-kb-text-muted: rgba(255, 255, 255, 0.32);
+  /* ---- 卡片 ---- */
+  --wb-kb-card-bg: rgba(255, 255, 255, 0.03);
+  --wb-kb-card-bg-soft: #232730;
+  --wb-kb-card-border: rgba(255, 255, 255, 0.1);
+  --wb-kb-card-border-soft: rgba(255, 255, 255, 0.08);
+  /* ---- 主按钮：深色下反色（白底黑字） ---- */
+  --wb-kb-btn-primary-bg: rgba(255, 255, 255, 0.92);
+  --wb-kb-btn-primary-bg-hover: #ffffff;
+  --wb-kb-btn-primary-fg: #000000;
+  /* ---- 次按钮 ---- */
+  --wb-kb-btn-surface: transparent;
+  --wb-kb-btn-surface-hover: rgba(255, 255, 255, 0.06);
+  --wb-kb-btn-border: rgba(255, 255, 255, 0.14);
+  --wb-kb-btn-border-hover: rgba(255, 255, 255, 0.28);
+  --wb-kb-btn-text: rgba(255, 255, 255, 0.92);
+  /* ---- 行 hover / selected ---- */
+  --wb-kb-row-hover-bg: rgba(255, 255, 255, 0.08);
+  --wb-kb-row-selected-bg: rgba(255, 255, 255, 0.12);
+  /* ---- 视图 Tab 胶囊 ---- */
+  --wb-kb-tabs-container-bg: rgba(255, 255, 255, 0.04);
+  --wb-kb-tabs-container-border: rgba(255, 255, 255, 0.08);
+  --wb-kb-tabs-active-bg: rgba(255, 255, 255, 0.12);
+  --wb-kb-tabs-active-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  --wb-kb-tab-hover-bg: rgba(255, 255, 255, 0.06);
+  /* ---- 弹窗 ---- */
+  --wb-kb-dialog-bg: #212234;
+  --wb-kb-dialog-border: rgba(255, 255, 255, 0.1);
+  --wb-kb-dialog-divider: rgba(255, 255, 255, 0.06);
+  --wb-kb-dialog-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --wb-kb-dialog-section-label: rgba(255, 255, 255, 0.32);
+  /* ---- 搜索 / 输入 ---- */
+  --wb-kb-input-bg: rgba(255, 255, 255, 0.04);
+  --wb-kb-input-border: rgba(255, 255, 255, 0.12);
+  --wb-kb-input-placeholder: rgba(255, 255, 255, 0.32);
+  --wb-kb-input-icon: rgba(255, 255, 255, 0.4);
+  /* ---- Banner ---- */
+  --wb-kb-banner-avatar-bg: rgba(253, 230, 138, 0.22);
+  /* ---- Checkbox：深色模式下反相为白底黑勾 ---- */
+  --wb-kb-checkbox-accent: rgba(255, 255, 255, 0.92);
+  --wb-kb-checkbox-check-color: #000000;
+  /* ---- Radio 未选边框：深色下用可辨识的低透明度白 ---- */
+  --wb-kb-radio-border: rgba(255, 255, 255, 0.24);
+}
+/**
+ * 企业版乐享 license 未分配的拦截视图样式。
+ *
+ * 设计目标：
+ * - 容器撑满 picker body 剩余空间，内容垂直居中（与图3 的 "加载中…" 居中态对齐），
+ *   修复 denied 视图被定位在弹窗左上角的问题。
+ * - 主行动按钮直接复用授权页 `lexiang-auth-guide__btn` 的同款 CSS variable，
+ *   保持品牌一致的"乐享黑色主按钮"。
+ * - 不依赖 panel 级 `tencent-lexiang-panel.less` 中的 `.tencent-lexiang-empty`
+ *   样式（picker 弹窗不一定 import 它），所有图标 / 文案样式都自带。
+ */
+.lexiang-license-denied {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 16px;
+  text-align: center;
+}
+.lexiang-license-denied__icon {
+  width: 230px;
+  height: 230px;
+  opacity: 0.75;
+  user-select: none;
+  pointer-events: none;
+}
+.lexiang-license-denied__text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--wb-text-medium, #4a4d57);
+  max-width: 440px;
+}
+.lexiang-license-denied__action {
+  /* 与 lexiang-auth-guide__btn 完全一致的乐享黑色主按钮样式，
+       不在这里复用同一个 className 以避免误带授权按钮的 :disabled / loading 联动。 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 160px;
+  padding: 10px 24px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--wb-kb-btn-primary-bg, #1a1a1a);
+  color: var(--wb-kb-btn-primary-fg, #ffffff);
+  transition: background 0.15s ease, opacity 0.15s ease;
+  margin-top: 4px;
+}
+.lexiang-license-denied__action:hover:not(:disabled) {
+  background: var(--wb-kb-btn-primary-bg-hover, #000000);
+}
+.lexiang-license-denied__action:active:not(:disabled) {
+  background: var(--wb-kb-btn-primary-bg-hover, #000000);
+}
+.lexiang-license-denied__action:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.lexiang-license-denied__action-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: lexiang-license-denied-spin 0.6s linear infinite;
+}
+@keyframes lexiang-license-denied-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* KbCascadeView 级联视图
+ *
+ * Figma 256:6549：
+ *   · 左栏 240 / 右栏 500，共用一个外层卡片（1px 边 + radius 6 + overflow hidden）
+ *   · 中间由 1px 竖线分割（复用 --wb-kb-card-border），而非两个独立卡片
+ *   · 列表行：36 高 / radius 6 / padding 8 12 / 12px/400
+ *   · 选中/hover bg #F4F5F5
+ *   · section 标题（个人知识库/共享知识库）12/400/#4C000000
+ */
+.lexiang-kb-cascade {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.lexiang-kb-cascade__breadcrumb {
+  padding: 0 0 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.lexiang-kb-cascade__columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--wb-kb-card-bg);
+  border: 1px solid var(--wb-kb-card-border);
+  border-radius: 6px;
+}
+.lexiang-kb-cascade__column {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  overflow: hidden;
+}
+.lexiang-kb-cascade__column:first-child {
+  flex: 0 0 240px;
+}
+.lexiang-kb-cascade__divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--wb-kb-card-border);
+  position: relative;
+}
+.lexiang-kb-cascade__divider--resizable {
+  cursor: col-resize;
+}
+.lexiang-kb-cascade__divider--resizable::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  right: -3px;
+  z-index: 1;
+}
+.lexiang-kb-cascade__col-header {
+  padding: 16px 16px 4px;
+  flex-shrink: 0;
+  color: var(--wb-kb-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--wb-kb-card-bg);
+}
+.lexiang-kb-cascade__col-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 4px 8px 8px;
+}
+.lexiang-kb-cascade__col-body::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.lexiang-kb-cascade__col-body::-webkit-scrollbar-thumb {
+  background: var(--wb-kb-card-border);
+  border-radius: 3px;
+}
+.lexiang-kb-cascade__empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-kb-text-tertiary);
+}
+.lexiang-kb-cascade__empty--centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  min-height: 100%;
+}
+.lexiang-kb-cascade__empty--action {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.lexiang-kb-cascade__empty--action:hover {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-kb-cascade__empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-kb-text-muted);
+  opacity: 0.75;
+}
+.lexiang-kb-cascade__empty-icon img {
+  width: 80px;
+  height: 80px;
+}
+.lexiang-kb-cascade__empty-text {
+  font-size: 12px;
+  color: var(--wb-kb-text-tertiary);
+}
+.lexiang-kb-cascade__team-row,
+.lexiang-kb-cascade__kb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 36px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-primary);
+  transition: background-color 120ms ease;
+  border-radius: 6px;
+  margin-bottom: 2px;
+}
+.lexiang-kb-cascade__team-row:hover,
+.lexiang-kb-cascade__kb-row:hover,
+.lexiang-kb-cascade__team-row--active,
+.lexiang-kb-cascade__kb-row--active {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-kb-cascade__team-avatar {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--wb-kb-banner-avatar-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  overflow: hidden;
+}
+.lexiang-kb-cascade__team-avatar--default {
+  background: transparent;
+  color: var(--wb-kb-text-secondary);
+}
+.lexiang-kb-cascade__radio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-kb-radio-border);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
+}
+.lexiang-kb-cascade__radio::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wb-kb-checkbox-check-color);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lexiang-kb-cascade__radio--checked {
+  border-color: var(--wb-kb-checkbox-accent);
+  background: var(--wb-kb-checkbox-accent);
+}
+.lexiang-kb-cascade__radio--checked::after {
+  opacity: 1;
+}
+.lexiang-kb-cascade__selector-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+.lexiang-kb-cascade__selector-placeholder {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+}
+.lexiang-kb-cascade__checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  border: 1px solid var(--wb-checkbox-border-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wb-kb-input-bg);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+.lexiang-kb-cascade__checkbox:hover {
+  border-color: var(--wb-checkbox-border-hover);
+}
+.lexiang-kb-cascade__checkbox svg {
+  width: 10px;
+  height: 10px;
+  color: var(--wb-kb-checkbox-check-color);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lexiang-kb-cascade__checkbox--checked {
+  background: var(--wb-kb-checkbox-accent);
+  border-color: var(--wb-kb-checkbox-accent);
+}
+.lexiang-kb-cascade__checkbox--checked svg {
+  opacity: 1;
+}
+.lexiang-kb-cascade__icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-kb-text-secondary);
+  font-size: 14px;
+}
+.lexiang-kb-cascade__kb-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.lexiang-kb-cascade__name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lexiang-kb-cascade__arrow {
+  margin-left: auto;
+  color: var(--wb-kb-text-tertiary);
+  flex-shrink: 0;
+}
+.lexiang-kb-cascade__load-more-sentinel {
+  height: 1px;
+}
+.lexiang-kb-cascade__load-more-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+.lexiang-kb-cascade__load-more-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--wb-kb-text-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: lexiang-kb-cascade-spin 0.6s linear infinite;
+}
+@keyframes lexiang-kb-cascade-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* DocTreeView 文档树形视图（多选弹窗右栏）
+ *
+ * Figma 256:6549 文件行：高 44 / padding 12 16 / gap 8 / radius 6
+ *   · checkbox 16×16 radius 2
+ *   · 选中 bg #F4F5F5（连续两行相邻时保留 radius 6）
+ *   · 未选 radio 仅 hover 时显示
+ */
+.lexiang-doc-tree-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: max-content;
+}
+.lexiang-doc-tree-folder-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lexiang-doc-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  min-height: 44px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-primary);
+  border-radius: 6px;
+  transition: background-color 120ms ease;
+}
+.lexiang-doc-tree-row:hover {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-doc-tree-row--selected {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-doc-tree-row--sticky {
+  position: sticky;
+  z-index: 10;
+  background: var(--wb-kb-card-bg);
+  border-radius: 6px;
+}
+.lexiang-doc-tree-row--sticky::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: inherit;
+}
+.lexiang-doc-tree-row--sticky:hover {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-doc-tree-row__expand-btn {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--wb-kb-text-tertiary);
+  transition: transform 200ms ease;
+}
+.lexiang-doc-tree-row__expand-btn svg {
+  width: 6px;
+  height: 10px;
+}
+.lexiang-doc-tree-row__expand-btn--expanded {
+  transform: rotate(90deg);
+}
+.lexiang-doc-tree-row__expand-placeholder {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.lexiang-doc-tree-row__selector-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+.lexiang-doc-tree-row__checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  border: 1px solid var(--wb-checkbox-border-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wb-kb-input-bg);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+.lexiang-doc-tree-row__checkbox:hover {
+  border-color: var(--wb-checkbox-border-hover);
+}
+.lexiang-doc-tree-row__checkbox svg {
+  width: 10px;
+  height: 10px;
+  color: var(--wb-kb-checkbox-check-color);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lexiang-doc-tree-row__checkbox--checked {
+  background: var(--wb-kb-checkbox-accent);
+  border-color: var(--wb-kb-checkbox-accent);
+}
+.lexiang-doc-tree-row__checkbox--checked svg {
+  opacity: 1;
+}
+.lexiang-doc-tree-row__icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  overflow: hidden;
+}
+.lexiang-doc-tree-row__name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lexiang-doc-tree-row__radio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-kb-radio-border);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
+}
+.lexiang-doc-tree-row__radio::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wb-kb-checkbox-check-color);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lexiang-doc-tree-row__radio--checked {
+  border-color: var(--wb-kb-checkbox-accent);
+  background: var(--wb-kb-checkbox-accent);
+}
+.lexiang-doc-tree-row__radio--checked::after {
+  opacity: 1;
+}
+.lexiang-doc-tree-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: left;
+}
+.lexiang-doc-tree-footer--action {
+  cursor: pointer;
+}
+.lexiang-doc-tree-footer--action:hover {
+  background: var(--wb-kb-row-selected-bg);
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-doc-tree-footer--sentinel {
+  justify-content: center;
+}
+.lexiang-doc-tree-footer__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--wb-kb-card-border);
+  border-top-color: var(--wb-kb-text-tertiary);
+  border-radius: 50%;
+  animation: lexiang-doc-tree-spin 0.8s linear infinite;
+}
+@keyframes lexiang-doc-tree-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* KbItemRow 条目行
+ *
+ * Figma 256:6549 文件行：高 44 / padding 12 16 / gap 8 / radius 6
+ *   · checkbox 16×16 radius 2：未选 白底 1px #99E6E9EF；选中 #E5000000 黑底白勾
+ *   · 行 hover bg #F4F5F5；选中 bg #F4F5F5
+ * Figma 256:7045 单选行：高 44 / radius 6 / radio 在左侧
+ *   · 未选 radio 仅 hover 时显示；选中 radio 为实心黑圆 + 白勾
+ */
+.lexiang-kb-item-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--wb-kb-text-primary);
+  transition: background-color 120ms ease;
+  position: relative;
+}
+.lexiang-kb-item-row:hover:not(.lexiang-kb-item-row--disabled) {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-kb-item-row:hover:not(.lexiang-kb-item-row--disabled) .lexiang-kb-item-row__source {
+  opacity: 1;
+}
+.lexiang-kb-item-row:hover:not(.lexiang-kb-item-row--disabled) .lexiang-kb-item-row__team-label {
+  display: inline;
+}
+.lexiang-kb-item-row:hover:not(.lexiang-kb-item-row--disabled) .lexiang-kb-item-row__hover-source {
+  display: inline;
+}
+.lexiang-kb-item-row--selected {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-kb-item-row--selected .lexiang-kb-item-row__team-label {
+  display: inline;
+}
+.lexiang-kb-item-row--selected .lexiang-kb-item-row__hover-source {
+  display: inline;
+}
+.lexiang-kb-item-row--active {
+  background: var(--wb-kb-row-selected-bg);
+}
+.lexiang-kb-item-row--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lexiang-kb-item-row__radio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-kb-radio-border);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 120ms ease;
+}
+.lexiang-kb-item-row__radio::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wb-kb-checkbox-check-color);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lexiang-kb-item-row__radio--checked {
+  border-color: var(--wb-kb-checkbox-accent);
+  background: var(--wb-kb-checkbox-accent);
+}
+.lexiang-kb-item-row__radio--checked::after {
+  opacity: 1;
+}
+.lexiang-kb-item-row__checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  border: 1px solid var(--wb-checkbox-border-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wb-kb-input-bg);
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+.lexiang-kb-item-row__checkbox:hover {
+  border-color: var(--wb-checkbox-border-hover);
+}
+.lexiang-kb-item-row__checkbox svg {
+  width: 10px;
+  height: 10px;
+  color: var(--wb-kb-checkbox-check-color);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lexiang-kb-item-row__checkbox--checked {
+  background: var(--wb-kb-checkbox-accent);
+  border-color: var(--wb-kb-checkbox-accent);
+}
+.lexiang-kb-item-row__checkbox--checked svg {
+  opacity: 1;
+}
+.lexiang-kb-item-row__icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-kb-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.lexiang-kb-item-row__icon > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.lexiang-kb-item-row__icon > img {
+  flex-shrink: 0;
+}
+.lexiang-kb-item-row__icon--logo {
+  overflow: hidden;
+  background: transparent;
+}
+.lexiang-kb-item-row__icon--logo img {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.lexiang-kb-item-row__left {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lexiang-kb-item-row__name {
+  flex-shrink: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-kb-item-row__team-label {
+  display: none;
+  flex-shrink: 0;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.lexiang-kb-item-row__hover-source {
+  display: none;
+  flex-shrink: 0;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+.lexiang-kb-item-row__source {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
+  padding-left: 12px;
+}
+.lexiang-kb-item-row__time {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-tertiary);
+  white-space: nowrap;
+  min-width: 120px;
+  text-align: right;
+}
+.lexiang-kb-item-row__arrow {
+  margin-left: 4px;
+  color: var(--wb-kb-text-tertiary);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.lexiang-kb-item-row__highlight {
+  background: transparent;
+  color: var(--wb-kb-text-primary);
+  padding: 0;
+  font-weight: 500;
+  font-style: normal;
+}
+/* PickerDialogShell 弹窗骨架
+ *
+ * Figma node 256:6549（选择文件）/ 256:7045（保存文件）对齐
+ *   · 788 宽、白底、radius 6、padding 24（header + content + footer 之间 gap 16）
+ *   · 标题 16/500 #E5000000、close 16×16 右上
+ *   · 黑底主按钮（#E5000000）+ 白底灰边次按钮；radius 6、高 30、padding 0 14
+ *   · 全量使用 --wb-kb-* token；深色模式自动反色
+ */
+.lexiang-picker-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wb-bg-overlay);
+  z-index: 10000;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.lexiang-picker-dialog {
+  position: relative;
+  width: 90%;
+  max-width: 800px;
+  min-width: 480px;
+  height: 80vh;
+  max-height: 700px;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-kb-dialog-shadow);
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 24px;
+  gap: 16px;
+}
+.lexiang-picker-dialog__resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}
+.lexiang-picker-dialog__resize-handle:hover {
+  background: var(--wb-bg-hover);
+}
+.lexiang-picker-dialog__close-btn {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--wb-kb-text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 4px;
+  transition: background-color 120ms ease;
+}
+.lexiang-picker-dialog__close-btn:hover {
+  background: var(--wb-kb-row-hover-bg);
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-picker-dialog__close-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: block;
+}
+.lexiang-picker-dialog__header {
+  flex-shrink: 0;
+}
+.lexiang-picker-dialog__title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--wb-kb-text-primary);
+  margin: 0 40px 0 0;
+}
+.lexiang-picker-dialog__subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-tertiary);
+}
+.lexiang-picker-dialog__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 16px;
+  overflow: hidden;
+}
+.lexiang-picker-dialog__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.lexiang-picker-dialog__tabs-wrap {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.lexiang-picker-dialog__search-wrap {
+  width: 260px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.lexiang-picker-dialog__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@keyframes lexiang-slide-from-right {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes lexiang-slide-from-left {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.lexiang-picker-dialog__body--slide-right {
+  animation: lexiang-slide-from-right 250ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+.lexiang-picker-dialog__body--slide-left {
+  animation: lexiang-slide-from-left 250ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+.lexiang-picker-dialog__footer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.lexiang-picker-dialog__footer-left {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-tertiary);
+}
+.lexiang-picker-dialog__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.lexiang-picker-dialog__cancel-btn,
+.lexiang-picker-dialog__confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 6px;
+  height: 30px;
+  min-width: 64px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.lexiang-picker-dialog__cancel-btn:disabled,
+.lexiang-picker-dialog__confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lexiang-picker-dialog__cancel-btn {
+  background-color: var(--wb-button-soft-bg);
+  color: var(--wb-color-text-primary);
+  border: none;
+}
+.lexiang-picker-dialog__cancel-btn:hover:not(:disabled) {
+  background: var(--wb-button-grey-bg-hover);
+}
+.lexiang-picker-dialog__confirm-btn {
+  background: var(--wb-kb-btn-primary-bg);
+  color: var(--wb-kb-btn-primary-fg);
+  border: 1px solid var(--wb-kb-btn-primary-bg);
+}
+.lexiang-picker-dialog__confirm-btn:hover:not(:disabled) {
+  background: var(--wb-kb-btn-primary-bg-hover);
+  border-color: var(--wb-kb-btn-primary-bg-hover);
+  color: var(--wb-kb-btn-primary-fg);
+}
+/* LexiangSearchInput 搜索框
+ *
+ * Figma：260×30 / radius 6 / 白底 1px #99E6E9EF / 内 padding 0 12 / gap 4
+ *   · 图标 16×16 #B2B2B2
+ *   · 文字 12/400；placeholder #4C000000
+ */
+.lexiang-search-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 30px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--wb-kb-input-bg);
+  border: 1px solid var(--wb-kb-input-border);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.lexiang-search-input:focus-within {
+  border-color: var(--wb-kb-btn-border-hover);
+}
+.lexiang-search-input__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--wb-kb-input-icon);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lexiang-search-input__input {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-search-input__input::placeholder {
+  color: var(--wb-kb-input-placeholder);
+}
+.lexiang-search-input__clear-btn {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 80ms ease;
+  color: var(--wb-kb-text-tertiary);
+}
+.lexiang-search-input__clear-btn:hover {
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-search-input__clear-btn svg {
+  width: 12px;
+  height: 12px;
+}
+/* LexiangTabs 胶囊式 Segmented Control
+ *
+ * Figma 256:6549 / 256:7045
+ *   · 外壳 170×30 / radius 6 / 1px #EBECEC / bg #F4F5F5 / padding 1
+ *   · Tab 项：min-width 80 / h 28 / padding 0 12 / 12px/500 / radius 6
+ *   · 激活：白底 + 0 1 4 #19000000 阴影
+ *   · 未激活文字 #B2000000；hover 叠浅灰背景
+ */
+.lexiang-tabs {
+  display: inline-flex;
+  padding: 1px;
+  border-radius: 6px;
+  background: var(--wb-kb-tabs-container-bg);
+  border: 1px solid var(--wb-kb-tabs-container-border);
+  height: 30px;
+  box-sizing: border-box;
+  gap: 0;
+}
+.lexiang-tabs__item {
+  min-width: 80px;
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wb-kb-text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lexiang-tabs__item:hover:not(.lexiang-tabs__item--disabled):not(.lexiang-tabs__item--active) {
+  background: var(--wb-kb-tab-hover-bg);
+  color: var(--wb-kb-text-primary);
+}
+.lexiang-tabs__item--active {
+  background: var(--wb-kb-tabs-active-bg);
+  color: var(--wb-kb-text-primary);
+  box-shadow: var(--wb-kb-tabs-active-shadow);
+  cursor: default;
+}
+.lexiang-tabs__item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

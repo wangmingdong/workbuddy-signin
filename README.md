@@ -59,7 +59,7 @@ schtasks /run /tn WorkBuddyDailyCheckin
 **签到已经由服务器自动完成**：服务器上的 systemd 定时器 `wb-checkin-daily.timer` **每天 09:10 自动签到**（若那一刻服务器不可用，恢复后会补跑），你什么都不用做。
 网页 `https://SERVICE_DOMAIN/buddy/` 只是**用来看记录**（累计积分 / 资源余额 / 昨日用量 / 连签天数 / 今日是否已签 / 上次签到时间与来源）；页面上的按钮是**手动备用**——万一定时没跑成功，点一下即可补签。
 
-> **资源余额 / 昨日用量**说明：余额来自 `get-user-resource` 接口（资源包 `CapacityRemainPrecise` 之和）。每日用量 = 昨日余额 − 今日余额，**由服务器自动签到定时器 + 页面访问共同按天采样**（尚无历史基线时显示 `--`，之后自动累计）。
+> **资源余额 / 昨日用量**说明：余额来自 `get-user-resource` 接口（资源包 `CapacityRemainPrecise` 之和）。**昨日用量来自官方「积分消耗明细」接口** `POST https://copilot.tencent.com/billing/meter/get-user-request-usage`（注意：路径**不带** `/v2`，与余额接口不同），按 `requestTime` 取昨天全部记录、对 `credit` 字段求和，真实准确（不再用「余额差值」估算，因为资源包会过期/新到账导致差值失准）。结果按天缓存，跨天自动失效。
 
 | 项目 | 值 |
 |------|----|
@@ -104,5 +104,6 @@ nginx -t && systemctl reload nginx
 - 签到接口：`POST https://copilot.tencent.com/v2/billing/meter/daily-checkin`（body `{}`）
 - 状态接口：`POST https://copilot.tencent.com/v2/billing/meter/checkin-activity-status`
 - 余额接口：`POST https://copilot.tencent.com/v2/billing/meter/get-user-resource`（**必须带浏览器 `User-Agent`，否则网关返回 403**；返回 `data.Response.Data.Accounts[].CapacityRemainPrecise` 求和即剩余积分）
+- 消耗明细接口：`POST https://copilot.tencent.com/billing/meter/get-user-request-usage`（**路径不带 `/v2`**；body `{startTime,endTime,pageNum,pageSize}`，返回 `data.data[]` 每条含 `credit` 消耗值、`requestTime`、`model`、`client`；「昨日用量」= 取昨天全部记录对 `credit` 求和）
 - 鉴权头：`Authorization: Bearer <accessToken>` + `X-User-Id` + `X-Domain: copilot.tencent.com`
 - token 来源：`%LOCALAPPDATA%\CodeBuddyExtension\Data\Public\auth\workbuddy-desktop.info`

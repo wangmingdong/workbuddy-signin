@@ -1,0 +1,208 @@
+[
+  {
+    "id": 30,
+    "name": "Web Design",
+    "icon": "web",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "AI Trends Site",
+      "Sneaker Culture Site",
+      "Neo-Brutalism Site"
+    ],
+    "prompts": [
+      "Create a website themed 'AI Development Trends · 2025-2026 Latest Trend Analysis'. The visuals follow Linear aesthetics with an engineering, cool, austere style. Content covers six core slices: the leap to Agent-ization, the collapse of inference costs, multimodal fusion, the explosion of on-device intelligence, deep cultivation of vertical industries, and governance and alignment. Include a set of key data (market size, enterprise adoption rate, annual decline in Token prices), a simplified diagram of the China-US-EU tripolar landscape, and five key predictions for 2026 (labeled with high/medium/low confidence). Data sources refer to Stanford HAI, McKinsey, a16z, Gartner, and IDC via online search.",
+      "Design a sneaker culture introduction website page, including a Hero section, a timeline of iconic sneaker evolution, street culture stories, and signature brand collaborations — streetwear, bold, and full of attitude.",
+      "Design a creative design website page from a Neo-Brutalism designer's perspective, combining brutalism's hard edges with saturated candy color blocks, bold outlines, and offset shadows. Visual design concept: thick borders, large rounded corners or hard-angled blocks, saturated pink/yellow/blue/green, bold sans-serif or monospace fonts; prominent offset shadows. Use sticker/hand-drawn elements to add playfulness while keeping layout divisions clear. Material and texture: solid fills, noise/stripe backgrounds, sticker/graffiti symbols; shadows are short but with clear offset, borders 2-4px. Avoid excessive glass and gradients. Overall mood: bold, playful yet orderly, like an interface made of colorful building blocks."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 31,
+    "name": "PPT Design",
+    "icon": "slide",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "Pixel Minecraft PPT",
+      "Wuxia Game Launch",
+      "Thesis Defense PPT",
+      "Humanoid Robot Brief",
+      "Omakase Pitch PPT",
+      "AI Hardware Launch"
+    ],
+    "prompts": [
+      "Create a 6-page PPT introducing Minecraft, with a cool and rich pixel-style layout and a pixel-themed design style.",
+      "Help me generate a set of launch event slide mockups for a Chinese-style wuxia open-world exploration game, including 6 main pages. The layout should be large and suitable for big-screen playback at the venue. Boldly use SVG decorations on the slides, keep page elements rich and refined, and showcase the game's art design, UI design, rich content, and other elements. Use 'ai' mode wherever images need to be generated.",
+      "Create a master's thesis defense PPT, 10 pages total, in a rigorous academic style. The main colors use dark navy (#0F172A) for titles, charcoal gray (#334155) for body text, and academic red (#B91C1C) to highlight key findings, with a pure white background. The page structure is: cover, research background and significance, literature review, research questions and hypotheses, research methodology, experimental design, data analysis, main conclusions, limitations and future work, and acknowledgments. Charts use classic black-white-gray colors, with no gradients. Each page has a chapter number in the top-right corner to help the defense committee navigate quickly. Chinese fonts use SimSun; English uses Times New Roman. The footer includes the school logo, name, student ID, and date. The overall feel is restrained and professional, highlighting the academic value of the research.",
+      "Create a 10-page internal research PPT presentation on 'Humanoid Robots 2026'. Requirements: conduct online searches to gather the latest trends and developments in the humanoid robotics field, with a focus on the latest progress and breakthroughs in embodied intelligence; analyze the transition of humanoid robots from laboratory R&D to real factory deployment; and integrate rich, reliable data visualization charts covering market forecasts, technology comparisons, application scenarios, and more. The result should be a complete research deliverable suitable for internal reporting. Use a Titanium gray visual style: #1C1C1E titanium black + #A1A1AA silver gray + #F59E0B warm-gold accents — overall industrial, precise, and rigorous.",
+      "Create an investment pitch PPT for an Omakase Japanese cuisine franchise, 10 pages total, in a 'Wabi-sabi aesthetic × Extreme negative space' style. Use rice-white washi paper color (#F5F0E8) as the main background, with ink black (#1A1A1A) and cinnabar red (#B8292E) accents in key positions. Negative space occupies more than 70% of each page; text is sparse and restrained, often with just a single line plus a stamp-like mark per page. The cover features only a hand-brushed calligraphy character '鮨' (in cinnabar red) in the bottom-left corner, with a vertical line of small text in the top-right noting the brand name — the rest is blank. Titles use a Japanese calligraphy style mixing kana and kanji; body text uses an ultra-thin sans-serif. All divider lines are replaced with hand-drawn ink brushstrokes. Data pages break conventional charts, presenting key numbers as haiku-style short phrases arranged vertically, such as '一期一会 / 八席 / 三十六道'. The franchise policy page unfolds as a Japanese scroll, read from right to left. Image placeholders use Japanese square-seal styles and irregular ink-blot shapes (labeled 'Dish Photo', 'Chef Portrait'). The overall feel is tranquil, restrained, and zen-like, conveying brand tone over information density.",
+      "Create a PPT for an AI hardware product launch event, 10 pages total, in a 'Minimalist Futurism × Dieter Rams homage' style. Use pure light gray-white (#F5F5F7) as the main background, near-black (#1D1D1F) for text, and the product's signature bright orange (#FF5C1A) as the sole accent color used only for key data. The entire deck follows the 'less is more' principle: each page has at most 7 characters as the title, with body text under 20 characters. The cover shows only the three-letter product name 'ORB' centered, at a font size occupying 1/3 of the screen height, with a small '2026 - 04 - 15' line below. The product showcase page uses a fully centered single-element composition: the product image placeholder is a perfect circle at the center (labeled 'Product Hero Shot'), surrounded by abundant breathing space, with a small model number line at the bottom. The spec comparison page uses ultra-fine 1px divider lines to split the page into an equal grid, with each cell containing only one number and one word (such as '12h' and 'Battery Life'). The overall feel is calm, premium, and full of breathing space, making the product itself the sole protagonist."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 32,
+    "name": "Visual Posters",
+    "icon": "mouse",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "NEXA Chip Launch",
+      "STRIDE Sports Poster",
+      "Anime Magazine Cover",
+      "TIDEWAY Summit Poster",
+      "Black-Red Cinematic Poster",
+      "Photography Biennial Poster",
+      "Autonomous Driving Poster"
+    ],
+    "prompts": [
+      "NEXA inference chip launch. Scene: AI chip company NEXA announces the successful tape-out of its first in-house inference chip, Silicon-1, at a global launch event. Main title: NEXA Silicon-1 Global Launch. Subtitle: 2nm process · 3 years of R&D · first successful tape-out. Info layer: July 9, 2026 · Shanghai · simultaneous global livestream. AI image prompt: a bare chip die floating in absolute darkness, cleaved from directly above by an extremely narrow beam of cool white light; the nanoscale metal traces on the chip surface shimmer with rainbow diffraction halos under the light — transitioning from copper-gold to indigo to electric violet. Extreme macro photography, extremely shallow depth of field, focus precisely on the compute core region at the very center of the chip, while the edge pad array blurs into vague geometric textures. Real studio lighting, no composite feel, no noise, industrial-grade texture, like a Science magazine cover. Font suggestions: Inter Black for the title; Source Han Sans Medium for Chinese.",
+      "16:9 full-bleed action poster, brand STRIDE, main title OWN THE PACE. A runner sprinting on a coastal highway shot from a low-angle wide lens, harsh noon light, fluorescent yellow-green running shoes as the only accent color, sky-blue environment. Giant warm-cream blocky type placed behind the subject, with white editorial micro-copy and a large '032' anchoring the grid. 4 colors and 2 fonts, high-contrast realistic commercial photography, all text kept within the safe zone with no overlap and no bleed.",
+      "Vertical 9:16 cover, oil-painting-textured realistic anime style, deep indigo background with dark gold accents (#080814 / #C9A84C). Main title in Yuji Syuku brush-calligraphy running-script at a large size anchored at the top (white + 5 layers of blue-purple neon glow); subtitle in Shippori Mincho B1 serif flanked by gold decorative lines. A decorative band at the top carries the English series identifier, the middle leaves room for the illustration subject, and the bottom uses a darkened gradient overlaid with a four-tier layout: 'intro line — three-column info row (character / volume no. / magazine) — fine info bar (price / ISBN / date)', plus vertical rotated English decoration on the right. Mixed running-script + Mincho dual-font typesetting throughout, unified low-saturation gold accents, and layered dark shadows to enhance depth.",
+      "TIDEWAY Singapore global summit as a 1080×1620 portrait cold cinematic poster (P08 TextureFull) — eyebrow 'JUL 18 — 20, 2026 · SINGAPORE', main title stack 'TIDEWAY / Global / Summit / 2026' stacked (with a purple '11 / EDITION' badge at top-right), Chinese subtitle 'The 11th year going global · 1,200 founders from 47 countries', meta '2026.07.18 — 07.20 · Marina Bay Sands · Singapore · tideway.com'. AI image: 'the steel bow of a modern cargo ship cuts through the ink-blue deep sea from the extreme low angle at the bottom-right of the frame, pushing water into a clean, crisp white arc under the cool morning daylight; the horizon is open and quiet, the sky a cloudless cool-blue-to-light-gray gradient, real ocean-surface photography, cinematic composition, azurite and cool-white as the main tones, sharp hull and heavy water, sharp and powerful, not romanticized, not sentimental, 2:3 portrait'. Fonts Inter Black 130/170/180 (main title stack); locked colors #0A0E1A / #1B3A57 / #E8F0FA / #A1A1AA / #7C3AED single-point purple electric; 4 blocks with y-zones 110 / 170-880 / 1080-1250 / 1400-1600; three gradient overlay masks at top + bottom + left vignette; text ≥ 28px, the hero is the image not the type.",
+      "Vertical 9:16 black-red cinematic poster: #080808/#D90429/#ECECEC; stacked Anton mega-title + Noto Sans SC Chinese subtitle; 5 glowing red panels + a pure-black seated silhouette + floor reflection + red glow; font size ≥28, Swiss whitespace.",
+      "'Presence' Contemporary Photography Biennial (referencing the Steidl Gordon Parks black-and-white archive album). Main title: Presence — A Contemporary Photography Biennial. Subtitle: 31 photographers · 7 cities · one question. Info layer: September 10 – November 30, 2026 · PSA 1F. AI image prompt: a photo of a city sidewalk shot upward from ground level, the subject being an ordinary pair of black leather shoes mid-stride, stepping on a wet gray asphalt road, with blurry city lights and the lower-body silhouette of a passerby reflected in the puddles. The entire frame contains only the shoes, legs, and the puddle reflections on the ground — no faces, no sense of narrative, only anonymity. Black-and-white street photography, high contrast, coarse film grain, like Garry Winogrand's 1960s New York street shots. The poster's overall design style is Editorial Design and documentary photography; the layout uses a 12-column grid, the subject occupies 65%, the title is bottom-centered in uppercase serif at 96pt, with 30% whitespace. Font suggestions: Source Han Serif Medium for Chinese (serif with documentary texture); Times New Roman Bold for English; all-caps Helvetica for the exhibition info.",
+      "Autonomous driving system road test (referencing Tokyo TDC minimalist posters). Main title: HALO 90-Day Zero-Disengagement. Subtitle: 1,284 km · 0 manual takeovers · Nanshan, Shenzhen. Info layer: Road Test White Paper v2.1 · released July 9. AI image prompt: a long-exposure photo of a nighttime city highway shot from the passenger-seat perspective; the foreground is a close-up of a small segment of the cool-white instrument-panel needle at the edge of the dashboard (out of focus), the mid-ground is a straight stretch of urban expressway, with freshly rain-wetted white lane-line reflections on the road surface, and a continuous warm-toned city skyline in the distance. The overall image is calm and restrained, with no sense of speed and no sense of technology — only the authentic feel of nighttime driving. City night photography, warm-cool contrast, film grain, like a 1970s New York taxi driver's dashcam. The poster's overall design style is Brutalism; the layout uses a 12-column grid, the subject occupies 75%, the title is bottom-centered, numbers use monospaced Tabular Figures at 96pt, with 20% whitespace. Font suggestions: Helvetica Now Display Bold for the large title; Source Han Sans Bold for Chinese; monospaced Tabular Figures for numbers."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 33,
+    "name": "Mobile App",
+    "icon": "phone",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "Fitness App Design",
+      "Community Discovery",
+      "Y2K Social App"
+    ],
+    "prompts": [
+      "Design a fitness App. Create a complete user registration flow and a workout data dashboard page for a fitness tracking App, with charts that display daily exercise data.",
+      "Referencing Xiaohongshu's (Little Red Book) design style, help me design a discovery page for a content community App, featuring a waterfall card layout and search/filter functionality.",
+      "Design a youth-oriented city check-in social App called 'CityGo' with a bold, vibrant, Y2K retro-futuristic style. The primary colors are fluorescent green, electric purple, and bright yellow, with extensive use of bold sans-serif fonts and irregular sticker elements. The home page features a city map scattered with bubbles marking user-captured check-in spots; tapping a bubble opens a 3x3 photo grid. The post interface supports adding hand-drawn doodles, stickers, and glitch-art filters to photos. All buttons are large rounded pill shapes with a bouncy tap animation. The overall feel is like a digital doodle-and-sticker book."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 34,
+    "name": "Design System",
+    "icon": "paint",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "Complete Design System",
+      "Admin Component Library",
+      "Design Token System"
+    ],
+    "prompts": [
+      "Help me build a complete Design System, including a color system, typography hierarchy, spacing rules, and foundational component specification documentation.",
+      "Referencing Ant Design's style, design a component library specification for my admin management system, including button, form, table, and modal components.",
+      "Create a Design Token system for a mobile App that supports light/dark theme switching, and output a complete variable table for colors, border radii, and shadows."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 35,
+    "name": "Web App",
+    "icon": "tools",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "Project Management",
+      "Resume Builder",
+      "Data Analytics Platform"
+    ],
+    "prompts": [
+      "Design a complete interface for a project management WebApp, including a dashboard overview, task kanban, team member management, and project settings pages. Style inspired by Linear — clean and efficient.",
+      "Design a resume-building Web App called 'Resume.io' with a clean, efficient, WYSIWYG style. Use a split-screen layout: the left side is the form editing area (collapsible panels for personal info, education, work experience, skills, etc.), and the right side displays a live preview of an A4-sized resume (with realistic shadows). The top bar allows switching between 6 template styles (minimalist black-and-white, business blue, designer colorful, academic serif, etc.), and the top-right corner has 'Download PDF' and 'Share Link' buttons. The preview on the right updates in real time as users edit, with modified fields briefly highlighted. The overall goal is to let users produce a high-quality resume within 10 minutes.",
+      "Design a SaaS data analytics platform WebApp interface, including data source connections, a visualization chart editor, report generation, and permission management modules. Professional business color scheme."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 36,
+    "name": "Brand Design",
+    "icon": "mouse",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "Tech Brand Logo",
+      "Coffee Brand Identity",
+      "SaaS Brand Identity"
+    ],
+    "prompts": [
+      "Design a tech-style brand Logo with deep blue as the primary color, suitable for an AI product. It should be simple and recognizable, and also provide standard color values and usage guidelines.",
+      "Design a complete visual identity system for my coffee brand, including Logo, color palette, typography guidelines, and business card style, with a warm and artistic style.",
+      "Referencing the design styles of Apple and Stripe, design the brand identity for my SaaS product, including the main Logo, icon variations, and brand color palette."
+    ],
+    "target": "all"
+  },
+  {
+    "id": 37,
+    "name": "Icons & Illustrations",
+    "icon": "mouse",
+    "mode": "design",
+    "plugins": [
+      {
+        "id": 0,
+        "name": "ardot-design-generator",
+        "marketplaceName": "cb_teams_marketplace"
+      }
+    ],
+    "promptTitles": [
+      "Admin Line Icons",
+      "Kids Edu Illustrations",
+      "Flat Finance Icons"
+    ],
+    "prompts": [
+      "Help me design a set of 24 linear-style general-purpose icons suitable for an admin management system, covering common scenarios such as Home, Users, Settings, and Data.",
+      "Design a set of cute-style illustrated icons for a children's education App, covering 12 scenes across the themes of reading, math, music, and science.",
+      "Design a set of flat-style financial icons covering 16 scenarios such as payment, billing, wallet, transfer, and wealth management, with a unified color scheme."
+    ],
+    "target": "all"
+  }
+]

@@ -1,0 +1,3993 @@
+@charset "UTF-8";
+/* Foundation Avatar —— 用 wb-* token */
+.wb-avatar {
+  /* inline-flex 自带 BFC，防止子节点 margin 溢出（CODEBUDDY tool 规则 2 同精神） */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  vertical-align: middle;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+  user-select: none;
+  /* width/height/fontSize 由 inline style 注入（按 size 计算），避免组合爆炸 */
+}
+
+.wb-avatar--circle {
+  border-radius: var(--wb-radius-full);
+}
+
+.wb-avatar--square {
+  /* 设计稿专家卡片方头像用 6px，与 wb-radius-md 一致 */
+  border-radius: var(--wb-radius-md);
+}
+
+.wb-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* 极短瞬间加载完成时避免出现 alt 文本残留 */
+  background: transparent;
+}
+
+.wb-avatar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 图标 fallback 颜色：稍弱一档，避免和文字头像视觉冲突 */
+  color: var(--wb-icon-secondary, var(--wb-color-text-secondary));
+}
+
+.wb-avatar__text {
+  display: inline-block;
+  /* 字号已由父级 inline style 注入，这里仅控字距 */
+  letter-spacing: 0;
+}
+
+/* === Avatar.Group ===
+ * 设计稿未画，工程兜底（详见 docs/avatar-design-gaps.md §2.0 v0.2.3 自落地）。
+ * 子 Avatar 通过负 margin-left 重叠 ~25%，描边色 = 容器背景色（视觉切割）。
+ */
+.wb-avatar-group {
+  display: inline-flex;
+  align-items: center;
+  /* BFC 防 margin 溢出（项目规则） */
+  overflow: visible;
+}
+
+.wb-avatar-group__item {
+  /* 描边：让重叠时能看到清晰的间隙；颜色取容器背景，视觉切割 */
+  box-shadow: 0 0 0 2px var(--wb-bg-primary);
+  /* 描边后元素需要相对定位，否则后续头像会盖住 box-shadow */
+  position: relative;
+  /* 后一个头像往左缩 ~25%；尺寸由 inline style 给定，无法 calc(size/-4)，
+     用一个相对保守的 -8px（适合 small 24 ~ medium 32 ~ large 40）
+     若需要更准的负 margin，业务可在外层加自定义 className 覆盖。 */
+  margin-left: -8px;
+}
+
+.wb-avatar-group__item:first-child {
+  margin-left: 0;
+}
+
+/* 「+N」额外头像默认配色：浅灰底 / 中灰字 */
+.wb-avatar-group__item--overflow {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-secondary);
+}
+/* Foundation Button 视觉层 —— 设计稿 v0.3 独立实现（不依赖 cb-chat-ui）
+ *
+ * 三档尺寸：
+ *   - medium（默认）：高 32px / 字号 14px / padding 0 12px / min-width 68px
+ *   - small：高 24px / 字号 12px / padding 0 8px / min-width 40px
+ *   - large：高 48px / 字号 14px / padding 0 32px
+ *
+ * 四种 variant：primary / secondary / grey / ghost
+ * 支持 danger 标志（独立于 variant）
+ * 支持 iconOnly / circle
+ *
+ * 所有颜色通过 --wb-button-* token 控制，支持 light/dark 主题自动切换。
+ */
+/* ============ 基础样式 ============ */
+.wb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  /* 字族 */
+  font-family: "PingFang SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  /* 默认胶囊圆角 */
+  border-radius: var(--wb-button-border-radius-medium);
+  /* ============ 尺寸 ============ */
+  /* medium（默认）：高 32px / 字号 14px / padding 0 12px / min-width 68px */
+}
+.wb-button--medium {
+  height: var(--wb-button-height-medium);
+  padding: 0 var(--wb-button-padding-medium);
+  font-size: var(--wb-button-font-size-medium);
+  gap: var(--wb-button-gap-medium);
+  min-width: var(--wb-button-min-width-medium);
+  line-height: var(--wb-button-line-height-medium);
+}
+.wb-button {
+  /* small：高 24px / 字号 12px / padding 0 8px / min-width 40px */
+}
+.wb-button--small {
+  height: var(--wb-button-height-small);
+  padding: 0 var(--wb-button-padding-small);
+  font-size: var(--wb-button-font-size-small);
+  gap: var(--wb-button-gap-small);
+  min-width: var(--wb-button-min-width-small);
+  border-radius: var(--wb-button-border-radius-small);
+  line-height: var(--wb-button-line-height-small);
+}
+.wb-button--small .wb-button__icon {
+  width: var(--wb-button-icon-size-small);
+  height: var(--wb-button-icon-size-small);
+}
+.wb-button {
+  /* large：高 48px / 字号 14px / padding 0 32px */
+}
+.wb-button--large {
+  height: var(--wb-button-height-large);
+  padding: 0 var(--wb-button-padding-large);
+  font-size: var(--wb-button-font-size-large);
+  gap: var(--wb-button-gap-large);
+  border-radius: var(--wb-button-border-radius-large);
+  line-height: var(--wb-button-line-height-large);
+}
+.wb-button {
+  /* ============ variant：primary（黑底白字）============ */
+}
+.wb-button--primary {
+  background-color: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.wb-button--primary:hover:not(:disabled) {
+  background-color: var(--wb-button-primary-bg-hover);
+}
+.wb-button--primary:active:not(:disabled) {
+  background-color: var(--wb-button-primary-bg-active);
+}
+.wb-button--primary:disabled, .wb-button--primary.wb-button--disabled {
+  background-color: var(--wb-button-primary-bg-disabled);
+  color: var(--wb-button-primary-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ============ variant：secondary（白底黑字 + 描边）============ */
+}
+.wb-button--secondary {
+  background-color: var(--wb-button-secondary-bg);
+  color: var(--wb-button-secondary-fg);
+  border: 1px solid var(--wb-button-secondary-border);
+}
+.wb-button--secondary:hover:not(:disabled) {
+  background-color: var(--wb-button-secondary-bg-hover);
+}
+.wb-button--secondary:active:not(:disabled) {
+  background-color: var(--wb-button-secondary-bg-active);
+}
+.wb-button--secondary:disabled, .wb-button--secondary.wb-button--disabled {
+  color: var(--wb-button-secondary-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ============ variant：grey（灰色底 + 黑字，无描边）============ */
+}
+.wb-button--grey {
+  background-color: var(--wb-button-grey-bg);
+  color: var(--wb-button-grey-fg);
+}
+.wb-button--grey:hover:not(:disabled) {
+  background-color: var(--wb-button-grey-bg-hover);
+}
+.wb-button--grey:active:not(:disabled) {
+  background-color: var(--wb-button-grey-bg-active);
+}
+.wb-button--grey:disabled, .wb-button--grey.wb-button--disabled {
+  background-color: var(--wb-button-grey-bg-disabled);
+  color: var(--wb-button-grey-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ============ variant：ghost（透明底）============ */
+}
+.wb-button--ghost {
+  background-color: var(--wb-button-ghost-bg);
+  color: var(--wb-button-ghost-fg);
+  font-weight: 400;
+}
+.wb-button--ghost:hover:not(:disabled) {
+  background-color: var(--wb-button-ghost-bg-hover);
+  color: var(--wb-button-ghost-fg-hover);
+}
+.wb-button--ghost:active:not(:disabled) {
+  background-color: var(--wb-button-ghost-bg-active);
+  color: var(--wb-button-ghost-fg-hover);
+}
+.wb-button--ghost:disabled, .wb-button--ghost.wb-button--disabled {
+  background-color: var(--wb-button-ghost-bg);
+  color: var(--wb-button-ghost-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ============ variant：ghost（透明底）============ */
+}
+.wb-button--link {
+  background-color: var(--wb-button-link-bg);
+  color: var(--wb-button-link-fg);
+  padding: 0;
+  min-width: 0;
+  height: auto;
+  font-weight: 400;
+}
+.wb-button--link:hover:not(:disabled) {
+  background-color: var(--wb-button-link-bg-hover);
+  color: var(--wb-button-link-fg-hover);
+  text-decoration: underline;
+}
+.wb-button--link:active:not(:disabled) {
+  background-color: var(--wb-button-link-bg-active);
+  color: var(--wb-button-link-fg-hover);
+  text-decoration: underline;
+}
+.wb-button--link:disabled, .wb-button--link.wb-button--disabled {
+  background-color: var(--wb-button-link-bg);
+  color: var(--wb-button-link-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ============ iconOnly 形态 ============ */
+}
+.wb-button--icon-only {
+  min-width: unset;
+  padding: 0;
+  /* medium iconOnly：等高正方 */
+}
+.wb-button--icon-only.wb-button--medium {
+  width: var(--wb-button-height-medium);
+  height: var(--wb-button-height-medium);
+}
+.wb-button--icon-only {
+  /* small iconOnly：等高正方 */
+}
+.wb-button--icon-only.wb-button--small {
+  width: var(--wb-button-height-small);
+  height: var(--wb-button-height-small);
+}
+.wb-button--icon-only {
+  /* large iconOnly：等高正方 */
+}
+.wb-button--icon-only.wb-button--large {
+  width: var(--wb-button-height-large);
+  height: var(--wb-button-height-large);
+}
+.wb-button {
+  /* ============ shape='circle' ============ */
+}
+.wb-button--circle {
+  border-radius: 50%;
+}
+.wb-button {
+  /* ============ danger 标志 ============ */
+  /* primary + danger：红底白字 */
+}
+.wb-button--danger.wb-button--primary {
+  background-color: var(--wb-button-danger-bg);
+  color: var(--wb-button-danger-fg-on-solid);
+}
+.wb-button--danger.wb-button--primary:hover:not(:disabled) {
+  background-color: var(--wb-button-danger-bg-hover);
+  color: var(--wb-button-danger-fg-on-solid);
+}
+.wb-button--danger.wb-button--primary:active:not(:disabled) {
+  background-color: var(--wb-button-danger-bg-active);
+}
+.wb-button--danger.wb-button--primary:disabled, .wb-button--danger.wb-button--primary.wb-button--disabled {
+  background-color: var(--wb-button-danger-bg-disabled);
+  color: var(--wb-button-danger-fg-on-solid-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* secondary + danger：保留白底、文字边框变红 */
+}
+.wb-button--danger.wb-button--secondary {
+  color: var(--wb-button-danger-fg);
+  border-color: var(--wb-button-danger-border);
+}
+.wb-button--danger.wb-button--secondary:hover:not(:disabled) {
+  background-color: var(--wb-button-danger-bg-soft-hover);
+  color: var(--wb-button-danger-fg);
+  border-color: var(--wb-button-danger-border);
+}
+.wb-button--danger.wb-button--secondary:active:not(:disabled) {
+  background-color: var(--wb-button-danger-bg-soft-active);
+}
+.wb-button--danger.wb-button--secondary:disabled, .wb-button--danger.wb-button--secondary.wb-button--disabled {
+  color: var(--wb-button-danger-fg-disabled);
+  border-color: var(--wb-button-danger-border-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* grey + danger：保留 grey 底色，文字变红 */
+}
+.wb-button--danger.wb-button--grey {
+  color: var(--wb-button-danger-fg);
+}
+.wb-button--danger.wb-button--grey:hover:not(:disabled) {
+  background-color: var(--wb-button-grey-bg-hover);
+  color: var(--wb-button-danger-fg);
+}
+.wb-button--danger.wb-button--grey:active:not(:disabled) {
+  background-color: var(--wb-button-grey-bg-active);
+}
+.wb-button--danger.wb-button--grey:disabled, .wb-button--danger.wb-button--grey.wb-button--disabled {
+  background-color: var(--wb-button-grey-bg-disabled);
+  color: var(--wb-button-danger-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ghost + danger：透明底，文字变红 */
+}
+.wb-button--danger.wb-button--ghost {
+  color: var(--wb-button-danger-fg);
+}
+.wb-button--danger.wb-button--ghost:hover:not(:disabled) {
+  background-color: var(--wb-button-danger-bg-soft-hover);
+  color: var(--wb-button-danger-fg);
+}
+.wb-button--danger.wb-button--ghost:active:not(:disabled) {
+  background-color: var(--wb-button-danger-bg-soft-active);
+}
+.wb-button--danger.wb-button--ghost:disabled, .wb-button--danger.wb-button--ghost.wb-button--disabled {
+  background-color: var(--wb-button-ghost-bg);
+  color: var(--wb-button-danger-fg-disabled);
+  cursor: not-allowed;
+}
+.wb-button {
+  /* ============ loading 状态 ============ */
+}
+.wb-button--loading {
+  position: relative;
+  pointer-events: none;
+  /* loading 时内容半透明，突出 spinner */
+}
+.wb-button--loading .wb-button__content,
+.wb-button--loading .wb-button__icon {
+  opacity: 0;
+}
+.wb-button--loading.wb-button--secondary .wb-button__loading-icon {
+  color: var(--wb-button-loading-secondary-fg);
+}
+.wb-button--loading.wb-button--grey .wb-button__loading-icon {
+  color: var(--wb-button-loading-grey-fg);
+}
+.wb-button--loading.wb-button--ghost .wb-button__loading-icon {
+  color: var(--wb-button-loading-ghost-fg);
+}
+.wb-button--loading.wb-button--danger .wb-button__loading-icon {
+  color: var(--wb-button-loading-danger-fg);
+}
+.wb-button--loading.wb-button--danger.wb-button--primary .wb-button__loading-icon {
+  color: var(--wb-button-loading-danger-fg-on-solid);
+}
+.wb-button--loading.wb-button--link .wb-button__loading-icon {
+  color: var(--wb-button-loading-link-fg);
+}
+.wb-button--loading.wb-button--small .wb-button__loading-icon {
+  width: var(--wb-button-icon-size-small);
+  height: var(--wb-button-icon-size-small);
+}
+.wb-button__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wb-button__loading-icon {
+  color: var(--wb-button-loading-primary-fg);
+  width: var(--wb-button-icon-size-medium);
+  height: var(--wb-button-icon-size-medium);
+  animation: wb-button-spin 0.8s linear infinite;
+}
+@keyframes wb-button-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.wb-button {
+  /* ============ fullWidth ============ */
+}
+.wb-button--full-width {
+  width: 100%;
+}
+.wb-button {
+  /* ============ icon 尺寸 ============ */
+}
+.wb-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wb-button-icon-size-medium);
+  height: var(--wb-button-icon-size-medium);
+  flex-shrink: 0;
+}
+.wb-button__icon svg {
+  width: 100%;
+  height: 100%;
+  color: currentColor;
+  fill: currentColor;
+}
+.wb-button {
+  /* ============ 内容区 ============ */
+}
+.wb-button__content {
+  display: inline-flex;
+  align-items: center;
+}
+/* Foundation Input —— 用 wb-* token */
+/* TODO: 此文件超过样式软阈值，后续按 base / variant / addon / textarea 拆分。 */
+/* global 变体对齐 ardot 674:305;674:246；focus 仅切换 border-color，错误态保留 focus ring。 */
+/* 不带装饰（无 prefix/suffix/allowClear）的纯输入框，沿用历史样式。 */
+.wb-input {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 var(--wb-spacing-3);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-lg);
+  /* 默认 medium 圆角 8px，size 修饰类会覆盖 */
+  outline: none;
+  transition: border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), box-shadow var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-input::placeholder {
+  color: var(--wb-text-placeholder-soft);
+}
+.wb-input:hover:not(:disabled):not(:read-only) {
+  border-color: var(--wb-border-strong);
+}
+.wb-input:focus:not(:disabled) {
+  border-color: var(--wb-border-focus);
+}
+.wb-input:disabled {
+  color: var(--wb-color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.wb-input--small {
+  height: 24px;
+  font-size: var(--wb-font-caption-size);
+  border-radius: var(--wb-radius-sm);
+  /* 4px */
+}
+
+.wb-input--medium {
+  height: 32px;
+  border-radius: var(--wb-radius-lg);
+  /* 8px（default 默认呈现） */
+}
+
+.wb-input--large {
+  height: 40px;
+  border-radius: var(--wb-radius-lg);
+  /* 8px */
+}
+
+.wb-input--status-error {
+  border-color: var(--wb-status-error);
+}
+.wb-input--status-error:hover:not(:disabled) {
+  border-color: var(--wb-status-error);
+}
+.wb-input--status-error:focus:not(:disabled) {
+  border-color: var(--wb-status-error);
+  /* 错误态 focus 光晕：红色 16% 透明度，对齐 antd error 风格 */
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-status-error) 16%, transparent);
+}
+
+/* 带装饰的输入框：外层 wrapper 持有边框和 hover/focus 视觉，内部 input 透明无边框。 */
+.wb-input-wrapper {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  gap: var(--wb-spacing-2);
+  padding: 0 var(--wb-spacing-3);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-lg);
+  /* 默认 medium 圆角 8px，size 修饰类会覆盖 */
+  color: var(--wb-color-text-primary);
+  transition: border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), box-shadow var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-input-wrapper:hover:not(.wb-input-wrapper--disabled) {
+  border-color: var(--wb-border-strong);
+}
+.wb-input-wrapper:focus-within:not(.wb-input-wrapper--disabled) {
+  border-color: var(--wb-border-focus);
+}
+
+.wb-input-wrapper--small {
+  height: 24px;
+  font-size: var(--wb-font-caption-size);
+  border-radius: var(--wb-radius-sm);
+  /* 4px */
+}
+
+.wb-input-wrapper--medium {
+  height: 32px;
+  border-radius: var(--wb-radius-lg);
+  /* 8px（default 默认呈现） */
+}
+
+.wb-input-wrapper--large {
+  height: 40px;
+  border-radius: var(--wb-radius-lg);
+  /* 8px */
+}
+
+.wb-input-wrapper--status-error {
+  border-color: var(--wb-status-error);
+}
+.wb-input-wrapper--status-error:hover:not(.wb-input-wrapper--disabled) {
+  border-color: var(--wb-status-error);
+}
+.wb-input-wrapper--status-error:focus-within:not(.wb-input-wrapper--disabled) {
+  border-color: var(--wb-status-error);
+  /* 错误态 focus 光晕：红色 16% 透明度，对齐 antd error 风格 */
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-status-error) 16%, transparent);
+}
+
+.wb-input-wrapper--disabled {
+  color: var(--wb-color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.wb-input__prefix,
+.wb-input__suffix {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--wb-color-text-tertiary);
+}
+
+.wb-input__inner {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.wb-input__inner::placeholder {
+  color: var(--wb-text-placeholder-soft);
+}
+.wb-input__inner:disabled {
+  cursor: not-allowed;
+}
+
+.wb-input__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--wb-color-text-tertiary);
+  cursor: pointer;
+  transition: color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-input__clear:hover {
+  color: var(--wb-color-text-secondary);
+}
+
+/* ============ variant="global"（ardot 674:305;674:246） ============ */
+/* 不带装饰的纯输入框：global 变体只调整圆角和左内边距（背景已统一为白底）。 */
+.wb-input--global {
+  /* ardot instance cornerRadius 未声明 → 0；与设计直觉冲突，详见 docs/input-design-gaps.md */
+  border-radius: 0;
+  /* 左内边距 20px = --wb-spacing-6（icon 槽位偏移） */
+  padding: 0 var(--wb-spacing-6);
+}
+
+/* 带装饰（prefix/suffix/clear）的 global 变体：
+ * ardot 主组件 padding-left=20，gap=4；wrapper 默认 padding 是 --wb-spacing-3(8)，
+ * 这里覆盖为 --wb-spacing-6(20)；gap 沿用默认 --wb-spacing-2(4)，无需重写。 */
+.wb-input-wrapper--global {
+  border-radius: 0;
+  padding: 0 var(--wb-spacing-6);
+  /* placeholder 渐变文字色取中间值，使用语义 placeholder-soft（30% 透明，对齐设计稿）。 */
+}
+.wb-input-wrapper--global .wb-input__inner::placeholder {
+  color: var(--wb-text-placeholder-soft);
+}
+
+/* ============ variant="filled" ============ */
+/* 填充式输入框：用于已在 primary 面板内的场景（弹窗/Modal/Drawer 中的搜索框等），
+ * 通过背景 --wb-bg-secondary 与外层 --wb-bg-primary 拉开层级。
+ * 几何（圆角 / padding / 高度）完全继承 default 的 size 修饰类，仅覆盖背景与边框：
+ *   - 默认：背景填充色 + transparent 边框（保留 1px 占位避免 hover 时布局抖动）
+ *   - hover / focus：边框切回 default 的色阶，与 default 视觉节奏一致 */
+.wb-input--filled {
+  background: var(--wb-bg-secondary);
+  border-color: transparent;
+}
+
+.wb-input-wrapper--filled {
+  background: var(--wb-bg-secondary);
+  border-color: transparent;
+}
+
+/* ============ 字符计数（showCount） ============ */
+/* 计数器渲染在 suffix 槽位末尾，使用次级文字色，避免抢眼。 */
+.wb-input__count {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  font-size: var(--wb-font-caption-size);
+  line-height: 1;
+  color: var(--wb-color-text-tertiary);
+  user-select: none;
+}
+
+/* ============ addonBefore / addonAfter ============ */
+/* 整体 group：外层水平排列，addon 与 input wrapper 共享边框圆角。
+ * 视觉策略：addon 灰底 + 1px 边框；中间 input wrapper 与 addon 共享边框线（消除重叠）。 */
+.wb-input-group {
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  /* addon 在两端时，input wrapper / 纯 input 自身的圆角要被切掉（与 addon 共享圆角） */
+}
+.wb-input-group .wb-input-wrapper,
+.wb-input-group .wb-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.wb-input-group {
+  /* 左 addon 存在时：input 左侧贴 addon → 切掉 input 左圆角 */
+}
+.wb-input-group > .wb-input-group__addon:first-child + .wb-input-wrapper,
+.wb-input-group > .wb-input-group__addon:first-child + .wb-input {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+}
+.wb-input-group {
+  /* 右 addon 存在时：input 右侧贴 addon → 切掉 input 右圆角 */
+}
+.wb-input-group > .wb-input-wrapper:has(+ .wb-input-group__addon),
+.wb-input-group > .wb-input:has(+ .wb-input-group__addon) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+}
+
+.wb-input-group--small .wb-input-group__addon {
+  height: 24px;
+  font-size: var(--wb-font-caption-size);
+  border-radius: var(--wb-radius-sm);
+}
+
+.wb-input-group--medium .wb-input-group__addon {
+  height: 32px;
+  border-radius: var(--wb-radius-md);
+}
+
+.wb-input-group--large .wb-input-group__addon {
+  height: 40px;
+  border-radius: var(--wb-radius-lg);
+}
+
+.wb-input-group__addon {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 0 var(--wb-spacing-3);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-secondary);
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+  white-space: nowrap;
+  /* 第一个 addon：保留左圆角，去掉右圆角（与 input 拼接） */
+}
+.wb-input-group__addon:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.wb-input-group__addon {
+  /* 最后一个 addon（且不是第一个，即右 addon）：保留右圆角，去掉左圆角 */
+}
+.wb-input-group__addon:last-child:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.wb-input-group--disabled .wb-input-group__addon {
+  color: var(--wb-color-text-disabled);
+  opacity: 0.6;
+}
+
+/* ============ Input.TextArea（多行文本） ============ */
+/* 纯 textarea：与 .wb-input 共享视觉风格，但 height 不固定、可换行。 */
+.wb-textarea {
+  display: block;
+  width: 100%;
+  padding: var(--wb-spacing-2) var(--wb-spacing-3);
+  font-family: inherit;
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-md);
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), box-shadow var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-textarea::placeholder {
+  color: var(--wb-color-text-tertiary);
+}
+.wb-textarea:hover:not(:disabled):not(:read-only) {
+  border-color: var(--wb-border-strong);
+}
+.wb-textarea:focus:not(:disabled) {
+  border-color: var(--wb-border-focus);
+}
+.wb-textarea:disabled {
+  color: var(--wb-color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* autoSize 模式：禁用手动拖动，组件 JS 自管 height */
+.wb-textarea--autosize {
+  resize: none;
+}
+
+.wb-textarea--status-error {
+  border-color: var(--wb-status-error);
+}
+.wb-textarea--status-error:hover:not(:disabled) {
+  border-color: var(--wb-status-error);
+}
+.wb-textarea--status-error:focus:not(:disabled) {
+  border-color: var(--wb-status-error);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-status-error) 16%, transparent);
+}
+
+/* showCount 模式：用 affix-wrapper 把 textarea 和计数器组合 */
+.wb-textarea-affix-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.wb-textarea-affix-wrapper > .wb-textarea {
+  /* 给右下角计数器留出空间，避免文本被遮挡 */
+  padding-bottom: calc(var(--wb-spacing-2) + 16px);
+}
+
+.wb-textarea__count {
+  position: absolute;
+  right: var(--wb-spacing-3);
+  bottom: var(--wb-spacing-2);
+  font-size: var(--wb-font-caption-size);
+  line-height: 1;
+  color: var(--wb-color-text-tertiary);
+  pointer-events: none;
+  user-select: none;
+}
+/* Foundation Tag —— 用 wb-* token */
+.wb-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  padding: 0 var(--wb-spacing-3);
+  border-radius: var(--wb-radius-full);
+  border: 1px solid transparent;
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: opacity var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-tag--small {
+  height: 20px;
+  padding: 0 var(--wb-spacing-2);
+  font-size: 11px;
+}
+
+.wb-tag--medium {
+  height: 22px;
+  padding: 2px 6px;
+}
+
+.wb-tag__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--wb-radius-full);
+  background: currentColor;
+}
+
+.wb-tag__label {
+  display: inline-block;
+}
+
+/* 关闭按钮：reset 原生 button + 圆形悬停反馈 */
+.wb-tag__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-right: -2px;
+  padding: 0;
+  border: none;
+  border-radius: var(--wb-radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-tag__close:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--wb-bg-active);
+}
+.wb-tag__close:disabled {
+  cursor: not-allowed;
+}
+
+/* 整体可点击：cursor + hover 微反馈 */
+.wb-tag--clickable {
+  cursor: pointer;
+}
+
+/* 禁用：整体降透明度 + cursor not-allowed */
+.wb-tag--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wb-tag--disabled .wb-tag__close {
+  cursor: not-allowed;
+}
+
+.wb-tag--default {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-primary);
+  border-color: var(--wb-border-default);
+}
+
+.wb-tag--success {
+  background: var(--wb-badge-success-bg);
+  color: var(--wb-status-success);
+  border-color: transparent;
+}
+
+.wb-tag--warning {
+  background: var(--wb-status-warning-soft);
+  color: var(--wb-status-warning);
+}
+
+.wb-tag--error {
+  background: var(--wb-status-error-soft);
+  color: var(--wb-status-error);
+}
+
+.wb-tag--info {
+  background: color-mix(in srgb, var(--wb-status-info) 12%, transparent);
+  color: var(--wb-status-info);
+}
+/* Foundation Card —— 用 wb-* token */
+.wb-card {
+  display: block;
+  /* 圆角 12px：对齐 ardot 节点 255:538「项目任务卡片」cornerRadius=12；
+     精确命中现有 token --wb-radius-xl(12px)，直接复用。 */
+  border-radius: var(--wb-radius-xl);
+  /* 背景：ardot 节点 255:538 fills=#FFFFFF（opacity=1）。 */
+  background: var(--wb-bg-primary);
+  /* BFC，防 margin 溢出（继承 workspace rules） */
+  overflow: hidden;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), box-shadow var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-card--elevated {
+  border: 1px solid transparent;
+  box-shadow: var(--wb-shadow-md);
+}
+
+.wb-card--outlined {
+  border: 1px solid var(--wb-border-default);
+  box-shadow: var(--wb-shadow-none);
+}
+
+.wb-card--flat {
+  border: 1px solid transparent;
+  box-shadow: var(--wb-shadow-none);
+}
+
+/* hoverable：悬停时强化视觉。对齐 antd Card.hoverable，替换旧的 interactive。 */
+.wb-card--hoverable {
+  cursor: pointer;
+}
+.wb-card--hoverable:hover {
+  background: var(--wb-bg-tertiary);
+}
+.wb-card--hoverable.wb-card--elevated:hover {
+  box-shadow: var(--wb-shadow-lg);
+}
+.wb-card--hoverable.wb-card--outlined:hover {
+  border-color: var(--wb-border-strong);
+}
+
+.wb-card--padding-none {
+  padding: 0;
+}
+
+.wb-card--padding-small {
+  padding: var(--wb-spacing-3);
+}
+
+.wb-card--padding-medium {
+  padding: var(--wb-spacing-5);
+}
+
+.wb-card--padding-large {
+  padding: var(--wb-spacing-7);
+}
+
+/* loading 占位：禁用 hover 视觉，不可点击，cursor 默认 */
+.wb-card--loading {
+  cursor: default;
+  pointer-events: none;
+}
+.wb-card--loading:hover {
+  /* 与上方 .wb-card 主背景保持一致 */
+  background: var(--wb-bg-primary);
+  border-color: var(--wb-border-default);
+  box-shadow: inherit;
+}
+
+.wb-card__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-3);
+}
+
+.wb-card__skeleton-row {
+  height: 12px;
+  border-radius: var(--wb-radius-sm);
+  background: linear-gradient(90deg, var(--wb-bg-tertiary) 0%, var(--wb-bg-primary) 50%, var(--wb-bg-tertiary) 100%);
+  background-size: 200% 100%;
+  animation: wb-card-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes wb-card-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+/* === Card.Meta（v0.2.3 自落地）===
+ * 设计稿未画复合结构，工程兜底（详见 docs/card-design-gaps.md §2.0）。
+ */
+.wb-card-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wb-spacing-3);
+  /* BFC 防 margin 溢出 */
+  overflow: hidden;
+}
+
+.wb-card-meta__avatar {
+  flex-shrink: 0;
+}
+
+.wb-card-meta__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-1);
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.wb-card-meta__title {
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+  /* 标题溢出截断 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-card-meta__description {
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+  font-weight: 400;
+  color: var(--wb-color-text-secondary);
+}
+/* Foundation Loading —— 用 wb-* token */
+.wb-loading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--wb-spacing-3);
+  color: var(--wb-color-text-secondary);
+}
+
+.wb-loading__spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* spinner 自身着色：走 status-info token，由内部 SVG 通过 currentColor 接管 fill */
+  color: var(--wb-status-info);
+  /* 持续旋转节奏：1.2s/圈，比 motion 过渡 token（最长 320ms）慢得多，符合 spinner 视觉惯例 */
+  animation: wb-loading-rotate 1.2s linear infinite;
+}
+
+.wb-loading__spinner-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wb-loading--small .wb-loading__spinner {
+  width: 14px;
+  height: 14px;
+}
+
+.wb-loading--medium .wb-loading__spinner {
+  width: 20px;
+  height: 20px;
+}
+
+.wb-loading--large .wb-loading__spinner {
+  width: 32px;
+  height: 32px;
+}
+
+.wb-loading__tip {
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+}
+
+@keyframes wb-loading-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* ---------- 包裹模式 wrapper ---------- */
+.wb-loading-wrapper {
+  position: relative;
+  display: block;
+}
+
+.wb-loading-wrapper__container {
+  /* spinning 时，children 区域降透明度 + 失去交互 */
+  transition: opacity var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-loading-wrapper--spinning .wb-loading-wrapper__container {
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.wb-loading-wrapper__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 半透明遮罩；在亮/暗主题下都不会过暗 */
+  background: var(--wb-bg-primary);
+  background: color-mix(in srgb, var(--wb-bg-primary) 35%, transparent);
+  z-index: 1;
+  pointer-events: auto;
+  cursor: progress;
+}
+/* Foundation Popover —— 用 wb-* token
+ *
+ * 视觉尽量对齐 ardot 设计稿「下拉菜单」（frame 3858:37），但只用现有 token：
+ *   - 背景 `--wb-bg-primary`（白）
+ *   - 圆角 `--wb-radius-xl`（12px，设计稿 16px，差 4px → 见 gap 文档）
+ *   - 阴影 `--wb-shadow-sm`（设计稿是双层超轻阴影，现有 token 形态不一致 → 见 gap 文档）
+ *   - 描边 `--wb-border-default`
+ * 这套样式同时给未来的 Dropdown / Select / Menu 使用，避免每个组件重写一遍。
+ */
+.wb-popover {
+  display: flex;
+  flex-direction: column;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-xl);
+  box-shadow: var(--wb-shadow-sm);
+  color: var(--wb-color-text-primary);
+  outline: none;
+  animation: wb-popover-fade-in var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+  padding: var(--wb-spacing-3);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+}
+
+.wb-popover__arrow {
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  transform: rotate(45deg);
+}
+
+.wb-popover--placement-top .wb-popover__arrow {
+  border-top: none;
+  border-left: none;
+}
+
+.wb-popover--placement-bottom .wb-popover__arrow {
+  border-bottom: none;
+  border-right: none;
+}
+
+.wb-popover--placement-left .wb-popover__arrow {
+  border-bottom: none;
+  border-left: none;
+}
+
+.wb-popover--placement-right .wb-popover__arrow {
+  border-top: none;
+  border-right: none;
+}
+
+@keyframes wb-popover-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* Foundation Popconfirm —— 气泡确认框版式
+ *
+ * 视觉职责（在 Popover 容器之上的"内部排版"）：
+ *   - icon 16×16 在最左 + title/description 在右；title 加粗、description 正文
+ *   - 按钮组右对齐，size=small；OK 主色，Cancel grey
+ *
+ * 视觉容器（圆角 / 阴影 / padding / 背景）由 Popover.scss 接管，本文件不复写。
+ */
+.wb-popconfirm__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-3);
+  max-width: 280px;
+  min-width: 200px;
+}
+
+.wb-popconfirm__message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wb-spacing-2);
+}
+
+.wb-popconfirm__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--wb-color-text-primary);
+  margin-top: 2px;
+}
+
+.wb-popconfirm__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-1);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wb-popconfirm__title {
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  font-weight: 600;
+  color: var(--wb-color-text-primary);
+  word-break: break-word;
+}
+
+.wb-popconfirm__description {
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+  color: var(--wb-color-text-secondary);
+  word-break: break-word;
+}
+
+.wb-popconfirm__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--wb-spacing-2);
+}
+/* TODO: 此文件已超过 300 行，考虑按 base / header-footer / confirm 拆分。 */
+/* Foundation Modal —— 标准 ardot 弹窗规格 */
+/* ---------- 遮罩（FloatingOverlay 输出的根节点） ---------- */
+.wb-modal__overlay {
+  display: flex;
+  justify-content: center;
+  /* 蒙层颜色统一走 token --wb-color-mask-color（全平台统一：light 黑 60% / dark 黑 80%，无模糊）。 */
+  background: var(--wb-color-mask-color);
+  /* z-index 由 useFloatingLayer 运行时分配（agent-ui 规则 7），不要在这里写。
+   * 嵌套场景（modal in drawer / modal in modal）由全局 LIFO 栈天然处理，
+   * 业务调用方无需通过 wrapClassName 抬高层级。 */
+  padding: var(--wb-spacing-5);
+  animation: wb-modal-overlay-in var(--wb-motion-duration-base) var(--wb-motion-easing-standard);
+}
+
+.wb-modal__overlay--top {
+  align-items: flex-start;
+  padding-top: 120px;
+}
+
+.wb-modal__overlay--center {
+  align-items: center;
+  padding: var(--wb-spacing-10);
+  min-height: 302px;
+  overflow: auto;
+}
+
+/* ---------- 容器 ---------- */
+.wb-modal {
+  display: flex;
+  flex-direction: column;
+  /* light: #ffffff / dark: #1f1f1f（来自 --wb-bg-primary token） */
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-secondary, rgba(0, 0, 0, 0.7));
+  /* light: rgba(0,0,0,0.08) ≈ #ebebeb / dark: --wb-color-border-secondary #2A2C31（dark md 已切实色描边） */
+  border: 0.5px solid var(--wb-color-border-primary, #e5e5e5);
+  border-radius: var(--wb-radius-4xl, 24px);
+  /* 弹窗双层柔和阴影：复用现成 shadow token --wb-shadow-popover（双层 0.04 alpha）。
+   * 设计稿原值是 0 4px 16px -4px / 6% + 0 4px 8px -8px / 4%，alpha 略不同，
+   * 但避免在业务 SCSS 里写 palette + color-mix；如设计师后续坚持精确 6%/4%，
+   * 再独立引入 --wb-shadow-modal token。 */
+  box-shadow: var(--wb-shadow-dialog);
+  padding: var(--wb-spacing-7);
+  outline: none;
+  overflow: hidden;
+  /* BFC */
+  animation: wb-modal-pop-in var(--wb-motion-duration-base) var(--wb-motion-easing-emphasized);
+  position: relative;
+}
+
+.wb-modal--small {
+  width: var(--wb-modal-width);
+  max-width: var(--wb-modal-max-width-s);
+  max-height: var(--wb-modal-max-height);
+}
+
+.wb-modal--medium {
+  width: var(--wb-modal-width);
+  max-width: var(--wb-modal-max-width-m);
+  max-height: var(--wb-modal-max-height);
+}
+
+.wb-modal--medium-large {
+  /* 设计稿 ardot 1303:6336 钉死 640，介于 medium(480) 和 large(800) 之间。 */
+  width: var(--wb-modal-width);
+  max-width: var(--wb-modal-max-width-ml);
+  max-height: var(--wb-modal-max-height);
+}
+
+.wb-modal--large {
+  width: var(--wb-modal-width);
+  max-width: var(--wb-modal-max-width-l);
+  max-height: var(--wb-modal-max-height);
+}
+
+/* unstyled 模式：去掉默认 padding/边框/阴影，让调用方完全自由 */
+.wb-modal--unstyled {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ---------- variant: confirm ----------
+ * 当前状态：所有 `.wb-modal--confirm` 覆盖规则已整段注释禁用（见下方注释块），
+ * confirm 弹窗与标准 Modal 走**完全一致**的圆角 / header 间距 / title 字号 / footer 间距。
+ *
+ * 历史设计意图（曾经想做但已回退）：
+ *   - 圆角 24 → 12
+ *   - header margin-bottom 由 --wb-spacing-5 收紧为 --wb-spacing-3
+ *   - title 字号使用 h3（当前 base 已经是 h3，实际无差异）
+ *   - footer margin-top 由 --wb-spacing-4 调整为 --wb-spacing-5
+ *
+ * 保留注释代码是为了后续如果设计确认要恢复 confirm 差异化视觉，能直接放开；
+ * 如果确认 base 样式已足够，应删除整段而不是继续留注释。
+ *
+ * 相关历史：collab 的 `wb-modal--no-divider` className 是这个 variant 的早期形态，
+ * 当前状态下已无需迁移（因为 confirm 也没有独立视觉）。
+ */
+/* ---------- Header（标题 + 关闭） ----------
+ * 设计稿 ardot 1303:5312（list/弹窗/标题）：
+ *   - 上下结构：第一行（返回 / 标题 / 操作）+ 第二行（description，可选）
+ */
+.wb-modal__header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--wb-spacing-2);
+  /* 设计统一：取消 header 分割线（2026-06 全局视觉调整） */
+  flex-shrink: 0;
+}
+.wb-modal__header + .wb-modal__body {
+  margin-top: var(--wb-spacing-5);
+}
+
+/* header 第一行：返回 + 标题区 + 尾部操作 */
+.wb-modal__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wb-spacing-4);
+  min-width: 0;
+  padding-right: var(--wb-spacing-7);
+}
+
+/* 左侧标题区（title + 附属说明） */
+.wb-modal__title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wb-spacing-2);
+  min-width: 0;
+  flex: 1;
+}
+
+.wb-modal__title {
+  margin: 0;
+  font-size: var(--wb-font-h3-size);
+  line-height: var(--wb-font-h3-line-height);
+  font-weight: var(--wb-font-h3-weight);
+  color: var(--wb-color-text-primary);
+  /* 长标题省略 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 标题附属说明（如 "草稿 · 自动保存于 12:30"）—— 字号小一档、弱化色 */
+.wb-modal__header-extra {
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-secondary);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 标题左侧返回按钮（设计稿 list/弹窗/标题"返回"槽） */
+.wb-modal__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wb-size-control-sm);
+  height: var(--wb-size-control-sm);
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--wb-color-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-modal__back:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+
+/* 标题右侧 tail：自定义 actions + closable × */
+.wb-modal__header-tail {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  flex-shrink: 0;
+}
+
+.wb-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+}
+
+.wb-modal__close {
+  position: absolute;
+  right: var(--wb-spacing-7);
+  top: var(--wb-spacing-7);
+  outline: none;
+}
+.wb-modal__close .wb-button__icon {
+  width: var(--wb-icon-size-md);
+  height: var(--wb-icon-size-md);
+}
+
+/* ---------- Body ---------- */
+/* header 内第二行：description */
+.wb-modal__description {
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-secondary, rgba(0, 0, 0, 0.7));
+  font-weight: var(--wb-font-body-weight);
+  margin-top: var(--wb-spacing-3);
+}
+
+.wb-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  position: relative; /* 为 ::after 蒙层提供定位上下文 */
+}
+.wb-modal__body::-webkit-scrollbar {
+  width: 6px;
+}
+.wb-modal__body::-webkit-scrollbar-thumb {
+  background: var(--wb-modal-scrollbar-thumb);
+  border-radius: var(--wb-radius-xl);
+}
+
+/* body 底部渐隐蒙层：滚动条可见时出现，暗示下方还有内容可滚动 */
+.wb-modal__body--mask::after {
+  content: "";
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  height: 60px;
+  margin-top: -60px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--wb-bg-primary) 100%);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* ---------- Footer ----------
+ * 设计稿 ardot 1303:5495（list/弹窗/底部操作栏）：
+ *   - 默认右对齐（老行为）
+ *   - between 模式：左操作 + 右按钮 SPACE_BETWEEN
+ */
+.wb-modal__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-4);
+  padding-top: var(--wb-spacing-4);
+  margin-top: var(--wb-spacing-4);
+  /* 设计统一：取消 footer 分割线（2026-06 全局视觉调整） */
+  flex-shrink: 0;
+}
+
+.wb-modal__footer--right {
+  justify-content: flex-end;
+}
+
+.wb-modal__footer--between {
+  justify-content: space-between;
+}
+
+/* 左操作区（如"链接管理"等次级操作） */
+.wb-modal__footer-extra {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  min-width: 0;
+  font-size: var(--wb-font-body-size);
+}
+
+/* 右按钮区（取消 + 主操作） */
+.wb-modal__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-4);
+  flex-shrink: 0;
+}
+
+/* ---------- Icon 布局（icon + header/body 横向 Flex） ---------- */
+.wb-modal__icon-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wb-spacing-3);
+  flex: 1;
+  min-height: 0;
+}
+
+.wb-modal__icon-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wb-icon-size-lg);
+  height: var(--wb-icon-size-lg);
+  margin-top: var(--wb-spacing-1);
+}
+.wb-modal__icon-wrapper svg,
+.wb-modal__icon-wrapper img {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.wb-modal__icon-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---------- Confirm 内容区（Modal.confirm / info / success / warning / error） ----------
+ * 当前状态：`.wb-modal__confirm-body / __confirm-icon / __confirm-content` 三个选择器已整段注释禁用。
+ * 目前 confirm 场景走 `.wb-modal__icon-layout` + `.wb-modal__icon-wrapper` + `.wb-modal__icon-content`
+ * 的通用 icon 布局（见上方 322~354 行），不再单独维护 confirm 专用布局。
+ *
+ * 保留注释代码作为参考；如果确认通用布局已够用，应删除整段而不是继续留注释。
+ */
+/* ---------- 动画 ---------- */
+@keyframes wb-modal-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes wb-modal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (max-height: 350px) {
+  .wb-modal {
+    min-height: 165px;
+  }
+}
+/* Foundation Drawer —— 侧滑抽屉（对齐 antd Drawer 标准视觉） */
+/* ---------- 遮罩（FloatingOverlay 输出的根节点） ---------- */
+.wb-drawer__overlay {
+  /* 与 Modal 相同 z-index 档位；如需"必须盖在 Modal 之上"由调用方通过 rootClassName 覆盖 */
+  z-index: 1100;
+  /* antd 默认半透明黑遮罩；与 Modal 共用语义 token --wb-color-mask-color
+   * （全平台统一：light 黑 60% / dark 黑 80%，无模糊）。 */
+  background: var(--wb-color-mask-color);
+  animation: wb-drawer-overlay-in var(--wb-motion-duration-base) var(--wb-motion-easing-standard);
+}
+
+.wb-drawer__overlay--no-mask {
+  background: transparent;
+  pointer-events: none;
+  /* 让容器自身重新拿到指针事件 */
+}
+.wb-drawer__overlay--no-mask > * {
+  pointer-events: auto;
+}
+
+/* placement 控制容器在 overlay 内贴哪一边 */
+.wb-drawer__overlay--right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.wb-drawer__overlay--left {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.wb-drawer__overlay--top {
+  display: flex;
+  justify-content: stretch;
+  align-items: flex-start;
+}
+
+.wb-drawer__overlay--bottom {
+  display: flex;
+  justify-content: stretch;
+  align-items: flex-end;
+}
+
+/* ---------- 容器 ---------- */
+.wb-drawer {
+  display: flex;
+  flex-direction: column;
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  outline: none;
+  overflow: hidden; /* BFC */
+  box-shadow: var(--wb-shadow-lg);
+}
+
+/* 水平方向（left / right）：高度 100%，宽度由 size / width 决定 */
+.wb-drawer--left,
+.wb-drawer--right {
+  height: 100%;
+  max-width: 100vw;
+}
+
+.wb-drawer--left.wb-drawer--default,
+.wb-drawer--right.wb-drawer--default {
+  /* antd default size: 378px */
+  width: 378px;
+}
+
+.wb-drawer--left.wb-drawer--large,
+.wb-drawer--right.wb-drawer--large {
+  /* antd large size: 736px */
+  width: 736px;
+}
+
+/* 垂直方向（top / bottom）：宽度 100%，高度由 size / height 决定 */
+.wb-drawer--top,
+.wb-drawer--bottom {
+  width: 100%;
+  max-height: 100vh;
+}
+
+.wb-drawer--top.wb-drawer--default,
+.wb-drawer--bottom.wb-drawer--default {
+  height: 378px;
+}
+
+.wb-drawer--top.wb-drawer--large,
+.wb-drawer--bottom.wb-drawer--large {
+  height: 736px;
+}
+
+/* ---------- 入场动画（按方向滑入） ---------- */
+.wb-drawer--right {
+  animation: wb-drawer-slide-right var(--wb-motion-duration-base) var(--wb-motion-easing-emphasized);
+}
+
+.wb-drawer--left {
+  animation: wb-drawer-slide-left var(--wb-motion-duration-base) var(--wb-motion-easing-emphasized);
+}
+
+.wb-drawer--top {
+  animation: wb-drawer-slide-top var(--wb-motion-duration-base) var(--wb-motion-easing-emphasized);
+}
+
+.wb-drawer--bottom {
+  animation: wb-drawer-slide-bottom var(--wb-motion-duration-base) var(--wb-motion-easing-emphasized);
+}
+
+/* ---------- Header ---------- */
+.wb-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wb-spacing-4);
+  padding: var(--wb-spacing-4) var(--wb-spacing-5);
+  border-bottom: 1px solid var(--wb-border-default);
+  flex-shrink: 0;
+}
+
+.wb-drawer__title {
+  margin: 0;
+  font-size: var(--wb-font-h3-size);
+  line-height: var(--wb-font-h3-line-height);
+  font-weight: var(--wb-font-h3-weight);
+  color: var(--wb-color-text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-drawer__header-extra {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  flex-shrink: 0;
+}
+
+.wb-drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 100px;
+  color: var(--wb-color-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-drawer__close:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+
+/* ---------- Content / Body ---------- */
+.wb-drawer__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--wb-spacing-5);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+}
+
+/* DrawerBody：调用方主动包装时清掉 content 自带 padding，让 Body 自带 padding，避免双层 */
+.wb-drawer__body {
+  /* 与 content 一致：不设额外样式；Body 仅作为语义包装与样式锚点 */
+}
+
+/* ---------- Footer ---------- */
+.wb-drawer__footer-wrap {
+  flex-shrink: 0;
+  padding: var(--wb-spacing-4) var(--wb-spacing-5);
+  border-top: 1px solid var(--wb-border-default);
+}
+
+.wb-drawer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--wb-spacing-3);
+}
+
+/* ---------- 动画 keyframes ---------- */
+@keyframes wb-drawer-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes wb-drawer-slide-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes wb-drawer-slide-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes wb-drawer-slide-top {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes wb-drawer-slide-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+/**
+ * Foundation Dropdown —— 与设计稿 (ardot 3858:37 「菜单」) 对齐
+ *
+ * 视觉规格摘要（设计稿 → 实现映射）：
+ *   - 容器：宽度 160px，圆角 16px，padding 8px（四周），白底 + 1px border + 双层投影
+ *   - 项：宽度 144px (160 - 8*2)，高度 32px，圆角 8px，padding 5px 8px
+ *   - 项内：icon 16×16 + 8px gap + 文本 14px/22px (PingFang SC)
+ *   - 分隔线：1px #F2F2F2，与 item 同宽 (144px)
+ *
+ * Token 命名空间隔离原则（packages/agent-ui/CODEBUDDY.md 规则 5）：
+ *   仅使用 --wb-* token；缺失值需先沉淀 token 或用 token 组合表达。
+ */
+/* 把 Popover 默认的内边距 / 圆角覆盖成菜单专用 */
+.wb-popover.wb-dropdown {
+  /* 设计稿：容器圆角 16px → --wb-radius-2xl */
+  border-radius: var(--wb-radius-2xl);
+  /* 设计稿：容器双层柔光投影 → --wb-shadow-popover (0/4/12 spread:-4 + 0/3/6 spread:-8, rgba 0,0,0,0.04) */
+  box-shadow: var(--wb-shadow-message-toolbar);
+  /* 容器边框。使用 --wb-color-border-secondary 确保边框在 Modal 等场景下可见。 */
+  border: 1px solid var(--wb-dropdown-border-color);
+  /* 设计稿：纯白底，对应 --wb-bg-primary（Popover 默认是 secondary，这里覆盖回 primary） */
+  background: var(--wb-dropdown-bg-color);
+  /* 设计稿：容器 padding 8px (四周)。Popover 默认就是 var(--wb-spacing-3) = 8px，
+     这里显式声明一遍只是为了让设计意图自包含、不依赖 Foundation 默认值。 */
+  padding: var(--wb-spacing-3);
+}
+
+.wb-dropdown__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  /* 项之间 2px 间距 */
+  gap: var(--wb-spacing-1);
+  /* 设计稿：菜单宽 160px，扣掉容器左右 padding 8px → list 144px */
+  width: 144px;
+  /* 分组之间间距 8px (设计稿 itemSpacing=8) —— 通过 divider 上下间距给出，见 __divider */
+}
+
+.wb-dropdown__item {
+  /* position: relative 是 hit-area 绝对定位的锚点，也保证 <li> 保留盒模型
+     让 e2e 的 li.wb-dropdown__item 依然可点。 */
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* 设计稿：item 内 icon 与 label 间距 8px */
+  gap: var(--wb-spacing-3);
+  /* 设计稿：item padding 5px 8px → --wb-spacing-2-5 (5px) + --wb-spacing-3 (8px) */
+  padding: var(--wb-spacing-2-5) var(--wb-spacing-3);
+  /* 设计稿：item 高度 32px → --wb-size-control-md */
+  min-height: var(--wb-size-control-md);
+  /* 设计稿：item 圆角 8px */
+  border-radius: var(--wb-radius-lg);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  /* 设计稿：rgba(0,0,0,0.9) → 语义对应 --wb-color-text-primary */
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-dropdown__item:hover, .wb-dropdown__item:focus-visible {
+  /* hover 底色：--wb-color-bg-secondary-hover-active（light = #F7F7F7） */
+  background: var(--wb-bg-hover-light);
+  outline: none;
+}
+
+/* 全埋点热区：绝对定位铺满 <li>，承接鼠标点击 + data-track-*。
+ *
+ * 为什么用独立 <button> 而不是把埋点挂到 <li>：
+ *   大同/伽利略 SDK 只识别原生可点击元素（button/a/input），
+ *   即便 <li role="menuitem"> 也不采其上的 data-track-id。
+ *
+ * 视觉：完全透明，不影响 <li> 的 hover / selected / disabled 样式。
+ * 焦点：tabIndex=-1 + aria-hidden，AT 键盘导航仍走外层 <li>。
+ * z-index：不显式设，默认位于 <li> 内部所有子元素之上（因为它是最后一个子节点）。
+ *          但 icon/label 的 pointer-events 默认 auto，也无所谓 —— 点击落到它们上
+ *          会正常冒泡到 <li> 触发 onClick，同样调用 handleClickItem。
+ */
+.wb-dropdown__item-hit {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wb-dropdown__item-hit:focus {
+  outline: none;
+}
+
+.wb-dropdown__item--selected {
+  /* selected 视觉与 hover 完全一致：仅显示 --wb-bg-hover 灰底。
+   * 业务方（conversation-list "更多" 菜单）的诉求：
+   *   再次 hover 唤起 dropdown 时，让当前激活的子项呈现出"被悬停"的样式即可，
+   *   不需要更强的语义化高亮（避免与 hover 状态视觉冲突 / 双高亮）。
+   * 因此这里不再叠加品牌色 indicator / 加粗字重 / 更深底色。
+   */
+  background: var(--wb-bg-hover);
+  color: var(--wb-color-text-primary);
+}
+.wb-dropdown__item--selected:hover, .wb-dropdown__item--selected:focus-visible {
+  background: var(--wb-bg-hover);
+}
+
+.wb-dropdown__item--disabled {
+  /* 设计稿 disabled 文字 rgba(0,0,0,0.3) ≈ --wb-color-text-disabled */
+  color: var(--wb-color-text-disabled);
+  cursor: not-allowed;
+}
+.wb-dropdown__item--disabled:hover, .wb-dropdown__item--disabled:focus-visible {
+  background: transparent;
+}
+.wb-dropdown__item--disabled {
+  /* 图标默认有自己的 color（icon-secondary 比文字浅一档，对应设计稿默认态 0.7/0.9 分级），
+   * 但 disabled / danger 等强语义态下，图标必须跟随文字色，否则会出现「文字变红、图标仍是灰」
+   * 的割裂效果。这里显式让子 icon 取 li 的 currentColor。 */
+}
+.wb-dropdown__item--disabled .wb-dropdown__icon {
+  color: inherit;
+}
+
+.wb-dropdown__item--danger {
+  color: var(--wb-status-error);
+}
+.wb-dropdown__item--danger:hover, .wb-dropdown__item--danger:focus-visible {
+  background: var(--wb-status-error-soft);
+}
+.wb-dropdown__item--danger {
+  /* 见 --disabled 的同款注释：danger 态下图标必须跟随文字变红。 */
+}
+.wb-dropdown__item--danger .wb-dropdown__icon {
+  color: inherit;
+}
+
+.wb-dropdown__icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--wb-icon-secondary);
+  /* 设计稿：icon 16×16 → --wb-icon-size-md */
+  width: var(--wb-icon-size-md);
+  height: var(--wb-icon-size-md);
+  font-size: var(--wb-icon-size-md);
+}
+
+.wb-dropdown__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.wb-dropdown__divider {
+  height: 1px;
+  /* 设计稿：分组之间 8px 间距（itemSpacing=8）→ divider 上下各 4px 撑出 8px 视觉间距 */
+  margin: var(--wb-spacing-2) 0;
+  /* 设计稿分隔线 #F2F2F2 → --wb-border-subtle（popup 内分组分隔色，比 border-default 更浅一档） */
+  background: var(--wb-border-subtle);
+}
+/* Foundation Notification —— 用 wb-* token；视觉对齐 ardot 686772472881246 */
+.wb-notification {
+  --wb-notification-radius: calc(var(--wb-radius-2xl) + var(--wb-radius-lg));
+  box-sizing: border-box;
+  width: 360px;
+  max-width: 100%;
+  padding: var(--wb-spacing-6);
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: var(--wb-notification-radius);
+  background: var(--wb-bg-primary);
+  background-clip: padding-box;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-color-text-primary) 2%, transparent), 0 8px 20px -8px color-mix(in srgb, var(--wb-color-text-primary) 4%, transparent), 0 18px 36px -24px color-mix(in srgb, var(--wb-color-text-primary) 5%, transparent);
+  /* BFC：防子元素 margin 溢出；同时裁掉圆角内的内容溢出。 */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-4);
+  isolation: isolate;
+}
+
+.wb-notification__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--wb-spacing-2);
+  min-width: 0;
+}
+
+.wb-notification__title {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+  color: var(--wb-color-text-primary);
+  font-size: var(--wb-font-body-strong-size);
+  line-height: var(--wb-font-body-strong-line-height);
+  font-weight: var(--wb-font-body-strong-weight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-notification__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-color-text-tertiary);
+  cursor: pointer;
+  transition: background-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-notification__close:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-primary);
+}
+
+/* 正文区：单 DOM 节点，折叠 / 展开通过 modifier 类切换；
+ * 不切换两个不同元素是为了避免展开时滚动位置丢失、a11y live region 重创建。 */
+.wb-notification__content {
+  margin: 0;
+  color: var(--wb-color-text-secondary);
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+  font-weight: var(--wb-font-caption-weight);
+  word-break: break-word;
+  /* 作为 flex 子项必须显式 min-width: 0 + width: 100%，
+     否则内容会撑开宽度，绕过 -webkit-box 换行计算，省略号不生效。 */
+  min-width: 0;
+  width: 100%;
+}
+
+.wb-notification__content--collapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-notification__content--expanded {
+  white-space: pre-wrap;
+  /* 超过 inline style maxHeight 后内部滚动 */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--wb-border-default) transparent;
+}
+.wb-notification__content--expanded::-webkit-scrollbar {
+  width: 6px;
+}
+.wb-notification__content--expanded::-webkit-scrollbar-thumb {
+  border-radius: var(--wb-radius-full);
+  background: var(--wb-border-default);
+}
+.wb-notification__content--expanded::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.wb-notification__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wb-spacing-2);
+  margin-top: var(--wb-spacing-1);
+}
+
+.wb-notification__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-1);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wb-color-text-tertiary);
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+  font-weight: var(--wb-font-caption-weight);
+  cursor: pointer;
+  transition: color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-notification__toggle:hover {
+  color: var(--wb-color-text-primary);
+}
+
+.wb-notification__actions {
+  display: inline-flex;
+  align-items: center;
+  /* 按钮间距 12px：设计稿标注 */
+  gap: var(--wb-spacing-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  /* 设计稿钉死 pill（cornerRadius=100），Foundation Button 默认 8px 圆角，
+   * 在本组件 scope 内覆盖；不污染全局 Button。 */
+}
+.wb-notification__actions .wb-button {
+  border-radius: var(--wb-radius-full);
+}
+/* TODO: 此文件已超过 300 行，考虑按 trigger / tag / popover / option 拆分。 */
+/* Foundation Select —— trigger 默认样式对齐 Ardot `btn / 状态=secondary、型号=小` 设计稿
+ * 对齐项见 docs/select-design-gaps.md §1。没有 token 的字段直接写死，已在 §5 登记。 */
+.wb-select {
+  display: inline-flex;
+  align-items: center;
+  /* 设计稿 itemSpacing = 2，对应 --wb-spacing-1 */
+  gap: var(--wb-spacing-1);
+  /* 设计稿左右 padding 12px = --wb-spacing-4 */
+  padding: 0 var(--wb-spacing-4);
+  /* 设计稿背景白色（不是灰底） */
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  /* 设计稿描边是实色 #E6E6E6，收敛为通用边框 token */
+  border: 1px solid var(--wb-border-default);
+  /* 设计稿 component 名 `btn` 即 Button 复用，圆角与 Button 一致使用胶囊 */
+  border-radius: var(--wb-radius-full);
+  font-size: var(--wb-font-body-size);
+  /* 设计稿 PingFang SC Medium / line-height 22px，与 Button 一致 */
+  line-height: var(--wb-font-body-line-height);
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+  text-align: left;
+  min-width: 120px;
+}
+.wb-select:hover:not(.wb-select--disabled) {
+  border-color: var(--wb-border-strong);
+}
+.wb-select:focus-visible, .wb-select.wb-select--open {
+  border-color: var(--wb-border-focus);
+}
+
+.wb-select--small {
+  height: 24px;
+  font-size: var(--wb-font-caption-size);
+}
+
+.wb-select--medium {
+  height: 32px;
+}
+
+.wb-select--large {
+  height: 40px;
+}
+
+.wb-select--invalid {
+  border-color: var(--wb-status-error);
+}
+.wb-select--invalid:focus-visible, .wb-select--invalid.wb-select--open {
+  border-color: var(--wb-status-error);
+}
+
+.wb-select--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  color: var(--wb-color-text-disabled);
+}
+
+.wb-select--full-width {
+  display: flex;
+  width: 100%;
+}
+
+.wb-select--empty .wb-select__value {
+  color: var(--wb-color-text-tertiary);
+}
+
+.wb-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* placeholder：单/多选共用 */
+.wb-select__placeholder {
+  flex: 1;
+  min-width: 0;
+  color: var(--wb-color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === 多选（v0.2.3 自落地） === */
+/* 多选模式触发器：高度自适应（单 tag 也保持基线高度），允许换行 */
+.wb-select--multiple {
+  /* 多个 tag 时允许换行；min-height 保持视觉稳定 */
+  flex-wrap: wrap;
+  /* 多选：内部 padding 比单选窄，给 tag 留空间 */
+  padding: 0 var(--wb-spacing-2) 0 var(--wb-spacing-2);
+}
+
+/* 多选 size 与触发器高度联动：用 min-height 而不是 height（多 tag 换行时撑高） */
+.wb-select--multiple.wb-select--small {
+  min-height: 24px;
+  height: auto;
+}
+
+.wb-select--multiple.wb-select--medium {
+  min-height: 32px;
+  height: auto;
+}
+
+.wb-select--multiple.wb-select--large {
+  min-height: 40px;
+  height: auto;
+}
+
+.wb-select__tags {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--wb-spacing-1);
+  /* 上下 padding 让 tag 与 trigger 边界保持呼吸 */
+  padding: 4px 0;
+}
+
+/* 单个 tag：复用 button-secondary 的视觉风格但更紧凑 */
+.wb-select__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-1);
+  height: 22px;
+  padding: 0 var(--wb-spacing-2);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-primary);
+  border-radius: var(--wb-radius-sm);
+  font-size: var(--wb-font-caption-size);
+  line-height: 1;
+  max-width: 100%;
+}
+
+.wb-select__tag-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.wb-select__tag-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--wb-icon-secondary);
+  opacity: 0.65;
+  transition: opacity var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-select__tag-close:hover {
+  opacity: 1;
+  background: var(--wb-bg-active);
+}
+.wb-select__tag-close > svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+.wb-select__caret {
+  flex-shrink: 0;
+  /* 设计稿 chevron 颜色绑定 --wb-color-text-primary（rgba(0,0,0,0.96)），近似用 icon-primary */
+  color: var(--wb-icon-primary);
+  font-size: 12px;
+  transition: transform var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-select--open .wb-select__caret {
+  transform: rotate(180deg);
+}
+
+/* 清除按钮：与 Tag 关闭按钮视觉一致 */
+.wb-select__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--wb-icon-secondary);
+  background: transparent;
+  opacity: 0.65;
+  transition: opacity var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-select__clear:hover {
+  opacity: 1;
+  background: var(--wb-bg-active);
+}
+.wb-select__clear > svg {
+  display: block;
+}
+
+/* 浮层内列表：把 Popover 的默认内边距换掉（顶部留出 spacing-2 的呼吸空间，
+   左右靠 .wb-select__option 自己的 padding 控制） */
+.wb-popover.wb-select-popover {
+  padding: var(--wb-spacing-2) 0;
+}
+
+/* 浮层 panel 容器：把搜索框和列表按列堆叠 */
+.wb-select__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+
+/* === showSearch：popover 顶部搜索框（v0.2.3 自落地） === */
+.wb-select__search {
+  padding: var(--wb-spacing-2) var(--wb-spacing-3);
+  border-bottom: 1px solid var(--wb-border-default);
+}
+
+.wb-select__search-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--wb-spacing-3);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-sm);
+  outline: none;
+}
+.wb-select__search-input::placeholder {
+  color: var(--wb-color-text-tertiary);
+}
+.wb-select__search-input:focus {
+  border-color: var(--wb-border-focus);
+}
+
+/* showSearch 无结果占位 */
+.wb-select__empty {
+  padding: var(--wb-spacing-3) var(--wb-spacing-4);
+  color: var(--wb-color-text-tertiary);
+  font-size: var(--wb-font-body-size);
+  text-align: center;
+}
+
+.wb-select__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  /* 选项过多时浮层不应无限增高 */
+  max-height: 256px;
+  overflow-y: auto;
+}
+
+.wb-select__option {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-3);
+  padding: var(--wb-spacing-2) var(--wb-spacing-4);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  border: none;
+}
+.wb-select__option:hover, .wb-select__option:focus-visible {
+  background: var(--wb-bg-hover);
+}
+
+.wb-select__option--selected {
+  /* "已选中"文字色：复用品牌主色文字 token；旧 --wb-text-link 别名（指向品牌色）保持视觉一致 */
+  color: var(--wb-color-text-brand-default);
+  font-weight: 600;
+}
+
+.wb-select__option--disabled {
+  color: var(--wb-color-text-disabled);
+  cursor: not-allowed;
+}
+.wb-select__option--disabled:hover, .wb-select__option--disabled:focus-visible {
+  background: transparent;
+}
+
+.wb-select__option-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.wb-select__option-check {
+  color: var(--wb-color-text-brand-default);
+  font-size: 12px;
+}
+/* Foundation Switch —— 用 wb-* token */
+.wb-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-3);
+  cursor: pointer;
+  user-select: none;
+  color: var(--wb-color-text-primary);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+}
+
+.wb-switch__control {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* 隐藏原生 input，但保留 a11y / keyboard */
+.wb-switch__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.wb-switch__track {
+  display: inline-flex;
+  align-items: center;
+  width: 32px;
+  height: 18px;
+  padding: 2px;
+  border-radius: var(--wb-radius-full);
+  background: var(--wb-bg-tertiary);
+  border: 1px solid var(--wb-border-default);
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-switch__thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--wb-radius-full);
+  background: var(--wb-control-selected-fg);
+  box-shadow: var(--wb-shadow-sm);
+  transition: transform var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+/* 选中态：track 变控件选中背景，thumb 右滑 */
+.wb-switch__input:checked + .wb-switch__track {
+  background: var(--wb-control-selected-bg);
+  border-color: var(--wb-control-selected-bg);
+}
+.wb-switch__input:checked + .wb-switch__track .wb-switch__thumb {
+  transform: translateX(14px);
+}
+
+/* hover */
+.wb-switch:hover .wb-switch__input:not(:disabled) + .wb-switch__track {
+  border-color: var(--wb-border-strong);
+}
+
+.wb-switch:hover .wb-switch__input:checked:not(:disabled) + .wb-switch__track {
+  background: var(--wb-control-selected-bg-hover);
+  border-color: var(--wb-control-selected-bg-hover);
+}
+
+/* disabled */
+.wb-switch:has(.wb-switch__input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* loading：thumb 变 spinner；整体已通过 disabled 禁用 */
+.wb-switch--loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+.wb-switch--loading .wb-switch__thumb {
+  /* spinner 基座，原本的纯色填充让位给旋转 */
+  background: transparent;
+  box-shadow: none;
+}
+
+.wb-switch__spinner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--wb-radius-full);
+  border: 1.5px solid var(--wb-control-selected-fg);
+  border-top-color: transparent;
+  animation: wb-switch-spin 0.8s linear infinite;
+  box-sizing: border-box;
+}
+
+@keyframes wb-switch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* 小尺寸 */
+.wb-switch--small {
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+}
+.wb-switch--small .wb-switch__track {
+  width: 24px;
+  height: 14px;
+}
+.wb-switch--small .wb-switch__thumb {
+  width: 8px;
+  height: 8px;
+}
+.wb-switch--small .wb-switch__input:checked + .wb-switch__track .wb-switch__thumb {
+  transform: translateX(10px);
+}
+
+.wb-switch__label {
+  display: inline-block;
+}
+/* Foundation Checkbox —— 用 wb-* token */
+.wb-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-3);
+  cursor: pointer;
+  user-select: none;
+  color: var(--wb-color-text-primary);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+}
+
+.wb-checkbox__control {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* 隐藏原生 input，但保留 a11y / keyboard */
+.wb-checkbox__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+/* 方框本体 */
+.wb-checkbox__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  border: 1.5px solid var(--wb-border-default);
+  box-sizing: border-box;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+/* 勾 / 横线 公用 ::before；默认隐藏 */
+.wb-checkbox__icon {
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+/* 选中：背景填充 + 显示对勾。
+   勾用 border-right + border-bottom + rotate(45deg) 实现，无需额外资源。
+
+   语义映射：Checkbox checked 本质等价于「主按钮」面，直接复用
+   --wb-button-primary-bg / --wb-button-primary-fg（light=黑底白勾、dark=白底黑勾），
+   既兑现"原来的黑底白勾"，也避免落到品牌色或浅灰中性面。
+   不复用 --wb-color-bg-primary-default —— 该 token light/dark 都是 gray-3，作为 checkbox
+   选中色会发灰（issue: checkbox 选中态显示灰色而非黑色）。 */
+.wb-checkbox__input:checked + .wb-checkbox__box {
+  background: var(--wb-button-primary-bg);
+  border-color: var(--wb-button-primary-bg);
+}
+.wb-checkbox__input:checked + .wb-checkbox__box .wb-checkbox__icon {
+  opacity: 1;
+  width: 4px;
+  height: 8px;
+  border: solid var(--wb-button-primary-fg);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-1px) rotate(45deg);
+  background: transparent;
+  border-radius: 0;
+}
+
+/* 半选：背景填充 + 显示横线（覆盖 checked 的 icon 视觉） */
+.wb-checkbox--indeterminate .wb-checkbox__box {
+  background: var(--wb-button-primary-bg);
+  border-color: var(--wb-button-primary-bg);
+}
+.wb-checkbox--indeterminate .wb-checkbox__icon {
+  opacity: 1;
+  width: 8px;
+  height: 1.5px;
+  background: var(--wb-button-primary-fg);
+  border: none;
+  border-radius: 1px;
+  transform: none;
+}
+
+/* hover：边框加深（未选中态）*/
+.wb-checkbox:hover .wb-checkbox__input:not(:disabled):not(:checked) + .wb-checkbox__box {
+  border-color: var(--wb-border-strong);
+}
+
+/* hover：选中态 / 半选态 → 主按钮面 hover（与上方 checked 同源）。
+   注意：不能用 --wb-color-bg-primary-hover —— 那是「悬浮面」语义 token，
+   light 主题落到 gray-4 会让已填充的黑色方块发灰。
+   --wb-button-primary-bg-hover 在 light=color-mix(black 96%, transparent)、
+   dark=color-mix(white 88%, transparent)，两套都不会发灰，且与 checked
+   面同源（都基于 --wb-button-primary-bg），与 Button 主按钮 hover 一致。 */
+.wb-checkbox:hover .wb-checkbox__input:checked:not(:disabled) + .wb-checkbox__box,
+.wb-checkbox--indeterminate:hover .wb-checkbox__input:not(:disabled) + .wb-checkbox__box {
+  background: var(--wb-button-primary-bg-hover);
+  border-color: var(--wb-button-primary-bg-hover);
+}
+
+/* disabled */
+.wb-checkbox:has(.wb-checkbox__input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 小尺寸：14×14，勾相应缩小 */
+.wb-checkbox--small {
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+}
+.wb-checkbox--small .wb-checkbox__box {
+  width: 14px;
+  height: 14px;
+}
+.wb-checkbox--small .wb-checkbox__input:checked + .wb-checkbox__box .wb-checkbox__icon {
+  width: 3px;
+  height: 6px;
+  border-width: 0 1.5px 1.5px 0;
+}
+.wb-checkbox--small.wb-checkbox--indeterminate .wb-checkbox__icon {
+  width: 6px;
+  height: 1.5px;
+}
+
+.wb-checkbox__label {
+  display: inline-block;
+}
+
+/* ============ Checkbox.Group ============ */
+.wb-checkbox-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.wb-checkbox-group--horizontal {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--wb-spacing-4);
+}
+
+.wb-checkbox-group--vertical {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--wb-spacing-2);
+}
+/* Foundation Tabs —— 严格对齐 ardot 229:23 TAB导航
+ *
+ * v0.2 设计稿命中态（唯一形态）：
+ *   - 选中：12 / 600 / 黑 96%（--wb-color-text-primary），下方 indicator
+ *           （宽 = 文字宽 - 8px / 高 3px / 与文字同色 / 无圆角）
+ *   - 默认：12 / 400 / 黑 76%（--wb-color-text-secondary），无 indicator
+ *   - 容器：高度 48 / 无 padding / 无背景 / 无外圆角 / 无外层分隔线 / tab 间距 0
+ *
+ * indicator 跟随文字宽度 + 横向滑动（antd InkBar 思路）：
+ *   1. tablist 内全局只画一根 .wb-tabs__ink-bar（绝对定位、贴底）
+ *   2. TSX 端在每次 active 切换 / ResizeObserver 触发时
+ *      测量当前 active label 的 left / width，注入到 tablist 的 CSS 变量：
+ *        --wb-tabs-ink-left  : 相对 tablist 的 left（已加 4px 内缩）
+ *        --wb-tabs-ink-width : 文字宽 - 8px
+ *   3. ink-bar 用 transform: translateX(var(--wb-tabs-ink-left)) + width: var(...)
+ *      切换 tab 时通过 transition 横向滑过去 + 宽度伸缩
+ *   4. tablist 加 .wb-tabs__list--measured 才打开 transition，
+ *      避免首次挂载从 (0,0) 滑出来的"飞入"动画
+ *
+ * 设计稿未给的（仅做最小可访问性兜底，不代表"标准能力"，详见 docs/tabs-design-gaps.md）：
+ *   - hover：默认态略提色到 strong，便于响应反馈
+ *   - focus-visible：键盘焦点框（a11y 必需）
+ *   - disabled：低对比 + not-allowed 光标
+ *   - indicator 切换 transition：用 transform/width 平滑过渡
+ *
+ * 不在本文件实现的（已从类型签名移除，等设计稿补齐再做）：
+ *   - variant: card / segmented / size: small / large / fullWidth
+
+ *   - 容器分隔线 / icon 前缀 / 可关闭 tab
+ */
+.wb-tabs {
+  /* 创建 BFC，防 margin 溢出 */
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-4);
+  color: var(--wb-color-text-primary);
+}
+
+/* tabPosition='left'：左侧 tab 列 + 右侧 panel，整体改为 row 布局
+ * 设计稿未画 left 形态，为「设置页左侧导航」等业务场景做最小可用兜底。
+ */
+.wb-tabs--left {
+  flex-direction: row;
+  gap: var(--wb-spacing-5);
+  align-items: stretch;
+}
+.wb-tabs--left .wb-tabs__list {
+  flex-direction: column;
+  align-items: stretch;
+  /* 让 list 拉满 panel 高度，indicator 可以贴右边贯通 */
+  flex-shrink: 0;
+  /* 与右侧 panel 之间画一条分隔线（设计稿未给，工程兜底） */
+  border-right: 1px solid var(--wb-border-default);
+}
+.wb-tabs--left .wb-tabs__tab {
+  /* 改为左对齐的列项（不再水平居中） */
+  justify-content: flex-start;
+  /* 设计稿未给 left 模式高度，写死 36 与 List 行高对齐 */
+  height: auto;
+  min-height: 36px;
+  padding: var(--wb-spacing-2) var(--wb-spacing-4);
+  /* 让 hover 高亮覆盖整行 */
+  width: 100%;
+}
+.wb-tabs--left .wb-tabs__panel {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wb-tabs__list {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0; /* 设计稿 itemSpacing=0 */
+  position: relative; /* ink-bar 的 absolute 容器 */
+  /* 默认初始几何，TSX 测量后覆盖 */
+  --wb-tabs-ink-left: 0px;
+  --wb-tabs-ink-width: 0px;
+}
+
+/* 单个 tab 头：默认态对齐 ardot 229:22（Property 1=默认）
+ * 布局说明：
+ *   - tab 用 row flex + center 让 label 在 48px 高度中垂直居中
+ *   - 真正测量的是 label（tab 内部的 inline-block 文字节点），
+ *     ink-bar 跟随 label 几何，不受 tab padding 影响 → 贴文字而非贴整个 tab
+ */
+.wb-tabs__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  /* 12 / 16 / 400，色 = 文字 medium（黑 76%） */
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  /* 高度对齐设计稿 48；左右 padding 由组件给一点最小气流（避免 label 紧挨 ink-bar 边缘） */
+  height: 48px;
+  padding: 0 var(--wb-spacing-3);
+  white-space: nowrap;
+  transition: color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-tabs__tab-label {
+  display: inline-block;
+  /* 选中加粗会让 label 宽度跳变 → ink-bar 抖动；
+   * 复制一份不可见的 bold 占位，让 label 宽度始终按"加粗后"计算
+   * 参考 https://css-tricks.com/bold-on-hover-without-the-layout-shift/
+   */
+}
+.wb-tabs__tab-label::after {
+  content: attr(data-text);
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+}
+
+/* hover：设计稿未给，仅做"轻微提色"a11y 兜底；待补稿后改 token */
+.wb-tabs__tab:hover:not(.wb-tabs__tab--active):not(.wb-tabs__tab--disabled) {
+  color: var(--wb-color-text-primary);
+}
+
+/* 选中态：对齐 ardot 229:21（Property 1=选中） —— 12 / 600 / 黑 96% */
+.wb-tabs__tab--active {
+  color: var(--wb-color-text-primary);
+  font-weight: 600;
+}
+
+/* disabled：设计稿未给，沿用 wb 通用禁用 token */
+.wb-tabs__tab--disabled {
+  color: var(--wb-color-text-disabled);
+  cursor: not-allowed;
+}
+
+/* === ink-bar：全局唯一，跟随 active label 横向滑动 + 宽度伸缩 ===
+ * 几何完全由 TSX 注入的 CSS 变量驱动：
+ *   left   = label.left - list.left + 4   （+4 是设计稿 indicator 比文字两侧各内缩 4）
+ *   width  = label.width - 8
+ * height/color/min-width 是设计稿固定参数。
+ *
+ * 首次挂载前（measured=false）transition 关闭，避免从 (0,0) 滑出；
+ * 测量后下一帧打开 transition，之后切换 tab 才走滑动动画。
+ */
+.wb-tabs__ink-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  /* 设计稿无下限；防止极短文字 indicator 缩到 < 8px 几乎看不见
+   * 注意：min-width 仅做视觉兜底，不影响测量值（测量值仍是 label 宽-8）
+   */
+  min-width: 16px;
+  width: var(--wb-tabs-ink-width);
+  background: var(--wb-color-text-primary);
+  border-radius: 0;
+  pointer-events: none;
+  transform: translateX(var(--wb-tabs-ink-left));
+  /* 首次挂载不动画，避免飞入 */
+  transition: none;
+}
+
+/* tabPosition='left'：ink-bar 改为竖条贴右边
+ * left 变量复用为 top，width 变量复用为 height（TSX 端 measure 已切换维度）
+ */
+.wb-tabs--left .wb-tabs__ink-bar {
+  top: 0;
+  bottom: auto;
+  left: auto;
+  right: -1px; /* 盖在分隔线上 */
+  width: 3px;
+  min-width: 0;
+  min-height: 16px;
+  height: var(--wb-tabs-ink-width);
+  transform: translateY(var(--wb-tabs-ink-left));
+}
+
+/* 测量完成后再打开滑动 transition，对齐 antd InkBar 视觉 */
+.wb-tabs__list--measured .wb-tabs__ink-bar {
+  transition: transform var(--wb-motion-duration-base) var(--wb-motion-easing-standard), width var(--wb-motion-duration-base) var(--wb-motion-easing-standard), height var(--wb-motion-duration-base) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+/* === panel === */
+.wb-tabs__panel {
+  outline: none;
+}
+/* Foundation Segmented —— 用 wb-* token
+ *
+ * 视觉对齐 ardot「按钮Button」(1285:111;1280:91)：
+ *   - 容器：高 36，圆角 8px，背景 --wb-bg-tertiary，padding 2px，无边框
+ *   - 选中段：白底 + drop-shadow(--wb-shadow-sm)，字重 600，色 --wb-color-text-primary
+ *   - 未选中段：透明底，字重 400，色 --wb-color-text-secondary，hover 加深背景
+ *   - count badge：色 --wb-color-text-tertiary，字重 500（与 label 共用 12/20 字号）
+ *
+ * 已知与设计稿 token 的偏差（详见 docs/segmented-design-gaps.md，等设计师评审）：
+ *   - 容器底色：设计稿 #F2F2F2；当前 token #EBEBEB（差 ~3%）
+ *   - 选中阴影：设计稿 0 1px 4px rgba(0,0,0,0.05)；token 0 1px 2px rgba(0,0,0,0.08)
+ *   - 字号 12/行高 20：token 体系无对应组合（caption 是 12/18，body 是 14/22），
+ *     按设计稿写死 12px / 20px，等设计师确认要不要补 --wb-font-control-* 一组。
+ *   - 选中/未选/count 文字色：设计稿走 rgba(0,0,0, 0.9 / 0.7 / 0.5)，token 用近似实色，
+ *     偏差 < 2% 暂复用，不擅自新建 token。
+ *   - 段高 32px（容器 36 - padding 2*2）：token 体系无对应 height，按设计稿写死。
+ */
+.wb-segmented {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  padding: var(--wb-spacing-1);
+  background: var(--wb-bg-inset-strong);
+  border-radius: var(--wb-radius-lg);
+  /* BFC 防 margin 溢出 */
+  overflow: hidden;
+}
+
+.wb-segmented--full {
+  display: flex;
+  width: 100%;
+}
+.wb-segmented--full .wb-segmented__item {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.wb-segmented__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--wb-spacing-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--wb-radius-lg);
+  cursor: pointer;
+  color: var(--wb-color-text-secondary);
+  /* 设计稿 12/20：token 体系暂无 12/20 组合（caption 12/18, body 14/22），写死 + 已记 gap */
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+  /* 设计稿段高 32px（容器 36 - padding 2*2）：token 无对应 height，写死 + 已记 gap */
+  height: 32px;
+  padding: 0 var(--wb-spacing-4);
+  white-space: nowrap;
+  transition: color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), box-shadow var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-segmented__item:hover:not(.wb-segmented__item--active):not(:disabled) {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+
+.wb-segmented__item--active {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-shadow-sm);
+  /* 设计稿选中段字重 Semibold */
+  font-weight: 600;
+}
+
+.wb-segmented__item:disabled {
+  color: var(--wb-color-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.wb-segmented--disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.wb-segmented__item-label {
+  display: inline-block;
+}
+
+/* === item-icon（v0.2.3 自落地）===
+ * 设计稿没画 icon 形态，工程兜底（详见 docs/segmented-design-gaps.md §2.0）。
+ * 默认尺寸 14×14（与 12px label 视觉协调），颜色继承 item 当前文字色。
+ */
+.wb-segmented__item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+.wb-segmented__item-icon > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wb-segmented__item-count {
+  display: inline-block;
+  color: var(--wb-color-text-tertiary);
+  font-weight: 500;
+}
+
+.wb-segmented__item--active .wb-segmented__item-count {
+  color: var(--wb-color-text-secondary);
+}
+
+/* === size: small ===
+ * 设计稿未提供 small 规格，业务推断：字号比 medium 小一档、整体收紧。
+ * 都暂时写死，等设计师补 small 规格（已记 gap）。
+ */
+.wb-segmented--small .wb-segmented__item {
+  font-size: 11px;
+  line-height: 16px;
+  height: 20px;
+  padding: 0 var(--wb-spacing-2);
+}
+
+.wb-segmented--small {
+  padding: var(--wb-spacing-1);
+  border-radius: var(--wb-radius-lg);
+}
+.wb-segmented--small .wb-segmented__item {
+  border-radius: var(--wb-radius-lg);
+}
+/* TODO: 此文件已超过 250 行，考虑按 base / loading / fixed-columns 拆分。 */
+/* Foundation Table —— 用 wb-* token */
+.wb-table {
+  position: relative;
+  /* BFC 防 margin 溢出；scroll 实际由内层 .wb-table__scroll 处理 */
+  overflow: hidden;
+  width: 100%;
+  border-radius: var(--wb-radius-md);
+  /* 表体底色：light 白 / dark 主背景；表头与 hover 在此基础上分层 */
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+}
+
+/* 内层滚动容器：scroll.x / scroll.y 在这里生效 */
+.wb-table__scroll {
+  width: 100%;
+  /* 默认随父级；scroll prop 通过 inline style 覆盖 */
+}
+
+.wb-table--bordered {
+  border: 1px solid var(--wb-border-default);
+}
+
+.wb-table__inner {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* === thead === */
+.wb-table__th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--wb-color-text-secondary);
+  /* 表头：与白色表体拉开层次，用浅灰 */
+  background: var(--wb-bg-secondary);
+  padding: var(--wb-spacing-3) var(--wb-spacing-4);
+  border-bottom: 1px solid var(--wb-border-default);
+  white-space: nowrap;
+}
+
+.wb-table__th--sortable {
+  cursor: pointer;
+  user-select: none;
+  padding: 0; /* 让 button 充满 cell */
+}
+
+.wb-table__sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  padding: var(--wb-spacing-3) var(--wb-spacing-4);
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-table__sort-btn:hover {
+  /* 表头是 secondary，hover 进一步加深到 tertiary 才有视觉反馈 */
+  background: var(--wb-bg-tertiary);
+}
+
+.wb-table__sort-indicator {
+  font-size: 10px;
+  color: var(--wb-color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.wb-table__sort-indicator--asc,
+.wb-table__sort-indicator--desc {
+  color: var(--wb-color-text-primary);
+}
+
+.wb-table__th--sorted {
+  color: var(--wb-color-text-primary);
+}
+
+/* === tbody === */
+.wb-table__row {
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-table__td {
+  padding: var(--wb-spacing-3) var(--wb-spacing-4);
+  border-bottom: 1px solid var(--wb-border-subtle, var(--wb-border-default));
+  vertical-align: middle;
+}
+
+.wb-table__row:last-child .wb-table__td {
+  border-bottom: none;
+}
+
+.wb-table--hover .wb-table__row:hover .wb-table__td {
+  background: var(--wb-bg-tertiary);
+}
+
+.wb-table--striped .wb-table__row:nth-child(even) .wb-table__td {
+  /* 斑马纹偶数行：在白底上叠浅灰 */
+  background: var(--wb-bg-secondary);
+}
+
+.wb-table--striped.wb-table--hover .wb-table__row:hover .wb-table__td {
+  /* 斑马纹 + hover：进一步加深，与 secondary 区分 */
+  background: var(--wb-bg-tertiary);
+}
+
+.wb-table__row--clickable {
+  cursor: pointer;
+}
+
+/* === rowSelection === */
+/* 选择列：固定窄宽 + 居中对齐复选框 */
+.wb-table__th--selection,
+.wb-table__td--selection {
+  width: 48px;
+  padding-left: var(--wb-spacing-4);
+  padding-right: var(--wb-spacing-2);
+  text-align: left;
+  vertical-align: middle;
+  /* 让 Checkbox 不会触发 user-select 反复选中 */
+  user-select: none;
+}
+
+/* compact 下选择列也更窄 */
+.wb-table--compact .wb-table__th--selection,
+.wb-table--compact .wb-table__td--selection {
+  width: 40px;
+  padding-left: var(--wb-spacing-3);
+  padding-right: var(--wb-spacing-2);
+}
+
+/* 选中行高亮：与 hover 区分（hover 是 tertiary，selected 是更明显的高亮）。
+   基于品牌主色 token 组合 12% 软底，见 docs/table-design-gaps.md §5。 */
+.wb-table__row--selected .wb-table__td {
+  background: color-mix(in srgb, var(--wb-brand-primary) 12%, transparent);
+}
+
+/* 选中态的 hover 进一步加深（18%），避免 hover 与 selected 颜色相同。 */
+.wb-table--hover .wb-table__row--selected:hover .wb-table__td {
+  background: color-mix(in srgb, var(--wb-brand-primary) 18%, transparent);
+}
+
+/* 同时开了 striped + selected 时，selected 优先，避免被斑马纹覆盖 */
+.wb-table--striped .wb-table__row--selected:nth-child(even) .wb-table__td,
+.wb-table--striped .wb-table__row--selected:nth-child(odd) .wb-table__td {
+  background: color-mix(in srgb, var(--wb-brand-primary) 12%, transparent);
+}
+
+/* === size: compact === */
+.wb-table--compact {
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+}
+.wb-table--compact .wb-table__th,
+.wb-table--compact .wb-table__td {
+  padding: var(--wb-spacing-2) var(--wb-spacing-3);
+}
+.wb-table--compact .wb-table__sort-btn {
+  padding: var(--wb-spacing-2) var(--wb-spacing-3);
+}
+
+/* === empty === */
+.wb-table__empty-row .wb-table__empty-cell {
+  text-align: center;
+  color: var(--wb-color-text-tertiary);
+  padding: var(--wb-spacing-7) var(--wb-spacing-4);
+  border-bottom: none;
+}
+
+/* === loading 覆盖层（只在数据存在时叠加，半透明） === */
+.wb-table__loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--wb-bg-secondary) 60%, transparent);
+  pointer-events: none;
+}
+
+.wb-table__loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--wb-border-default);
+  border-top-color: var(--wb-color-bg-primary-default);
+  border-radius: var(--wb-radius-full);
+  animation: wb-table-spin 0.8s linear infinite;
+}
+
+@keyframes wb-table-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* === scroll.y：表头 sticky（v0.2.3 自落地） ===
+   外层 .wb-table__scroll 出现纵向滚动时，把 thead > th 钉在顶部。 */
+.wb-table--scroll-y .wb-table__th {
+  position: sticky;
+  top: 0;
+  /* 高于 fixed 列（z-index:2），确保滚到固定列时表头还在最上层 */
+  z-index: 3;
+  /* 已是 secondary；显式声明避免被父级背景透出 */
+  background: var(--wb-bg-secondary);
+}
+
+/* === columns[i].fixed：左/右固定列（v0.2.3 自落地） ===
+   inline style 已写好 position: sticky + left/right + z-index；
+   这里仅补背景色（防止滚动时透出 row 内容），以及 sticky 列与非 sticky 列的视觉分隔阴影。 */
+.wb-table__cell--fixed {
+  /* th/td 共用：保证 sticky 列有不透明背景，否则横向滚动时透出后续单元格 */
+  background: inherit;
+}
+
+/* 把背景从 row 继承上来：行 hover/selected/striped 都能透传到 fixed 列 */
+.wb-table__row .wb-table__td.wb-table__cell--fixed {
+  background: var(--wb-bg-primary);
+}
+
+.wb-table--hover .wb-table__row:hover .wb-table__td.wb-table__cell--fixed {
+  background: var(--wb-bg-tertiary);
+}
+
+.wb-table--striped .wb-table__row:nth-child(even) .wb-table__td.wb-table__cell--fixed {
+  background: var(--wb-bg-secondary);
+}
+
+.wb-table__row--selected .wb-table__td.wb-table__cell--fixed {
+  background: color-mix(in srgb, var(--wb-brand-primary) 12%, transparent);
+}
+
+.wb-table--hover .wb-table__row--selected:hover .wb-table__td.wb-table__cell--fixed {
+  background: color-mix(in srgb, var(--wb-brand-primary) 18%, transparent);
+}
+
+/* th 的 fixed 背景固定为 secondary（与表头一致） */
+.wb-table__th.wb-table__cell--fixed {
+  background: var(--wb-bg-secondary);
+}
+
+/* 视觉分隔：左固定最右一列加右描边；右固定最左一列加左描边。
+   通过相邻选择器：fixed-left 后面紧跟非 fixed → 在 fixed-left 上加右阴影；
+   fixed-right 前面是非 fixed → 在 fixed-right 上加左阴影。
+   原本想用 box-shadow + palette-black 8% 模糊渐变效果，但 token 真源没有方向性 shadow color；
+   改用现成 border token 给一条 1px 实色分隔线，与 antd Table fixed 列的另一种主流方案一致。 */
+.wb-table__cell--fixed-left:has(+ :not(.wb-table__cell--fixed-left)) {
+  border-right: 1px solid var(--wb-border-default);
+}
+
+.wb-table__cell--fixed-right {
+  /* 右固定列：先无分隔，下面规则只对最左一个右固定列加左描边 */
+}
+
+:not(.wb-table__cell--fixed-right) + .wb-table__cell--fixed-right {
+  border-left: 1px solid var(--wb-border-default);
+}
+/* Foundation Breadcrumb —— 视觉对齐 ardot 674:548
+ *
+ * 设计稿事实（不靠猜测）：
+ *   - 容器 layout: flex 横向，itemSpacing=8（含 leading icon 与首项之间）
+ *   - 文本/分隔符/icon 统一 rgba(0,0,0,0.65) → 复用 --wb-color-text-secondary
+ *     （light #5a5a5a ≈ 黑 65%，与设计稿黑 65% 实质等效；dark #b0b0b0 ≈ 白 69%，
+ *      与设计稿白 65% 有 ~4% 的合理近似偏差。按"复用现有 token、不为单点新增"约定就近映射。）
+ *   - 字体 PingFang SC Regular 14 / 22
+ *   - leading icon 16×16
+ *
+ * 注意（项目规则 · tool-renderer 无关，但 BFC 习惯仍然带上）：
+ *   外层不使用 margin；间距用 gap 控制。
+ */
+.wb-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  font-weight: var(--wb-font-body-weight);
+  color: var(--wb-color-text-secondary);
+}
+.wb-breadcrumb__list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wb-breadcrumb__leading-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--wb-color-text-secondary);
+}
+.wb-breadcrumb__leading-icon > svg,
+.wb-breadcrumb__leading-icon > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.wb-breadcrumb__leading-icon--clickable {
+  cursor: pointer;
+}
+.wb-breadcrumb__leading-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.wb-breadcrumb__leading-icon-btn > svg,
+.wb-breadcrumb__leading-icon-btn > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.wb-breadcrumb__leading-icon-btn:hover {
+  color: var(--wb-color-text-primary);
+}
+.wb-breadcrumb__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--wb-color-text-secondary);
+  max-width: 200px;
+  min-width: 0;
+}
+.wb-breadcrumb__item--current {
+  color: var(--wb-color-text-primary);
+  font-weight: var(--wb-font-body-strong-weight);
+}
+.wb-breadcrumb__separator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--wb-color-text-secondary);
+  user-select: none;
+}
+.wb-breadcrumb__text {
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-breadcrumb__link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wb-breadcrumb__link:hover {
+  text-decoration: underline;
+}
+/**
+ * Foundation Progress —— 用 wb-* token
+ *
+ * Token 复用说明：
+ *   - 轨道色 rgba(0,0,0,0.08) → 复用 --wb-bg-active（值一致；语义"面状底色"）
+ *   - 中性填充 rgba(0,0,0,0.96) → 复用 --wb-color-text-primary（值一致；设计稿钉死）
+ *   - 品牌填充 → 复用 --wb-brand-primary
+ *   - 状态填充 → 复用 --wb-status-success / --wb-status-error
+ *   - 圆角 pill → 复用 --wb-radius-full
+ *   - 动画时长 → 复用 --wb-motion-duration-*
+ *
+ * 已知 token 缺口（已记录到 GapsBlock，不在本文件新增）：
+ *   - dark 主题下 --wb-color-text-primary 仍是 rgba(0,0,0,0.96)（黑），在深色背景上中性条会"消失"
+ *     → tone='neutral' 在 dark 主题下需要业务方手动切到 tone='brand' 或临时盖 token
+ *   - 没有专门的 --wb-progress-track / fill token：本组件直接复用 --wb-bg-active / --wb-color-text-primary
+ *     如未来设计师独立出 token，再在此处替换即可
+ */
+.wb-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  width: 100%;
+  /* 创建 BFC，防止内部 margin 溢出（项目规则） */
+  overflow: hidden;
+}
+
+.wb-progress__track {
+  flex: 1 1 auto;
+  position: relative;
+  height: 4px;
+  background: var(--wb-bg-active);
+  overflow: hidden;
+}
+
+.wb-progress__fill {
+  height: 100%;
+  width: 0;
+  background: var(--wb-color-text-primary);
+  transition: width var(--wb-motion-duration-base, 200ms) var(--wb-motion-easing-standard, ease-out), background-color var(--wb-motion-duration-fast, 150ms) var(--wb-motion-easing-standard, ease-out);
+}
+
+.wb-progress__info {
+  flex-shrink: 0;
+  min-width: 32px;
+  text-align: right;
+  font-size: var(--wb-font-caption-size);
+  line-height: var(--wb-font-caption-line-height);
+  color: var(--wb-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- size ---- */
+.wb-progress--sm .wb-progress__track {
+  height: 4px;
+}
+
+.wb-progress--md .wb-progress__track {
+  height: 6px;
+}
+
+/* ---- shape ---- */
+.wb-progress--square .wb-progress__track,
+.wb-progress--square .wb-progress__fill {
+  border-radius: 0;
+}
+
+.wb-progress--pill .wb-progress__track,
+.wb-progress--pill .wb-progress__fill {
+  border-radius: var(--wb-radius-full);
+}
+
+/* ---- tone ---- */
+.wb-progress--neutral .wb-progress__fill {
+  background: var(--wb-color-text-primary);
+}
+
+.wb-progress--brand .wb-progress__fill {
+  background: var(--wb-brand-primary);
+}
+
+/* ---- status：优先级高于 tone（CSS 源顺序保证） ---- */
+.wb-progress--success .wb-progress__fill {
+  background: var(--wb-status-success);
+}
+
+.wb-progress--error .wb-progress__fill {
+  background: var(--wb-status-error);
+}
+
+.wb-progress--success .wb-progress__info {
+  color: var(--wb-status-success);
+}
+
+.wb-progress--error .wb-progress__info {
+  color: var(--wb-status-error);
+}
+
+/* ---- custom-stroke（v0.2.3 自落地）：strokeColor 从 inline style 注入，
+ * 此处用空规则提升优先级、让选择器可由后续覆盖。
+ * inline style 自带最高优先级，无需 !important，也不会被 tone/status 干扰。
+ */
+.wb-progress--custom-stroke .wb-progress__fill {
+  /* placeholder：inline style 注入 background 优先 */
+}
+
+/* ---- indeterminate：左右滑动动画 ---- */
+.wb-progress--indeterminate .wb-progress__fill {
+  /*
+   * 用 30% 宽度块在 -100% → 100% 之间循环平移
+   * （翻译：先躲在轨道左侧外，滑过整个轨道，再消失到右侧外）
+   * transition 关掉以免 width 0 → 30% 时跟动画打架
+   */
+  width: 30%;
+  transition: none;
+  animation: wb-progress-indeterminate 1.4s var(--wb-motion-easing-standard, ease-in-out) infinite;
+}
+
+@keyframes wb-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+/* 减少动画偏好：把 indeterminate 退化为持续 50% 占位条，避免诱发动晕 */
+@media (prefers-reduced-motion: reduce) {
+  .wb-progress--indeterminate .wb-progress__fill {
+    width: 50%;
+    animation: none;
+    transform: none;
+    opacity: 0.6;
+  }
+}.wb-scroll-load-more {
+  overflow-y: auto;
+  position: relative;
+}
+.wb-scroll-load-more__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+}
+.wb-scroll-load-more__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--wb-color-border-tertiary, rgba(255, 255, 255, 0.1));
+  border-top-color: var(--wb-color-text-secondary, rgba(255, 255, 255, 0.6));
+  border-radius: 50%;
+  animation: wb-scroll-load-more-spin 0.6s linear infinite;
+}
+@keyframes wb-scroll-load-more-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.wb-scroll-load-more__end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  color: var(--wb-color-text-tertiary, rgba(255, 255, 255, 0.4));
+  font-size: 12px;
+}
+
+/**
+ * Cascader 样式 —— 全部走 wb-* token，与 Select 设计语系对齐
+ * 触发器视觉与 Select 一致；浮层多列结构是 Cascader 特有
+ *
+ * TODO: 此文件已 ~320 行（软阈值 200），目前按章节注释分组（触发器 / 浮层面板 /
+ * 多列联动 / 多选勾选 / 搜索结果）已经清晰。若再增加形态可按章节拆 partials。
+ */
+/* ============================================================================
+   触发器（与 Select 接近的 button-like 外观）
+   ============================================================================ */
+.wb-cascader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wb-spacing-1);
+  padding: 0 var(--wb-spacing-4);
+  min-width: 200px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-color-text-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-lg);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+  transition: border-color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-cascader:not(.wb-cascader--disabled):hover {
+  border-color: var(--wb-border-strong);
+}
+.wb-cascader.wb-cascader--open {
+  border-color: var(--wb-button-primary-bg);
+}
+
+.wb-cascader--small {
+  height: 24px;
+  font-size: var(--wb-font-caption-size);
+}
+
+.wb-cascader--medium {
+  height: 32px;
+}
+
+.wb-cascader--large {
+  height: 40px;
+}
+
+.wb-cascader--invalid,
+.wb-cascader--invalid:hover {
+  border-color: var(--wb-status-error);
+}
+
+.wb-cascader--disabled {
+  cursor: not-allowed;
+  color: var(--wb-color-text-disabled);
+}
+
+.wb-cascader--full-width {
+  display: flex;
+  width: 100%;
+}
+
+.wb-cascader__placeholder {
+  color: var(--wb-color-text-tertiary);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-cascader__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-cascader__caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--wb-icon-secondary);
+  margin-left: auto;
+  /* 与 Select 的 caret 一致：旋转表达 open 态 */
+  transition: transform var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-cascader__caret.wb-cascader__caret--open {
+  transform: rotate(180deg);
+  color: var(--wb-icon-primary);
+}
+
+.wb-cascader__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  border-radius: var(--wb-radius-full);
+  color: var(--wb-icon-secondary);
+  cursor: pointer;
+}
+.wb-cascader__clear:hover {
+  background: var(--wb-bg-active);
+}
+
+/* 多选 Tag 列表 */
+.wb-cascader--multiple {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 32px;
+  /* 限制触发器最大高度，避免选太多时把布局撑爆；2 行 Tag 约 54px + padding */
+  max-height: 68px;
+  overflow: hidden;
+  padding: 3px var(--wb-spacing-2);
+}
+
+.wb-cascader__tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1 1 auto;
+  align-items: center;
+}
+
+/* 多选 Tag —— 复用 foundation Tag（small），仅微调嵌套尺寸 */
+.wb-cascader__tag {
+  max-width: 100px;
+  border-radius: var(--wb-radius-sm);
+}
+.wb-cascader__tag .wb-tag__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* +N 折叠徽章 */
+.wb-cascader__tag-overflow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* maxTagCount=0 时的"已选 N 项"文本 */
+.wb-cascader__tag-summary {
+  color: var(--wb-color-text-primary);
+  font-size: var(--wb-font-body-size);
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   浮层面板
+   ============================================================================ */
+.wb-cascader-popover {
+  width: fit-content;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-md);
+  box-shadow: var(--wb-shadow-popover);
+  padding: 0;
+  /* 不设 overflow:hidden —— 否则动态新增列时宽度无法自动撑开，
+     列内滚动由 .wb-cascader__column 的 overflow-y:auto 独立处理 */
+}
+
+.wb-cascader__panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.wb-cascader__search {
+  padding: var(--wb-spacing-2) var(--wb-spacing-3);
+  border-bottom: 1px solid var(--wb-border-default);
+}
+
+/* 搜索框复用 foundation Input（filled + small），仅覆盖宽度铺满 */
+/* focus 边框用黑色 token（--wb-border-strong），不跟品牌色走 */
+.wb-cascader__search-input {
+  width: 100%;
+  /* Input 带装饰时使用 wb-input-wrapper，需覆盖其 focus-within 的品牌色 */
+}
+.wb-cascader__search-input.wb-input-wrapper:focus-within {
+  border-color: var(--wb-border-strong);
+}
+.wb-cascader__search-input {
+  /* Input 无装饰时直接是 input 元素 */
+}
+.wb-cascader__search-input:focus {
+  border-color: var(--wb-border-strong);
+}
+
+/* ============================================================================
+   多列联动
+   ============================================================================ */
+.wb-cascader__columns {
+  display: flex;
+  align-items: stretch;
+  /* 确保多列容器始终按所有列的总宽度撑开，不被父级 flex 容器压缩 */
+  width: max-content;
+  max-height: 280px;
+}
+
+.wb-cascader__column {
+  list-style: none;
+  margin: 0;
+  padding: var(--wb-spacing-1) 0;
+  min-width: 140px;
+  width: 180px;
+  flex: 0 0 auto;
+  max-height: 280px;
+  overflow-y: auto;
+  border-right: 1px solid var(--wb-border-default);
+  /* 细滚动条 —— 覆盖 workbuddy-app 全局 10px 粗滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--wb-scrollbar-thumb) transparent;
+}
+.wb-cascader__column::-webkit-scrollbar {
+  width: 6px;
+}
+.wb-cascader__column::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wb-cascader__column::-webkit-scrollbar-thumb {
+  border-radius: var(--wb-radius-full);
+  background: var(--wb-scrollbar-thumb);
+}
+.wb-cascader__column::-webkit-scrollbar-thumb:hover {
+  background: var(--wb-scrollbar-thumb-hover);
+}
+.wb-cascader__column:last-child {
+  border-right: none;
+}
+
+.wb-cascader__option {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  padding: var(--wb-spacing-2) var(--wb-spacing-3);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-cascader__option:hover {
+  background: var(--wb-bg-hover);
+}
+.wb-cascader__option.wb-cascader__option--active {
+  background: var(--wb-bg-hover);
+  font-weight: 500;
+}
+.wb-cascader__option.wb-cascader__option--selected {
+  background: var(--wb-bg-hover);
+  color: var(--wb-button-primary-bg);
+  font-weight: 500;
+}
+.wb-cascader__option.wb-cascader__option--disabled {
+  cursor: not-allowed;
+  color: var(--wb-color-text-disabled);
+}
+.wb-cascader__option.wb-cascader__option--disabled:hover {
+  background: transparent;
+}
+
+.wb-cascader__option-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-cascader__option-chevron {
+  display: inline-flex;
+  color: var(--wb-icon-secondary);
+}
+
+.wb-cascader__empty {
+  padding: var(--wb-spacing-3) var(--wb-spacing-4);
+  color: var(--wb-color-text-tertiary);
+  font-size: var(--wb-font-body-size);
+  text-align: center;
+}
+
+/* 多选勾选框 —— 复用 foundation Checkbox，仅微调嵌套间距 */
+.wb-cascader__leaf-check {
+  /* 抵消 Checkbox 默认的 gap/间距，在 Cascader option 行内紧凑排列 */
+  gap: 0;
+  pointer-events: none;
+  /* 点击事件由 li 统一处理 */
+}
+
+/* ============================================================================
+   搜索结果（扁平路径列表）
+   ============================================================================ */
+.wb-cascader__search-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--wb-spacing-1) 0;
+  max-height: 280px;
+  overflow-y: auto;
+  /* 细滚动条 —— 与 column 保持一致 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--wb-scrollbar-thumb) transparent;
+}
+.wb-cascader__search-list::-webkit-scrollbar {
+  width: 6px;
+}
+.wb-cascader__search-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wb-cascader__search-list::-webkit-scrollbar-thumb {
+  border-radius: var(--wb-radius-full);
+  background: var(--wb-scrollbar-thumb);
+}
+.wb-cascader__search-list::-webkit-scrollbar-thumb:hover {
+  background: var(--wb-scrollbar-thumb-hover);
+}
+
+.wb-cascader__search-item {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2);
+  padding: var(--wb-spacing-2) var(--wb-spacing-4);
+  font-size: var(--wb-font-body-size);
+  line-height: var(--wb-font-body-line-height);
+  color: var(--wb-color-text-primary);
+  cursor: pointer;
+}
+.wb-cascader__search-item:hover {
+  background: var(--wb-bg-hover);
+}
+.wb-cascader__search-item.wb-cascader__search-item--selected {
+  color: var(--wb-button-primary-bg);
+}
+
+.wb-cascader__search-item-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-cascader__search-item-check {
+  color: var(--wb-button-primary-bg);
+}
+
+.wb-cascader__search-empty {
+  padding: var(--wb-spacing-3) var(--wb-spacing-4);
+  color: var(--wb-color-text-tertiary);
+  font-size: var(--wb-font-body-size);
+  text-align: center;
+}
+/**
+ * RegionPicker 样式 —— 在通用 Cascader 浮层上覆盖「中国行政区」场景的列宽
+ *
+ * 设计意图：
+ *   - Cascader 通用底座的列宽是 width:100%（弹性分配），不应硬编码
+ *   - RegionPicker 限定数据是中国行政区（最长名字如"克孜勒苏柯尔克孜自治州"约 10 字符），
+ *     因此可以安全地给每列固定宽度，保证：
+ *       1. hover 展开下一层时不会导致前面列宽跳变
+ *       2. 滚动到长名字时列宽不会被撑开
+ *       3. 超长名字靠 text-overflow: ellipsis 截断（Cascader 已有）
+ */
+.wb-region-picker-popover {
+  /* 总宽度随列数自适应（1列=160px, 2列=320px, 3列=480px） */
+  width: fit-content;
+}
+.wb-region-picker-popover .wb-cascader__column {
+  width: 160px;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+/* Foundation ColorPicker —— 用 wb-* token */
+.wb-color-picker {
+  display: grid;
+  gap: var(--wb-spacing-2);
+  justify-content: start;
+}
+
+.wb-color-picker__swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--wb-radius-sm);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), box-shadow var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+
+.wb-color-picker__swatch:hover {
+  transform: scale(1.08);
+}
+
+.wb-color-picker__swatch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--wb-control-selected-bg);
+}
+
+/* 选中态：外描一圈选中环 + 内部对勾 */
+.wb-color-picker__swatch--selected {
+  box-shadow: 0 0 0 2px var(--wb-bg-primary), 0 0 0 4px var(--wb-control-selected-bg);
+}
+
+.wb-color-picker__check {
+  /* 对勾颜色：白/深自适应交给业务色块的对比度；这里默认白色描边，多数标签背景较浅时
+     由业务传入的深色块也能看清；若需更强对比后续可加 prop */
+  color: var(--wb-color-text-primary);
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
+}
+
+.wb-color-picker--disabled {
+  opacity: 0.5;
+}
+.wb-color-picker--disabled .wb-color-picker__swatch {
+  cursor: not-allowed;
+}
+.wb-color-picker--disabled .wb-color-picker__swatch:hover {
+  transform: none;
+}

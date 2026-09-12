@@ -1,0 +1,99 @@
+.workspace-preparing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background-color: var(--wb-home-bg-secondary);
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.workspace-preparing--entering {
+  opacity: 0;
+  transform: scale(1.02);
+}
+.workspace-preparing--exiting {
+  opacity: 0;
+  transform: scale(0.98);
+}
+.workspace-preparing__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 420px;
+  padding: 32px;
+  text-align: center;
+}
+.workspace-preparing__icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--wb-color-text-primary);
+  margin-bottom: 8px;
+}
+.workspace-preparing__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--wb-color-text-primary);
+  line-height: 1.4;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+.workspace-preparing__title .cb-loading-dots {
+  min-width: 0;
+  font-size: 19px;
+}
+.workspace-preparing__description {
+  margin: 0;
+  font-size: 14px;
+  color: var(--wb-color-text-tertiary);
+  line-height: 1.5;
+}
+.workspace-preparing__progress {
+  width: 200px;
+  max-width: 280px;
+  margin-top: 8px;
+}
+.workspace-preparing__progress-track {
+  width: 100%;
+  height: 4px;
+  background-color: var(--wb-color-bg-input);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.workspace-preparing__progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%);
+  background-size: 200% 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+  animation: shimmer 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@keyframes progressPulse {
+  0%, 100% {
+    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  50% {
+    animation-timing-function: cubic-bezier(0.2, 0, 0.4, 1);
+  }
+}

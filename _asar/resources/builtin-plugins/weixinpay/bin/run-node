@@ -1,0 +1,39 @@
+#!/bin/sh
+# Resolve the host-designated Node and exec it (macOS / Linux).
+#
+# Sole consumer: the MCP stdio server (.mcp.json `command`). On Windows the MCP
+# launcher resolves the sibling bin/run-node.cmd via PATHEXT instead, so this
+# script is POSIX-only. (It once also served Windows hooks under Git-Bash; the
+# hooks — and with them all MSYS awareness here — were removed 2026-07.)
+#
+# Why not just `node`? On macOS the CLI caller-authz rejects NVM/Homebrew Node,
+# so we must prefer the host-managed Node, whose containing directory the host
+# exports via WORKBUDDY_EXTRA_PATHS (':'-separated) instead of PATH. Trust that
+# first, fall back to PATH, else fail loudly. We deliberately do NOT dig into
+# the host's internal binaries dir — that layout is the host's business, and
+# guessing there can pick a stale or partially-extracted install.
+
+set -e
+
+# Subshell body ( ) so the IFS override stays local and never leaks into the
+# script's positional parameters (needed intact for the final exec "$@").
+resolve_from_extra_paths() (
+  [ -n "${WORKBUDDY_EXTRA_PATHS:-}" ] || exit 1
+  IFS=:
+  for _d in $WORKBUDDY_EXTRA_PATHS; do
+    if [ -n "$_d" ] && [ -x "$_d/node" ]; then
+      printf '%s\n' "$_d/node"
+      exit 0
+    fi
+  done
+  exit 1
+)
+
+NODE_BIN=$(resolve_from_extra_paths || command -v node || true)
+
+if [ -z "$NODE_BIN" ]; then
+  echo "[weixinpay] FATAL: cannot locate node (checked WORKBUDDY_EXTRA_PATHS and PATH)" >&2
+  exit 127
+fi
+
+exec "$NODE_BIN" "$@"

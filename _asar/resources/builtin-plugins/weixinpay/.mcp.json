@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "weixinpay": {
+      "command": "${CODEBUDDY_PLUGIN_ROOT}/bin/run-node",
+      "args": ["${CODEBUDDY_PLUGIN_ROOT}/dist/mcp-server.mjs"],
+      "env": {
+        "WECHATPAY_PAYSIGN_SERVICE_ID": "agentpay"
+      }
+    }
+  }
+}

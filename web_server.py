@@ -37,8 +37,6 @@ ACCESS_KEY = os.environ.get("WB_ACCESS_KEY", "")   # 留空 = 不校验口令；
 
 # 最近一次签到结果（由 workbuddy_checkin.py 写入；自动定时与手动点击都会记）
 STATE_FILE = os.environ.get("WB_STATE_FILE", os.path.join(BASE_DIR, "last_run.json"))
-# 余额采样历史（用于推算每日用量）：{ "YYYY-MM-DD": 剩余积分 }
-HISTORY_FILE = os.environ.get("WB_BALANCE_HISTORY", os.path.join(BASE_DIR, "balance_history.json"))
 
 
 # ============================ 业务逻辑 ============================
@@ -116,41 +114,56 @@ def get_remaining():
     return {"remaining": round(total, 2), "packages": pkgs}
 
 
-def record_balance(remaining):
-    """把今日余额记进历史文件（按天去重，保留最近 60 天）。"""
-    try:
-        today = datetime.date.today().isoformat()
-        hist = {}
-        try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                hist = json.load(f)
-        except Exception:
-            hist = {}
-        hist[today] = remaining
-        keys = sorted(hist.keys())
-        if len(keys) > 60:
-            for k in keys[:-60]:
-                hist.pop(k, None)
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(hist, f, ensure_ascii=False)
-    except Exception:
-        pass
+# 消耗明细接口（官方"积分消耗明细"）的 base：与 get-user-resource 同域名，但路径不带 /v2
+def _base_usage(sess):
+    return "https://%s/billing/meter" % sess["domain"]
 
 
-def daily_usage():
-    """每日用量 = 昨日余额 - 今日余额（正数=消耗）。无历史返回 None。"""
-    try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            hist = json.load(f)
-        days = sorted(hist.keys())
-        today = datetime.date.today().isoformat()
-        if today in hist and len(days) >= 2:
-            prev_days = [d for d in days if d < today]
-            if prev_days:
-                return round(hist[prev_days[-1]] - hist[today], 2)
-    except Exception:
-        pass
-    return None
+# 按天缓存，避免每次刷新页面都打一次接口（服务器长驻，跨天自动失效）
+_USAGE_CACHE = {}
+
+
+def _fetch_usage_day(sess, day):
+    """拉取某一天的全部消耗明细，返回当日消耗积分总和（自动翻页）。"""
+    base = _base_usage(sess)
+    total_credit = 0.0
+    page = 1
+    page_size = 200
+    while True:
+        body = {
+            "startTime": "%s 00:00:00" % day,
+            "endTime": "%s 23:59:59" % day,
+            "pageNum": page,
+            "pageSize": page_size,
+        }
+        s, b = call(base, "/get-user-request-usage", sess, body)
+        if s != 200:
+            raise RuntimeError("查询消耗明细返回 HTTP %s" % s)
+        d = json.loads(b)
+        recs = ((d.get("data") or {}).get("data") or [])
+        if not recs:
+            break
+        for r in recs:
+            try:
+                total_credit += float(r.get("credit") or 0)
+            except Exception:
+                pass
+        total = int((d.get("data") or {}).get("total") or 0)
+        if page * page_size >= total or len(recs) < page_size:
+            break
+        page += 1
+    return round(total_credit, 2)
+
+
+def get_yesterday_usage():
+    """昨日用量 = 昨日全部消耗明细的 credit 求和（来自官方"积分消耗明细"，真实准确）。"""
+    sess = _session()
+    yest = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    if yest in _USAGE_CACHE:
+        return _USAGE_CACHE[yest]
+    val = _fetch_usage_day(sess, yest)
+    _USAGE_CACHE[yest] = val
+    return val
 
 
 def get_status():
@@ -173,13 +186,16 @@ def get_status():
         "usage": None,
         "packages": [],
     }
-    # 余额与每日用量（独立接口，失败不影响签到主流程）
+    # 余额与昨日用量（独立接口，失败不影响签到主流程）
     try:
         res = get_remaining()
         st["remaining"] = res["remaining"]
         st["packages"] = res["packages"]
-        record_balance(res["remaining"])
-        st["usage"] = daily_usage()
+    except Exception:
+        pass
+    # 昨日用量：来自官方"积分消耗明细"真实消耗，单独 try 防止拖垮整体
+    try:
+        st["usage"] = get_yesterday_usage()
     except Exception:
         pass
     return st

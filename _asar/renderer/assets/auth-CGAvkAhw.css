@@ -1,0 +1,186 @@
+/* LexiangAuthPage 样式（webview 方案） */
+.lexiang-auth-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.lexiang-auth-page__webview-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.lexiang-auth-page__webview-container webview {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  min-height: 0;
+}
+.lexiang-auth-page__loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--wb-bg-secondary);
+  z-index: 1;
+}
+.lexiang-auth-page__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e2e2;
+  border-top-color: var(--wb-brand-bright);
+  border-radius: 50%;
+  animation: lexiang-auth-spin 0.8s linear infinite;
+}
+@keyframes lexiang-auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lexiang-auth-page__status-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+}
+.lexiang-auth-page__status-icon {
+  width: 48px;
+  height: 48px;
+}
+.lexiang-auth-page__status-icon[data-variant='warning'] {
+  color: #f59e0b;
+}
+.lexiang-auth-page__status-icon[data-variant='error'] {
+  color: #ef4444;
+}
+.lexiang-auth-page__status-icon[data-variant='success'] {
+  color: var(--wb-brand-bright);
+}
+.lexiang-auth-page__status-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.lexiang-auth-page__status-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wb-text-strong);
+  line-height: 1.4;
+}
+.lexiang-auth-page__status-desc {
+  font-size: 13px;
+  color: var(--wb-text-medium, #888);
+  line-height: 1.5;
+  max-width: 360px;
+}
+.lexiang-auth-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.lexiang-auth-page__primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 99px;
+  height: 36px;
+  min-width: 88px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  outline: none;
+  background-color: var(--wb-brand-bright);
+  color: var(--wb-text-white);
+  transition: background-color 120ms ease;
+}
+.lexiang-auth-page__primary-btn:hover {
+  background-color: var(--wb-kb-brand-hover);
+}
+.lexiang-auth-page__secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 99px;
+  height: 36px;
+  min-width: 88px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+  outline: none;
+  background-color: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.lexiang-auth-page__secondary-btn:hover {
+  background-color: var(--wb-bg-card-strong);
+  border-color: var(--wb-border-default);
+}
+.lexiang-auth-page__link-btn {
+  background: transparent;
+  border: none;
+  color: var(--wb-text-medium, #888);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lexiang-auth-page__link-btn:hover {
+  color: var(--wb-text-strong, #222);
+}
+.lexiang-auth-page__bottom-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-hover);
+}
+/* Dark Mode */
+.dark .lexiang-auth-page__loading-overlay {
+  background: var(--wb-bg-primary);
+}
+.dark .lexiang-auth-page__spinner {
+  border-color: var(--wb-border-strong);
+  border-top-color: var(--wb-brand-bright);
+}
+.dark .lexiang-auth-page__status-title {
+  color: var(--wb-text-strong);
+}
+.dark .lexiang-auth-page__bottom-bar {
+  background: var(--wb-bg-secondary);
+  border-top-color: var(--wb-border-strong);
+}
+.dark .lexiang-auth-page__secondary-btn {
+  background-color: var(--wb-bg-elevated);
+  color: var(--wb-text-strong);
+  border-color: var(--wb-border-default);
+}
+.dark .lexiang-auth-page__secondary-btn:hover {
+  background-color: var(--wb-bg-hover);
+  border-color: var(--wb-border-default);
+}
+.dark .lexiang-auth-page__link-btn {
+  color: var(--wb-text-muted, #858699);
+}
+.dark .lexiang-auth-page__link-btn:hover {
+  color: var(--wb-text-strong, #d2d3e0);
+}

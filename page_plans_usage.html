@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <script data-cb-injected="runtime-env">window.APP_EDITION = 'standard';
+window.RUN_ENV = 'dev';
+window.PRODUCT_FEATURES = '__PRODUCT_FEATURES__';
+window.IS_INTERNATIONAL_EDITION = 'false';
+window.__toCdnUrl = (url) => {
+  const BASE_URL = '//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b';
+  return (/__.*?__$/.test(BASE_URL) ? '' : BASE_URL) + '/' + url;
+};
+
+// 腾讯云页面统计脚本：私有化(内网)环境无法访问外网，跳过加载，避免同步请求阻塞首屏；
+// 其余环境异步注入，不 render-blocking。
+if (window.APP_EDITION !== 'enterprisePrivate') {
+  var qcStat = document.createElement('script');
+  qcStat.src = 'https://dscache.tencent-cloud.cn/ecache/qcstat/qcloud/qcloudStatApi.js';
+  qcStat.async = true;
+  document.head.appendChild(qcStat);
+}</script>
+
+  <meta charset="UTF-8" />
+  <link rel="dns-prefetch" href="//tob-billing.tencent.com" />
+  <link rel="dns-prefetch" href="//tob-charge.tencent.com" />
+  <meta name="viewport"
+    content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,shrink-to-fit=no" />
+  <!-- title / keywords / description / <html lang> 全部由 usercenter-inject-common-html 注入的
+       运行时 bootstrap 按 brand(hostname)×region(IS_INTERNATIONAL_EDITION) 决定；
+       不再有静态 SEO 出口（个人中心是登录后场景，静态注入拿不到 hostname 会写错品牌）。
+       此处 lang="zh-CN" 仅为运行时覆盖前的安全默认（intl 由 bootstrap 改为 en-US）。
+       env（APP_EDITION/RUN_ENV/PRODUCT_FEATURES/IS_INTERNATIONAL_EDITION/__toCdnUrl + qcStat）
+       也由该插件注入到 <head> 最前。数据源见 src/head/tkd.ts。 -->
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+  <!-- 微信 JS-SDK：在小程序 WebView 中提供 wx.miniProgram API -->
+  <script type="text/javascript" src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js" defer></script>
+
+  <!-- vConsole: 移动端调试面板，仅分享页 / ?debug=1 时启用 -->
+  <!--
+  <script>
+    (function () {
+      var href = window.location.href;
+      var needDebug = /\/share\//.test(href) || /[?&]debug=1/.test(href);
+      if (!needDebug) return;
+      var s = document.createElement('script');
+      s.src = 'https://unpkg.com/vconsole@3.15.1/dist/vconsole.min.js';
+      s.onload = function () {
+        // eslint-disable-next-line no-new
+        new window.VConsole();
+      };
+      document.head.appendChild(s);
+    })();
+  </script>
+  -->
+
+  <link rel="icon" href="" />
+  <script>
+    if (APP_EDITION === 'standard') {
+      document.title = '腾讯云代码助手 CodeBuddy - AI 时代的智能编程伙伴';
+      const link = document.querySelector("link[rel='icon']");
+      link.href = __toCdnUrl('assets/logo.svg');
+    }
+  </script>
+  <!-- 品牌主题首帧落地：在解析 HTML 时（早于 JS bundle）同步判定品牌，
+       写入 <html data-brand> 并设置根背景色，避免刷新时先闪一下深色底。
+       判定逻辑须与 src/utils/brand.ts getBrand() 保持一致。 -->
+  <script>
+    (function () {
+      try {
+        var STORAGE_KEY = 'cb_brand_override';
+        var VALID = { codebuddy: 1, workbuddy: 1 };
+        var host = window.location.hostname;
+        var overrideAllowed =
+          host === 'localhost' ||
+          host.indexOf('127.') === 0 ||
+          host.indexOf('192.168.') === 0 ||
+          host.indexOf('staging') !== -1 ||
+          host.indexOf('test') !== -1;
+
+        var brand = null;
+        if (overrideAllowed) {
+          var q = new URLSearchParams(window.location.search).get('brand');
+          if (q && VALID[q]) {
+            brand = q;
+            try { window.localStorage.setItem(STORAGE_KEY, q); } catch (e) {}
+          }
+          if (!brand) {
+            try {
+              var s = window.localStorage.getItem(STORAGE_KEY);
+              if (s && VALID[s]) brand = s;
+            } catch (e) {}
+          }
+        }
+        if (!brand) brand = host.indexOf('.workbuddy.') !== -1 ? 'workbuddy' : 'codebuddy';
+
+        document.documentElement.dataset.brand = brand;
+
+        // iframe 三方回跳中转页（/profile/iframe-callback）跳过品牌底色 + 打 data-callback：
+        //   - 该路由是 iframe 里加载的过渡页，视觉需求是纯净的 #ededed 灰底（组件内联）+
+        //     spinner，不能带主题底色（否则 iframe 里会闪深色/浅色主题底）。
+        //   - <html> 上的行内 style 优先级最高，任何 CSS 都盖不住，所以只能在源头这里判定
+        //     并跳过设置。同时把 data-callback 打上，让 app.less 里 :root[data-callback]
+        //   规则把 body / #root 的 --cb-surface-page 也一并透明化。
+        // - 用 endsWith 而非等值：BrowserRouter basename='/profile'，实际路径是
+    //     /profile/iframe-callback；endsWith 也扛得住未来 basename 调整。
+        //   - main.tsx 顶部还会再幂等打一次 data-callback，双保险（bundle 顺序万一被 CDN
+     //     缓存或 HTML 修改打乱时兜底）。
+        if (window.location.pathname.indexOf('/iframe-callback') !== -1) {
+          document.documentElement.setAttribute('data-callback', '');
+          document.documentElement.style.backgroundColor = 'transparent';
+        } else {
+          // 与 brand-tokens.less 的 --cb-surface-page 保持一致
+          document.documentElement.style.backgroundColor = brand === 'workbuddy' ? '#f5f7fa' : '#18161a';
+        }
+      } catch (e) {
+        /* 判定失败时留给 JS bundle 的 applyBrandToRoot() 兜底 */
+  }
+    })();
+  </script>
+
+  <!-- 米大师企业版二维码支付 SDK（UMD，全局 window.MidasEpPayment）。
+       三域名容灾：主域名加载失败时依次尝试备用域名，确保 SDK 可用性。 -->
+  <script>
+  (function () {
+      var urls = [
+          'https://midas.gtimg.cn/enterprise/epn/midas-ep-payment.tob-billing.umd.js',
+          'https://static.pay.qq.com/enterprise/epn/midas-ep-payment.tob-billing.umd.js',
+          'https://mfile.pay.qq.com/enterprise/epn/midas-ep-payment.tob-billing.umd.js'
+      ];
+      function load(i) {
+          if (i >= urls.length) return;
+          var s = document.createElement('script');
+          s.src = urls[i];
+          s.onerror = function () { load(i + 1); };
+          document.head.appendChild(s);
+      }
+      load(0);
+  })();
+  </script>
+  <script data-cb-injected="head-bootstrap">(function(){
+  try {
+    var DATA = {"tkd":{"codebuddy":{"cn":{"title":"腾讯云代码助手 CodeBuddy - 个人中心","keywords":"CodeBuddy,腾讯云代码助手,个人中心,订阅管理,计费","description":"腾讯云代码助手 CodeBuddy 个人中心，管理您的订阅、用量及账户信息。"},"intl":{"title":"Tencent Cloud CodeBuddy - Account","keywords":"CodeBuddy,account,subscription,usage,billing","description":"Manage your Tencent Cloud CodeBuddy subscription, usage, and account settings."}},"workbuddy":{"cn":{"title":"WorkBuddy - 个人中心","keywords":"WorkBuddy,AI办公,个人中心,订阅管理,计费","description":"WorkBuddy 个人中心，管理您的订阅、用量及账户信息。"},"intl":{"title":"WorkBuddy - Account","keywords":"WorkBuddy,account,subscription,usage,billing","description":"Manage your WorkBuddy subscription, usage, and account settings."}}},"favicon":{"codebuddy":{"icon":"assets/logo.svg","appleTouch":"apple-touch-icon.png"},"workbuddy":{"icon":"assets/logo.svg","appleTouch":"apple-touch-icon.png"}},"lang":{"cn":"zh-CN","intl":"en-US"},"isDev":false,"useToCdnUrl":true};
+    var host = window.location.hostname;
+    var search = window.location.search;
+
+    var overrideAllowed = DATA.isDev
+      || host.indexOf('staging') !== -1
+      || host.indexOf('test') !== -1
+      || host === 'localhost'
+      || host.indexOf('127.') === 0
+      || host.indexOf('192.168.') === 0;
+
+    var brand = null;
+    if (overrideAllowed) {
+      try {
+        var q = new URLSearchParams(search).get('brand');
+        if (q === 'codebuddy' || q === 'workbuddy') {
+          brand = q;
+          try { window.localStorage.setItem('cb_brand_override', q); } catch (e) {}
+        }
+      } catch (e) {}
+      if (!brand) {
+        try {
+          var s = window.localStorage.getItem('cb_brand_override');
+          if (s === 'codebuddy' || s === 'workbuddy') { brand = s; }
+        } catch (e) {}
+      }
+    }
+    if (!brand) { brand = host.indexOf('.workbuddy.') !== -1 ? 'workbuddy' : 'codebuddy'; }
+
+    var flag = window.IS_INTERNATIONAL_EDITION;
+    var region = 'cn';
+    if (flag === true) {
+      region = 'intl';
+    } else if (typeof flag === 'string' && !/__.*?__$/.test(flag) && (flag === 'true' || flag === '1')) {
+      region = 'intl';
+    }
+
+    var brandData = DATA.tkd[brand] || DATA.tkd.codebuddy || DATA.tkd.workbuddy;
+    var tkd = brandData ? brandData[region] : null;
+    var lang = DATA.lang[region];
+
+    if (lang) { document.documentElement.lang = lang; }
+    if (tkd) {
+      if (tkd.title) { document.title = tkd.title; }
+      setMeta('name', 'keywords', tkd.keywords);
+      setMeta('name', 'description', tkd.description);
+      setMeta('property', 'og:title', tkd.title);
+      setMeta('property', 'og:description', tkd.description);
+      if (tkd.ogUrl) {
+        setMeta('property', 'og:url', tkd.ogUrl);
+        setLink('canonical', tkd.ogUrl);
+      }
+    }
+
+    var fav = DATA.favicon[brand];
+    if (fav && fav.icon) {
+      var iconHref = fav.icon;
+      if (DATA.useToCdnUrl && typeof window.__toCdnUrl === 'function') {
+        try { iconHref = window.__toCdnUrl(fav.icon); } catch (e) {}
+      } else {
+        iconHref = '/' + fav.icon;
+      }
+      setLink('icon', iconHref);
+    }
+
+    function setMeta(attr, key, content) {
+      if (!content) { return; }
+      var el = document.querySelector('meta[' + attr + '="' + key + '"]');
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    }
+    function setLink(rel, href) {
+      if (!href) { return; }
+      var el = document.querySelector('link[rel="' + rel + '"]');
+      if (!el) {
+        el = document.createElement('link');
+        el.setAttribute('rel', rel);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('href', href);
+    }
+  } catch (e) { /* 判定失败留给 React 侧 resolveHead 兜底 */ }
+})();</script>
+  <script type="module" crossorigin src="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/index-BQUE1svh.js"></script>
+  <link rel="modulepreload" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/vendor-react-Cyq0qwcu.js">
+  <link rel="modulepreload" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/vendor-utils-Cp2zQtRs.js">
+  <link rel="modulepreload" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/config-D_y8qqW1.js">
+  <link rel="modulepreload" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/vendor-tdesign-0HW8U-n9.js">
+  <link rel="modulepreload" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/vendor-monitoring-DIjgSk5U.js">
+  <link rel="stylesheet" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/config-D1M3AIAK.css">
+  <link rel="stylesheet" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/vendor-tdesign-BZ0J0zcW.css">
+  <link rel="stylesheet" crossorigin href="//download.codebuddy.cn/web/usercenter/1e4320fa2a2213f8344eb7adb25e0429d937000b/assets/index-CznNKX5z.css">
+</head>
+
+<body style="margin: 0; padding: 0">
+  <div id="root"></div>
+</body>
+
+</html>

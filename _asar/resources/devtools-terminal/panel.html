@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    :root {
+        --bg-base: #0f0f11;
+        --bg-surface: #18181b;
+        --bg-elevated: #1f1f23;
+        --bg-hover: #26262b;
+        --border: #2a2a2e;
+        --border-focus: #5e6ad2;
+        --text-primary: #e8e8ed;
+        --text-secondary: #8b8b8f;
+        --text-tertiary: #5c5c63;
+        --accent: #5e6ad2;
+        --accent-hover: #6e7ae2;
+        --accent-muted: rgba(94, 106, 210, 0.15);
+        --green: #4ade80;
+        --yellow: #facc15;
+        --red: #f87171;
+        --radius: 6px;
+        --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+        --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, 'Cascadia Code', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+        width: 100%; height: 100%;
+        overflow: hidden;
+        background: var(--bg-base);
+        color: var(--text-primary);
+        font-family: var(--font);
+        font-size: 13px;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Toolbar ─── */
+    #toolbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border);
+        height: 36px;
+        flex-shrink: 0;
+    }
+
+    #toolbar .label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+    }
+
+    /* ─── Session select ─── */
+    #session-select {
+        flex: 1;
+        min-width: 0;
+        background: var(--bg-elevated);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 4px 24px 4px 8px;
+        font-size: 12px;
+        font-family: var(--font);
+        line-height: 1.4;
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.15s;
+        -webkit-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238b8b8f' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    #session-select:hover { border-color: var(--text-tertiary); }
+    #session-select:focus { border-color: var(--border-focus); box-shadow: 0 0 0 2px var(--accent-muted); }
+    #session-select option { background: var(--bg-elevated); color: var(--text-primary); }
+
+    /* ─── Buttons ─── */
+    #toolbar button {
+        background: var(--bg-elevated);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 500;
+        font-family: var(--font);
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    #toolbar button:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        border-color: var(--text-tertiary);
+    }
+    #toolbar button:active {
+        transform: scale(0.97);
+    }
+    #toolbar button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+    }
+    #toolbar button.primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+    }
+
+    /* ─── Status ─── */
+    .status {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--text-tertiary);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .status-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--text-tertiary);
+        flex-shrink: 0;
+    }
+    .status-dot.connected { background: var(--green); }
+    .status-dot.connecting { background: var(--yellow); animation: pulse 1.5s ease-in-out infinite; }
+    .status-dot.error { background: var(--red); }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+
+    /* ─── Terminal ─── */
+    #terminal-container {
+        width: 100%;
+        height: calc(100% - 36px);
+        background: var(--bg-base);
+        overflow: hidden;
+        position: relative;
+    }
+
+    /*
+     * xterm calculates a pixel width = cols × char-width, leaving a
+     * sub-character gap on the right. We hide the scrollbar by default
+     * and overlay it on hover so the viewport stretches to the edge.
+     * The container background matches the terminal so the gap is invisible.
+     */
+    #terminal-container .xterm,
+    #terminal-container .xterm-viewport,
+    #terminal-container .xterm-screen {
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    #terminal-container .xterm-cursor-layer { opacity: 0 !important; }
+
+    #terminal-container .xterm-viewport {
+        overflow-y: auto !important;
+        right: 0 !important;
+        background-color: transparent !important;
+        scrollbar-width: thin;
+        scrollbar-color: transparent transparent;
+    }
+    #terminal-container:hover .xterm-viewport {
+        scrollbar-color: var(--border) transparent;
+    }
+    #terminal-container .xterm-viewport::-webkit-scrollbar {
+        width: 8px;
+        background: transparent;
+    }
+    #terminal-container .xterm-viewport::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    #terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 4px;
+    }
+    #terminal-container:hover .xterm-viewport::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+    }
+    #terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* ─── Placeholder ─── */
+    .placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        gap: 8px;
+        color: var(--text-tertiary);
+        font-size: 13px;
+        user-select: none;
+    }
+    .placeholder svg {
+        opacity: 0.3;
+    }
+
+    /* ─── Debug ─── */
+    #debug {
+        display: none;
+        padding: 8px 10px;
+        font-size: 11px;
+        font-family: var(--font-mono);
+        color: var(--red);
+        background: rgba(248, 113, 113, 0.08);
+        border-bottom: 1px solid rgba(248, 113, 113, 0.15);
+        word-break: break-all;
+    }
+</style>
+</head>
+<body>
+    <div id="toolbar">
+        <span class="label">Session</span>
+        <select id="session-select"><option value="">Select a session...</option></select>
+        <button id="attach-btn" class="primary">Attach</button>
+        <button id="refresh-btn">Refresh</button>
+        <div class="status" id="status">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">disconnected</span>
+        </div>
+    </div>
+    <div id="debug"></div>
+    <div id="terminal-container">
+        <div class="placeholder" id="placeholder">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg>
+            Select a session and click Attach
+        </div>
+    </div>
+    <script src="ghostty-web.js"></script>
+    <script src="panel.js"></script>
+</body>
+</html>

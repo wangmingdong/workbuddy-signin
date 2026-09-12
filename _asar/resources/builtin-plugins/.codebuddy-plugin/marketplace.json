@@ -1,0 +1,39 @@
+{
+  "name": "workbuddy-builtin",
+  "description": "WorkBuddy 内置插件市场，跟随 Desktop 一起分发，无需用户手动安装。",
+  "owner": {
+    "name": "WorkBuddy",
+    "email": "workbuddy@tencent.com"
+  },
+  "metadata": {
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "weixinpay",
+      "description": "微信 AI 支付 — 在对话中通过微信支付完成 AI 代付",
+      "source": "./weixinpay",
+      "version": "1.5.111",
+      "author": {
+        "name": "Tencent ClawPay Team"
+      },
+      "category": "支付"
+    },
+    {
+      "name": "tencent-docs-plugin",
+      "description": "腾讯文档官方 MCP 插件，按用户身份自动路由到 C 端或 SaaS 端 skill，支持创建/编辑/管理在线文档、智能表格、幻灯片、思维导图等",
+      "source": "./tencent-docs-plugin",
+      "version": "1.0.0",
+      "author": {
+        "name": "tencent-docs"
+      },
+      "category": "办公协作"
+    },
+    {
+      "name": "tencent-pptx",
+      "description": "由腾讯文档团队出品的演示文稿智能助手，支持通过自然语言创建、编辑与排版幻灯片",
+      "source": "./tencent-pptx",
+      "version": "v20260712"
+    }
+  ]
+}

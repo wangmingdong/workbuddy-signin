@@ -1,0 +1,72 @@
+.skill-scan-result-dialog-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+.skill-scan-result-dialog-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.skill-scan-result-dialog-label {
+  color: var(--wb-color-text-secondary);
+  flex-shrink: 0;
+}
+.skill-scan-result-dialog-value {
+  color: var(--wb-color-text-primary);
+  word-break: break-all;
+}
+.skill-scan-result-dialog-desc {
+  color: var(--wb-color-text-secondary);
+  line-height: 1.5;
+}
+.skill-scan-result-dialog-risk {
+  font-weight: 600;
+}
+.skill-scan-result-dialog-risk--high {
+  color: var(--wb-error);
+}
+.skill-scan-result-dialog-risk--medium {
+  color: var(--wb-warning);
+}
+.skill-scan-result-dialog-risk--low {
+  color: var(--wb-info);
+}
+.skill-scan-result-dialog-risk--safe {
+  color: var(--wb-success);
+}
+.skill-scan-result-dialog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.skill-scan-result-dialog-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-color-text-secondary);
+}
+.skill-scan-result-dialog-tag--high {
+  color: var(--wb-error);
+  background: var(--wb-status-error-soft-bg);
+  border: 1px solid var(--wb-status-error-soft);
+}
+.skill-scan-result-dialog-tag--medium {
+  color: var(--wb-warning);
+  background: var(--wb-status-warning-soft-bg);
+  border: 1px solid var(--wb-status-warning-soft);
+}
+.skill-scan-result-dialog-tag--low {
+  color: var(--wb-info);
+  background: color-mix(in srgb, var(--wb-info) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-info) 25%, transparent);
+}
+.skill-scan-result-dialog-tag--safe {
+  color: var(--wb-success);
+  background: var(--wb-status-success-soft-bg);
+  border: 1px solid color-mix(in srgb, var(--wb-success) 25%, transparent);
+}

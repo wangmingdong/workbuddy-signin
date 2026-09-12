@@ -1,0 +1,71 @@
+#!/bin/sh
+# Resolve a WorkBuddy-signed Node and exec it.
+
+set -e
+
+resolve_from_extra_paths() {
+  paths=${WORKBUDDY_EXTRA_PATHS:-}
+  [ -n "$paths" ] || return 1
+  # Subshell scopes IFS — no save/restore dance, safe on early exit.
+  (
+    IFS=:
+    for d in $paths; do
+      if [ -n "$d" ] && [ -x "$d/node" ]; then
+        printf '%s\n' "$d/node"
+        exit 0
+      fi
+    done
+    exit 1
+  )
+}
+
+resolve_from_managed_dirs() {
+  root=${WORKBUDDY_CONFIG_DIR:-${CODEBUDDY_CONFIG_DIR:-$HOME/.workbuddy}}
+  versions_dir="$root/binaries/node/versions"
+  [ -d "$versions_dir" ] || return 1
+
+  names=""
+  for dir in "$versions_dir"/*/; do
+    [ -d "$dir" ] || continue
+    name=${dir%/}
+    name=${name##*/}
+    # Skip partial extracts — matches WorkBuddy's own listManagedBinDirs filter.
+    case "$name" in
+      *.installing.*|*.__extract_temp__*) continue ;;
+    esac
+    names="$names$name
+"
+  done
+  [ -n "$names" ] || return 1
+
+  for ver in $(printf '%s' "$names" | sort -Vr); do
+    candidate="$versions_dir/$ver/bin/node"
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_from_path() {
+  command -v node 2>/dev/null
+}
+
+NODE_BIN=$(resolve_from_extra_paths || resolve_from_managed_dirs || resolve_from_path || true)
+
+if [ -z "$NODE_BIN" ]; then
+  echo "[tencent-pptx] FATAL: cannot locate node (checked WORKBUDDY_EXTRA_PATHS, managed binaries dir, and PATH)" >&2
+  exit 127
+fi
+
+# 把选中的 node 所在 bin 目录注入 PATH，使子进程也能找到 node。
+# 否则脚本里 spawn 的 `npm` 软链 shebang(`#!/usr/bin/env node`) 会在 PATH 里找不到
+# node 而报 `env: node: No such file or directory`，导致 slidep/mcporter 永远装不上。
+NODE_DIR=$(dirname "$NODE_BIN")
+case ":$PATH:" in
+  *":$NODE_DIR:"*) ;;
+  *) PATH="$NODE_DIR:$PATH"; export PATH ;;
+esac
+
+exec "$NODE_BIN" "$@"

@@ -1,0 +1,723 @@
+@charset "UTF-8";
+/**
+ * 资料库开通页样式
+ * 颜色 token 严格使用 --wb-* 前缀，禁止直接使用 --vscode-*。
+ */
+/**
+ * OneID 官方开通组件（@tencent/oneid-open-components-react）的自定义样式 token。
+ *
+ * 该组件是基于 Stencil 的 Web Component，外部样式只能通过其约定的 CSS 自定义
+ * 属性注入到内部 shadow DOM。蒙层颜色对齐项目其他弹窗（modal）—— 半透明黑，
+ * 让背景明显变暗，区别于"半透明白"那种几乎看不出蒙层的视觉。
+ *
+ * 放到 :root 上是为了让组件无论挂在哪个父节点（onboarding / tencent-docs）下
+ * 都能继承到——CSS 自定义属性同值重复声明是幂等的，多处声明无副作用。
+ */
+:root {
+  --oneid-dialog-wrapper-bg: var(--wb-color-mask-strong);
+}
+
+.kb-onboarding-panel {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  /* 整体垂直居中（卡片高度小于面板时居中显示，超出则按 padding 起始排版） */
+  align-items: center;
+  background: var(--wb-home-bg-secondary);
+  color: var(--wb-color-text-primary);
+  padding: 40px 32px;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  position: relative;
+}
+
+.kb-onboarding-panel__content {
+  width: 100%;
+  max-width: 548px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 24px;
+  /* 配合外层 align-items: center 实现整体居中；同时保证内容超长时自然滚动 */
+  margin: auto 0;
+}
+
+.kb-onboarding-panel__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.kb-onboarding-panel__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 32px;
+  color: var(--wb-color-text-primary);
+}
+
+.kb-onboarding-panel__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/*
+ * 单服务面板的内容容器：相对两卡版，gap 略小，整体更紧凑。
+ * 与 .kb-onboarding-panel__content 共用，单服务时叠加此修饰类。
+ */
+.kb-onboarding-panel__content--single {
+  gap: 20px;
+}
+
+/*
+ * 单服务面板顶部品牌头图区：
+ *   WorkBuddy logo（左） →›››→ 服务图标（右）
+ * 视觉对齐 C 端 lexiang-auth-guide：64x64 彩色圆角背景 + 流动箭头动画。
+ * 颜色按服务区分：腾讯文档 = 蓝、乐享 = 绿、WorkBuddy = 蓝。
+ */
+.kb-onboarding-panel__brands {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.kb-onboarding-panel__brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  padding: 8px;
+}
+.kb-onboarding-panel__brand-icon img,
+.kb-onboarding-panel__brand-icon svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+/* WorkBuddy（蓝色背景） */
+.kb-onboarding-panel__brand-icon--wb {
+  background: var(--wb-onboarding-brand-bg-blue);
+}
+
+/* 服务图标背景：按服务区分 */
+.kb-onboarding-panel__brand-icon--doc {
+  background: var(--wb-onboarding-brand-bg-blue);
+}
+
+.kb-onboarding-panel__brand-icon--lexiang {
+  background: var(--wb-onboarding-brand-bg-green);
+}
+
+/*
+ * 流动箭头：与 C 端保持一致的视觉与动画节奏。
+ */
+.kb-onboarding-panel__brand-connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--wb-onboarding-arrow-default);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 600;
+  user-select: none;
+}
+
+.kb-onboarding-panel__brand-arrow {
+  display: inline-block;
+  line-height: 1;
+  opacity: 0.25;
+  animation: kb-onboarding-arrow-flow 1.6s ease-in-out infinite;
+}
+.kb-onboarding-panel__brand-arrow:nth-child(1) {
+  animation-delay: 0s;
+}
+.kb-onboarding-panel__brand-arrow:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.kb-onboarding-panel__brand-arrow:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes kb-onboarding-arrow-flow {
+  0% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+    color: var(--wb-onboarding-arrow-default);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(0);
+    color: var(--wb-onboarding-arrow-active);
+  }
+  70% {
+    opacity: 0.5;
+    transform: translateX(1px);
+    color: var(--wb-onboarding-arrow-fade);
+  }
+  100% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+    color: var(--wb-onboarding-arrow-default);
+  }
+}
+.kb-onboarding-panel__footnote {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-secondary);
+}
+
+/*
+ * 底部提示 icon：绿色盾牌（SVG），与 C 端 lexiang-auth-guide 保持一致。
+ * 颜色统一走 success token，便于暗色模式自动适配。
+ */
+.kb-onboarding-panel__footnote-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--wb-status-success);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.kb-onboarding-panel__footnote-icon svg {
+  display: block;
+}
+
+/*
+ * OneID 列应用接口异常时（如 HTTP 403）展示的横幅提示。
+ * 渲染在 header 下方、卡片上方，告知用户「统一授权系统状态异常」无法判断开通态，
+ * 同时下方的卡片仍然保留，便于管理员继续走授权 / 联系管理员流程。
+ */
+.kb-onboarding-panel__error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-color-text-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.kb-onboarding-panel__error-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--wb-status-warning);
+  color: var(--wb-text-white);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kb-onboarding-panel__error-text {
+  flex: 1 1 auto;
+  color: var(--wb-color-text-primary);
+}
+
+.kb-onboarding-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 20px;
+  background: var(--wb-bg-card);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--wb-color-text-primary) 6%, transparent);
+}
+
+.kb-onboarding-card--enabled {
+  opacity: 0.88;
+}
+
+.kb-onboarding-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kb-onboarding-card__icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kb-onboarding-card__icon img {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.kb-onboarding-card__icon svg {
+  display: block;
+  max-width: 36px;
+  max-height: 36px;
+  object-fit: contain;
+  overflow: hidden;
+}
+
+.kb-onboarding-card__heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kb-onboarding-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kb-onboarding-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--wb-color-text-primary);
+}
+
+.kb-onboarding-card__badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.kb-onboarding-card__badge--free {
+  color: var(--wb-status-success);
+  background: color-mix(in srgb, var(--wb-status-success) 12%, transparent);
+}
+
+.kb-onboarding-card__badge--paid {
+  color: var(--wb-status-warning);
+  background: color-mix(in srgb, var(--wb-status-warning) 12%, transparent);
+}
+
+/*
+ * desc 行：左侧服务描述、右侧「前往了解 >」链接（仅单服务面板渲染）。
+ * 用 flex + align-items:flex-end 让长描述与链接基线对齐。
+ */
+.kb-onboarding-card__desc-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.kb-onboarding-card__desc {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--wb-color-text-secondary);
+}
+
+/*
+ * 「前往了解 >」链接：紧贴在卡片标题 + badge 右侧。
+ * 单服务面板专属（two-card 面板不渲染此元素）。
+ */
+.kb-onboarding-card__learn-link {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-color-text-link-default);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.kb-onboarding-card__learn-link:hover {
+  text-decoration: underline;
+}
+
+.kb-onboarding-card__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--wb-color-text-primary);
+}
+
+.kb-onboarding-card__capabilities {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.kb-onboarding-card__capability {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--wb-color-text-secondary);
+}
+
+.kb-onboarding-card__check {
+  flex-shrink: 0;
+  color: var(--wb-status-success);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kb-onboarding-card__btn {
+  align-self: stretch;
+  width: 100%;
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, background 0.2s, border-color 0.2s;
+}
+.kb-onboarding-card__btn:disabled {
+  cursor: not-allowed;
+}
+
+.kb-onboarding-card__btn--primary {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.kb-onboarding-card__btn--primary:hover:not(:disabled) {
+  background: var(--wb-button-primary-bg-hover);
+}
+.kb-onboarding-card__btn--primary:disabled {
+  opacity: 0.56;
+}
+
+.kb-onboarding-card__btn--done {
+  background: var(--wb-button-secondary-bg);
+  color: var(--wb-button-secondary-fg);
+  opacity: 0.65;
+}
+
+/*
+ * OneID 授权弹窗的宿主容器：让 <OneidAppActivation> 脱离流布局。
+ *
+ * 不套这层时组件本体作为 React 兄弟节点直接挂在卡片下面，挂载/卸载时
+ * 会占据 flex 列的一行高度，导致点"立即开通"瞬间整个开通页向下抖动。
+ * 套 fixed + inset:0 让它彻底脱离流布局；pointer-events 走子元素 auto，
+ * 既保证 Stencil 内部弹窗可点击，也不阻挡未渲染时的事件穿透。
+ *
+ * z-index 略高于 OneID 默认的 1000（依据其 Stencil 组件实测值）。
+ */
+.kb-onboarding-card__oneid-host {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+}
+.kb-onboarding-card__oneid-host > * {
+  pointer-events: auto;
+}
+
+/* ─────────────────────────── Dev Toolbar ─────────────────────────── */
+/*
+ * 临时调试工具栏：右上角悬浮按钮，展开后可切换 VPC / 旗舰 / 管理员 / 非管理员。
+ * 仅作为本地联调使用，OneID 接口 ready 后建议移除。
+ */
+.kb-onboarding-dev {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kb-onboarding-dev__toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-card);
+  color: var(--wb-color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.kb-onboarding-dev__toggle:hover {
+  color: var(--wb-color-text-primary);
+  border-color: color-mix(in srgb, var(--wb-color-text-primary) 30%, var(--wb-border-default));
+}
+
+.kb-onboarding-dev__panel {
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-card);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--wb-color-text-primary) 12%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-onboarding-dev__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-onboarding-dev__label {
+  width: 32px;
+  font-size: 11px;
+  color: var(--wb-color-text-secondary);
+}
+
+.kb-onboarding-dev__chip {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.kb-onboarding-dev__chip:hover {
+  color: var(--wb-color-text-primary);
+}
+.kb-onboarding-dev__chip.is-active {
+  background: var(--wb-button-primary-bg);
+  border-color: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+
+.kb-onboarding-dev__reset {
+  align-self: stretch;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-color-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.kb-onboarding-dev__reset:hover {
+  color: var(--wb-color-text-primary);
+  background: var(--wb-bg-hover);
+}
+
+/* ─────────────────────────── Skeleton ──────────────────────────── */
+/*
+ * 资料库开通页骨架屏。
+ *
+ * 触发：useOneidAppStatus.status === 'checking' 期间整页覆盖。
+ * 设计：
+ *  - 颜色走 --cb-skeleton-* token，亮 / 暗主题自适配；
+ *    背景 fallback 到 cb-bg-secondary，老主题或 token 缺失时不至于一片白。
+ *  - shimmer 节奏与 cb-chat-ui 全局 skeleton 一致（1.5s ease-in-out infinite）。
+ *  - 各骨架块尺寸（title 22px / subtitle 13px / card padding 20px 24px / btn 44px）
+ *    与真实内容（kb-onboarding-panel__title / __subtitle / kb-onboarding-card）一致，
+ *    checking → ready 切换无视觉位移。
+ */
+.kb-onboarding-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.kb-onboarding-skeleton__brands {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.kb-onboarding-skeleton__brand {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--wb-bg-skeleton);
+  background-image: linear-gradient(90deg, var(--wb-bg-skeleton) 0%, var(--wb-bg-skeleton-highlight) 50%, var(--wb-bg-skeleton) 100%);
+  background-size: 200% 100%;
+  animation: kb-onboarding-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.kb-onboarding-skeleton__brand-connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kb-onboarding-skeleton__brand-arrow {
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--wb-bg-skeleton);
+  opacity: 0.6;
+}
+
+.kb-onboarding-skeleton__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  /* 与真实 header 8px gap 接近，略放宽避免两条紧贴看着发闷 */
+}
+
+.kb-onboarding-skeleton__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kb-onboarding-skeleton__card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+  background: var(--wb-bg-card);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+}
+
+.kb-onboarding-skeleton__card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kb-onboarding-skeleton__card-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-image: linear-gradient(90deg, var(--wb-bg-skeleton) 0%, var(--wb-bg-skeleton-highlight) 50%, var(--wb-bg-skeleton) 100%);
+  background-size: 200% 100%;
+  animation: kb-onboarding-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.kb-onboarding-skeleton__card-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* 与真实 .kb-onboarding-card__heading（gap 4px）略宽，让两条骨架视觉透气 */
+}
+
+.kb-onboarding-skeleton__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kb-onboarding-skeleton__btn-row {
+  display: flex;
+}
+
+.kb-onboarding-skeleton__footnote {
+  display: flex;
+  justify-content: center;
+}
+
+.kb-onboarding-skeleton__bar {
+  display: block;
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, var(--wb-bg-skeleton) 0%, var(--wb-bg-skeleton-highlight) 50%, var(--wb-bg-skeleton) 100%);
+  background-size: 200% 100%;
+  animation: kb-onboarding-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.kb-onboarding-skeleton__bar--title {
+  width: 60%;
+  height: 22px;
+  align-self: center;
+}
+
+.kb-onboarding-skeleton__bar--subtitle {
+  width: 80%;
+  height: 14px;
+  align-self: center;
+}
+
+.kb-onboarding-skeleton__bar--card-title {
+  width: 40%;
+  height: 16px;
+}
+
+.kb-onboarding-skeleton__bar--card-desc {
+  width: 70%;
+  height: 12px;
+}
+
+.kb-onboarding-skeleton__bar--line-main {
+  width: 90%;
+  height: 12px;
+}
+
+.kb-onboarding-skeleton__bar--line-sub {
+  width: 75%;
+  height: 12px;
+}
+
+.kb-onboarding-skeleton__bar--line-short {
+  width: 50%;
+  height: 12px;
+}
+
+.kb-onboarding-skeleton__bar--btn {
+  width: 100%;
+  height: 44px;
+  border-radius: 6px;
+}
+
+.kb-onboarding-skeleton__bar--footnote {
+  width: 45%;
+  height: 12px;
+}
+
+@keyframes kb-onboarding-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

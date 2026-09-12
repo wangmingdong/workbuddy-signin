@@ -1,0 +1,1009 @@
+._previewContainer_ohbm6_1 {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+._editorWrapper_ohbm6_8 {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+._editorRoot_ohbm6_16 {
+  height: 100%;
+  width: 100%;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+  --sc-color-selection: rgba(0, 194, 154, .12);
+  --sc-color-selection-active: rgba(255, 191, 0, 0.12);
+}
+
+._placeholderButton_ohbm6_25 {
+  display: block;
+  width: 100%;
+  cursor: text;
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0;
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.625;
+  color: var(--wb-color-text-disabled);
+  transition: color 0.15s;
+}
+._placeholderButton_ohbm6_25:hover {
+  color: var(--wb-color-text-secondary);
+}
+
+:root.dark ._editorRoot_ohbm6_16,
+:root.cb-dark ._editorRoot_ohbm6_16,
+:root .dark ._editorRoot_ohbm6_16,
+:root .cb-dark ._editorRoot_ohbm6_16 {
+  background-color: var(--wb-sidebar-bg);
+}.selection-quote-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: var(--wb-bg-popover);
+  border: 1px solid var(--wb-border-popover);
+  border-radius: 6px;
+  box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.04), 0px 3px 6px 0px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+}
+.selection-quote-trigger__icon {
+  flex-shrink: 0;
+  color: var(--wb-color-text-primary);
+}
+.selection-quote-trigger__label {
+  color: var(--wb-color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.selection-quote-trigger:hover {
+  background: var(--wb-color-bg-primary-hover);
+}
+
+.selection-quote-popup__container {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 8px 8px 12px;
+  background: var(--wb-bg-popover);
+  border: 1px solid var(--wb-border-popover);
+  border-radius: 12px;
+  /* shadow/Popup */
+  box-shadow: var(--wb-shadow-selection-quote-popup);
+}
+.selection-quote-popup__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--wb-color-text-primary);
+  min-width: 0;
+  resize: none;
+  overflow-y: auto;
+  word-break: break-word;
+  min-height: 22px;
+  max-height: 110px;
+}
+.selection-quote-popup__input::placeholder {
+  color: var(--wb-color-text-disabled);
+}
+.selection-quote-popup__input::-webkit-scrollbar {
+  width: 4px;
+}
+.selection-quote-popup__input::-webkit-scrollbar-track {
+  background: transparent;
+}
+.selection-quote-popup__input::-webkit-scrollbar-thumb {
+  background: var(--wb-scrollbar-thumb);
+  border-radius: 2px;
+}
+.selection-quote-popup__input::-webkit-scrollbar-thumb:hover {
+  background: var(--wb-scrollbar-thumb-hover);
+}
+.selection-quote-popup__submit-wrap {
+  position: relative;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.selection-quote-popup__submit-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 12px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wb-bg-tooltip);
+  color: var(--wb-text-white);
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+.selection-quote-popup__submit-btn--active {
+  opacity: 1;
+  cursor: pointer;
+}
+.selection-quote-popup__submit-btn--active:hover {
+  opacity: 0.85;
+}
+.selection-quote-popup--multiline .selection-quote-popup__container {
+  flex-direction: column;
+  align-items: stretch;
+}
+.selection-quote-popup--multiline .selection-quote-popup__input {
+  flex: none;
+  width: 100%;
+}
+.selection-quote-popup--multiline .selection-quote-popup__submit-wrap {
+  align-self: flex-end;
+  margin-left: 0;
+  margin-top: 8px;
+}
+.selection-quote-popup__tooltip {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  right: -8px;
+  background: var(--wb-bg-popover);
+  border: 0.5px solid var(--wb-border-popover);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md-offsetx-2, 0px) 6px 24px var(--shadow-md-spread-2, -4px) rgba(0, 0, 0, 0.04), var(--shadow-md-offsetx-1, 0px) 4px 6px var(--shadow-md-spread-1, -8px) rgba(0, 0, 0, 0.04);
+  padding: 2px 6px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 100;
+  white-space: nowrap;
+}
+.selection-quote-popup__tooltip--visible {
+  opacity: 1;
+  visibility: visible;
+}
+.selection-quote-popup__tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 20px;
+}
+.selection-quote-popup__tooltip-label {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-color-text-primary);
+}
+.selection-quote-popup__tooltip-kbd-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.selection-quote-popup__tooltip-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: var(--wb-color-bg-primary-hover);
+  border-radius: 4px;
+  border: none;
+  padding: 0;
+  font-style: normal;
+}
+
+.sc-deco-selection-highlight, .sc-deco-selection-highlight-active {
+  background-color: var(--sc-color-selection);
+  padding-top: calc((var(--sc-content-line-height) - 1) / 2 * 1em);
+  padding-bottom: calc((var(--sc-content-line-height) - 1) / 2 * 1em);
+  margin-top: calc((var(--sc-content-line-height) - 1) / 2 * -1em);
+  margin-bottom: calc((var(--sc-content-line-height) - 1) / 2 * -1em);
+}
+
+.sc-deco-selection-highlight-active {
+  background-color: var(--sc-color-selection-active);
+}
+
+.quote-tooltip {
+  max-width: 320px;
+  padding: 6px 10px;
+  background: var(--sc-ui-bg, #fff);
+  border: 1px solid var(--sc-ui-border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sc-ui-text, #111);
+  white-space: pre-wrap;
+  word-break: break-word;
+  position: relative;
+}
+.quote-tooltip::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 16px;
+  width: 10px;
+  height: 6px;
+  background: var(--sc-ui-bg, #fff);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  filter: drop-shadow(0 -1px 0 var(--sc-ui-border, #e5e7eb));
+}[data-sc-mode='markdown'] {
+  --sc-text-default: rgba(0, 0, 0, 0.9);
+  --sc-border-grey: #ebebeb;
+  --sc-bg-grey_background: #f7f7f7;
+  --sc-divider-default: #efefef;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+:root[data-sc-color-scheme='dark'] [data-sc-mode='markdown'] {
+  --sc-text-default: rgba(255, 255, 255, 0.9);
+  --sc-border-grey: rgba(255, 255, 255, 0.15);
+  --sc-bg-grey_background: #252526;
+  --sc-divider-default: rgba(255, 255, 255, 0.1);
+}
+[data-sc-mode='markdown'][data-sc-theme] {
+  --sc-text-code: rgba(0, 0, 0, 0.9);
+  --sc-content-font-size: 14px;
+  --sc-content-line-height: 1.75;
+  --sc-content-font-weight-bold: 600;
+  --sc-heading-1-font-size: 20px;
+  --sc-heading-2-font-size: 18px;
+  --sc-heading-3-font-size: 16px;
+  --sc-heading-4-font-size: 14px;
+  --sc-heading-5-font-size: 14px;
+  --sc-heading-6-font-size: 14px;
+  --sc-heading-line-height: 1.75;
+  --sc-heading-1-color: rgba(0, 0, 0, 0.9);
+  --sc-heading-2-color: rgba(0, 0, 0, 0.9);
+  --sc-heading-3-color: rgba(0, 0, 0, 0.9);
+  --sc-heading-4-color: rgba(0, 0, 0, 0.9);
+  --sc-heading-5-color: rgba(0, 0, 0, 0.9);
+  --sc-heading-6-color: rgba(0, 0, 0, 0.9);
+  --sc-heading-1-font-weight: 600;
+  --sc-heading-2-font-weight: 600;
+  --sc-heading-3-font-weight: 600;
+  --sc-heading-letter-spacing: normal;
+  --sc-link-color: #1470b4;
+  --sc-link-color-hover: #0e58a0;
+  --sc-link-text-decoration: none;
+  --sc-inline-code-bg: #ebebeb;
+  --sc-inline-code-border-radius: 4px;
+  --sc-inline-code-padding: 0.15em 4px;
+  --sc-inline-code-font-size: 12px;
+  --sc-code-block-font-size: 12px;
+  --sc-code-block-bg: #ffffff;
+  --sc-code-block-border: 1px solid #ebebeb;
+  --sc-code-block-radius: 16px;
+  --sc-quote-bg: transparent;
+  --sc-quote-text-color: rgba(0, 0, 0, 0.5);
+  --sc-quote-border-color: #ebebeb;
+  --sc-quote-border-radius: 0;
+  --sc-quote-border-width: 4px;
+  --sc-quote-padding: 0 16px;
+  --sc-callout-radius: 10px;
+  --sc-block-gap: 12px;
+  --sc-block-gap-heading-before: 24px;
+  --sc-block-gap-heading-after: 8px;
+  --sc-block-gap-media: 12px;
+  --sc-block-gap-container: 12px;
+  --sc-block-gap-separator: 20px;
+  --sc-block-gap-table-before: 12px;
+  --sc-block-gap-table-after: 12px;
+  --sc-block-gap-inner: 4px;
+  --sc-block-padding-x: 16px;
+  --sc-block-padding-y: 14px;
+  --sc-block-radius: 16px;
+  --sc-image-radius: 16px;
+  --sc-block-indent: 20px;
+  --sc-divider-padding: 0;
+  --sc-page-body-padding-bottom: 16px;
+  --sc-page-padding-x: 16px;
+}
+:root[data-sc-color-scheme='dark'] [data-sc-mode='markdown'][data-sc-theme] {
+  --sc-text-code: rgba(255, 255, 255, 0.9);
+  --sc-inline-code-bg: rgba(200, 200, 200, 0.15);
+  --sc-code-block-bg: #1e1e1e;
+  --sc-code-block-border: 1px solid rgba(255, 255, 255, 0.12);
+  --sc-quote-bg: transparent;
+  --sc-quote-text-color: rgba(255, 255, 255, 0.5);
+  --sc-quote-border-color: rgba(255, 255, 255, 0.15);
+  --sc-link-color: #46a8f0;
+  --sc-link-color-hover: #5ea9f2;
+  --sc-heading-1-color: rgba(255, 255, 255, 0.9);
+  --sc-heading-2-color: rgba(255, 255, 255, 0.9);
+  --sc-heading-3-color: rgba(255, 255, 255, 0.9);
+  --sc-heading-4-color: rgba(255, 255, 255, 0.9);
+  --sc-heading-5-color: rgba(255, 255, 255, 0.9);
+  --sc-heading-6-color: rgba(255, 255, 255, 0.9);
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-header1 {
+  margin-top: 20px;
+  margin-bottom: 16px;
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-header2 {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-header3 {
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-header4,
+[data-sc-mode='markdown'] .sc-block.sc-block-header5,
+[data-sc-mode='markdown'] .sc-block.sc-block-header6 {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+[data-sc-mode='markdown'] .sc-mark-link {
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+[data-sc-mode='markdown'] .sc-mark-link:hover {
+  color: var(--sc-link-color-hover);
+  text-decoration: underline;
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-bulleted_list,
+[data-sc-mode='markdown'] .sc-block.sc-block-numbered_list {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-bulleted_list:has( + .sc-block:not(.sc-block-bulleted_list):not(.sc-block-numbered_list)),
+[data-sc-mode='markdown'] .sc-block.sc-block-numbered_list:has( + .sc-block:not(.sc-block-bulleted_list):not(.sc-block-numbered_list)),
+[data-sc-mode='markdown'] .sc-block.sc-block-bulleted_list:last-child,
+[data-sc-mode='markdown'] .sc-block.sc-block-numbered_list:last-child {
+  margin-bottom: 16px;
+}
+[data-sc-mode='markdown'] .sc-table-wrapper table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--sc-border-grey, #ebebeb);
+  border-radius: 16px;
+  overflow: hidden;
+}
+[data-sc-mode='markdown'] .sc-table-wrapper table td,
+[data-sc-mode='markdown'] .sc-table-wrapper table th {
+  border-right: 1px solid var(--sc-border-grey, #ebebeb);
+  border-bottom: 1px solid var(--sc-border-grey, #ebebeb);
+  border-top: none;
+  border-left: none;
+}
+[data-sc-mode='markdown'] .sc-table-wrapper table td:last-child,
+[data-sc-mode='markdown'] .sc-table-wrapper table th:last-child {
+  border-right: none;
+}
+[data-sc-mode='markdown'] .sc-table-wrapper table tr:last-child > td,
+[data-sc-mode='markdown'] .sc-table-wrapper table tr:last-child > th {
+  border-bottom: none;
+}
+[data-sc-mode='markdown'] .sc-table-wrapper table tr:first-child > td,
+[data-sc-mode='markdown'] .sc-table-wrapper table tr:first-child > th {
+  background-color: var(--sc-bg-grey_background, #f7f7f7);
+  font-weight: 600;
+}
+[data-sc-mode='markdown'] .sc-block.sc-block-image {
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+[data-sc-mode='markdown'] .sc-image-frame {
+  gap: 8px;
+}
+[data-sc-mode='markdown'] .sc-image-caption {
+  color: rgba(0, 0, 0, 0.5);
+}
+[data-sc-mode='markdown'] .sc-image-media img {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.sc-block-equation .katex-display {
+  margin: 0;
+}
+.sc-equation-inline {
+  margin: 0 2px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.sc-equation-inline--selected {
+  user-select: none;
+  background: var(--sc-selection-bg, rgba(45, 170, 219, 0.15));
+  box-shadow: 0 0 0 1px var(--sc-ui-primary, #2daadb);
+}
+/* 行内脚注引用：渲染为 <sup>，胶囊样式，使用主色调以确保可见性 */
+.sc-footnote-inline {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0 6px;
+  min-width: 14px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--sc-ui-primary);
+  background-color: var(--sc-ui-primary-subtle, rgba(59, 130, 246, 0.08));
+  border-radius: var(--sc-ui-radius-lg, 8px);
+  cursor: pointer;
+  user-select: none;
+  vertical-align: super;
+  position: relative;
+  top: -2px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sc-footnote-inline:hover {
+  background-color: var(--sc-ui-primary-subtle-hover, rgba(59, 130, 246, 0.15));
+  color: var(--sc-ui-primary);
+}
+.sc-footnote-inline--selected {
+  background-color: var(--sc-ui-primary);
+  color: var(--sc-ui-text-on-primary);
+}
+.sc-footnote-inline--missing {
+  color: var(--sc-ui-danger);
+  background-color: var(--sc-ui-hover);
+}
+/* hover 卡片：由 Radix Tooltip 的 Portal 渲染，定位由 Radix 自动管理 */
+.sc-footnote-hover-card {
+  min-width: 220px;
+  max-width: 360px;
+  overflow: hidden;
+  white-space: normal;
+  background: var(--sc-ui-surface);
+  border: 1px solid var(--sc-ui-surface-border);
+  border-radius: var(--sc-ui-radius-md, 6px);
+  box-shadow: var(--sc-ui-surface-shadow-1), var(--sc-ui-surface-shadow-2);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--sc-ui-text);
+  user-select: none;
+}
+.sc-footnote-hover-card__content {
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  color: var(--sc-ui-text);
+}
+.sc-footnote-hover-card__missing {
+  color: var(--sc-ui-text-muted);
+  font-style: italic;
+}
+.sc-footnote-hover-card__divider {
+  height: 1px;
+  background: var(--sc-ui-separator);
+  margin: 6px -10px;
+}
+.sc-footnote-hover-card__actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.sc-footnote-hover-card__btn {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--sc-ui-text-muted);
+  border-radius: var(--sc-ui-radius-sm, 4px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sc-footnote-hover-card__btn:hover {
+  background: var(--sc-ui-hover);
+  color: var(--sc-ui-text);
+}
+/**
+ * Mermaid lightbox 私有样式（壳由 lightbox-shell 提供）。
+ *
+ * 给 SVG 一个白底底板，避免 mermaid 的深色文字直接落在黑色 backdrop 上。
+ *
+ * 尺寸注意：
+ * LightboxShell 的 `.sc-lightbox-shell__content-inner > svg` 兜底规则只命中
+ * 直接子 svg。本组件用一层 div 包裹 SVG（提供白底/padding），SVG 不是直接子，
+ * 该兜底不会生效，必须在此处自行约束尺寸。
+ *
+ * 此外 mermaid 渲染器开启了 `useMaxWidth: true`，会在 SVG 上写入 inline
+ * `style="max-width: <自然宽度>px"`，把矢量图钉死在自然宽度。内联预览时容器
+ * 有明确宽度、SVG width="100%" 能撑开；全屏后容器 shrink-to-fit 回退到自然
+ * 尺寸，再被 inline max-width 限制 → 图显得过小。下面在 PC 端覆盖该 inline
+ * 值并给容器一个基于视口的明确宽度，让矢量图放大到适配视口。
+ */
+.sc-mermaid-lightbox-svg {
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+.sc-mermaid-lightbox-svg svg {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 48px);
+}
+@media (min-width: 769px) {
+  .sc-mermaid-lightbox-svg {
+    width: calc(100vw - 160px);
+    max-width: 100%;
+    max-height: calc(100vh - 148px);
+  }
+  .sc-mermaid-lightbox-svg svg {
+    max-width: none !important;
+    width: 100%;
+    height: auto;
+    max-height: calc(100vh - 196px);
+    object-fit: contain;
+  }
+}
+/**
+ * Mermaid 插件颜色单一数据源（design tokens）。
+ *
+ * 所有 `--sc-mermaid-*` 变量的默认值集中声明在此，作为整个插件颜色的唯一声明处。
+ * 声明在 :root 上，确保：
+ * - mermaidjs 渲染器通过 getComputedStyle(documentElement) 能解析到图表色；
+ * - 消费方可在任意祖先选择器（或 :root）覆盖变量，自动跟随宿主 light/dark，
+ *   无需改代码、无需重渲染。
+ *
+ * 命名规范：统一 `--sc-mermaid-` 前缀（插件标识）+ 语义化名称；
+ * 每个变量的默认值 fallback 到原全局变量 / 原硬编码值，保证重构后像素级零变化。
+ */
+:root {
+  /* ── 图表 SVG 主题色（渲染器实际消费，见 theme-map.ts DEFAULT_THEME_COLORS） ── */
+  --sc-mermaid-bg: #ffffff;
+  --sc-mermaid-fg: #1f1f1f;
+  --sc-mermaid-accent: #6366f1;
+  --sc-mermaid-border: #c7c7f4;
+  --sc-mermaid-surface: #ededfc;
+  --sc-mermaid-muted: #6b7280;
+  /* ── 代码编辑区 ── */
+  /* 代码盒：默认灰底 */
+  --sc-mermaid-code-bg: #f6f7f9;
+  /* ── 外层卡片容器（.sc-mermaid-editor） ── */
+  --sc-mermaid-card-bg: var(--sc-bg-page, #fff);
+  --sc-mermaid-card-border: var(--line, rgba(0, 0, 0, 0.08));
+  --sc-mermaid-card-hover-border: rgba(0, 0, 0, 0.16);
+  --sc-mermaid-card-hover-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  /* 聚焦态：光标落入本块时（BlockShell 给外壳加 is-focused）
+   * 复用编辑器主题蓝 --sc-text-blue（自带 light/dark 适配）：
+   * - light: rgb(41, 114, 244)  dark: rgb(78, 168, 246) */
+  --sc-mermaid-card-focused-border: var(--sc-text-blue);
+  --sc-mermaid-card-focused-shadow: inset 0 0 0 1px var(--sc-text-blue), 0 0 0 2px rgba(41, 114, 244, 0.08);
+  /* ── 预览空态 / 错误态 ── */
+  --sc-mermaid-muted-fg: var(--sc-text-grey);
+  --sc-mermaid-error-title-fg: var(--sc-text-red);
+  --sc-mermaid-error-detail-bg: var(--sc-inline-code-bg);
+  /* ── Hover 悬浮工具栏（PC 端） ── */
+  --sc-mermaid-toolbar-bg: var(--sc-bg-page, #fff);
+  --sc-mermaid-toolbar-border: var(--sc-divider-light_grey_divider, #e8e8e8);
+  --sc-mermaid-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --sc-mermaid-toolbar-hover-bg: rgba(0, 0, 0, 0.03);
+  --sc-mermaid-toolbar-divider: var(--sc-divider-light_grey_divider, #e8e8e8);
+  --sc-mermaid-toolbar-check-color: var(--sc-text-blue, #0052d9);
+  --sc-mermaid-toolbar-color: var(--sc-text-default, #1f1f1f);
+}
+/* ── 暗黑模式覆盖 ── */
+:root[data-theme='dark'],
+.dark {
+  --sc-mermaid-toolbar-bg: var(--sc-bg-page, #2c2c2c);
+  --sc-mermaid-toolbar-border: var(--sc-divider-light_grey_divider, #444);
+  --sc-mermaid-toolbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --sc-mermaid-toolbar-hover-bg: rgba(255, 255, 255, 0.06);
+  --sc-mermaid-toolbar-divider: var(--sc-divider-light_grey_divider, #444);
+  --sc-mermaid-toolbar-color: var(--sc-text-default, #e0e0e0);
+}
+/* ── Mermaid 样式 ─────────────────────────────────────────── */
+/* 颜色变量（--sc-mermaid-*）的默认值统一声明在 themes/mermaid-tokens.less，
+   由 mermaid-block.tsx 在本文件之前引入。外部覆盖可在任意祖先选择器上重定义。 */
+.sc-block-mermaid {
+  position: relative;
+}
+/* 关闭默认的块级选中蒙层（::after 蓝色半透明背景），
+ * mermaid 选中态改由 .sc-mermaid-editor 的 border 描边表达（见上方 .is-selected & 规则）。
+ * 选择器特异性：.sc-block-mermaid.is-selected::after > .sc-block.is-selected::after */
+.sc-block-mermaid.is-selected::after {
+  content: none;
+}
+.sc-mermaid-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--sc-block-radius, 8px);
+  overflow: hidden;
+  background: var(--sc-mermaid-card-bg);
+  border: 1px solid var(--sc-mermaid-card-border);
+  user-select: text;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  /* 聚焦态：光标落入本块时 BlockShell 给外壳（.sc-block）加 is-focused。
+   * 不再变更外层卡片 border / box-shadow，保持与未聚焦一致的视觉。 */
+  /* 块级选中态：点击 block menu / 框选命中时 BlockShell 给外壳（.sc-block）加 is-selected。
+   * mermaid 作为 plainText block 会被 isOpaqueBlock 命中，默认走 .sc-block.is-selected::after
+   * 蓝色半透明蒙层。此处覆盖默认蒙层，改为仅 border 描边高亮（不加阴影），
+   * 避免蒙层压住预览图导致视觉浑浊。 */
+}
+@media (hover: hover) {
+  .sc-mermaid-editor:hover {
+    border-color: var(--sc-mermaid-card-hover-border);
+    box-shadow: var(--sc-mermaid-card-hover-shadow);
+  }
+}
+.is-selected .sc-mermaid-editor {
+  border-color: var(--sc-mermaid-card-focused-border);
+}
+.sc-mermaid-editor__body {
+  display: flex;
+  min-height: 240px;
+}
+.sc-mermaid-editor--split .sc-mermaid-editor__body .sc-mermaid-code-pane,
+.sc-mermaid-editor--split .sc-mermaid-editor__body .sc-mermaid-preview-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+.sc-mermaid-editor--source .sc-mermaid-editor__body .sc-mermaid-code-pane {
+  flex: 1 1 100%;
+}
+.sc-mermaid-editor--source .sc-mermaid-editor__body .sc-mermaid-preview-pane {
+  display: none;
+}
+.sc-mermaid-editor--preview .sc-mermaid-editor__body .sc-mermaid-code-pane {
+  display: none;
+}
+.sc-mermaid-editor--preview .sc-mermaid-editor__body .sc-mermaid-preview-pane {
+  flex: 1 1 100%;
+}
+.sc-mermaid-code-pane {
+  /* 独立盒子：距外层卡片 12px（外层无内边距，直接用 margin 达成视觉 12px） */
+  margin: 12px;
+  /* 盒内留白：垂直 14 / 水平 16 */
+  padding: 14px 16px;
+  border-radius: var(--sc-block-radius, 8px);
+  /* 默认灰底；用 1px 透明边框预留位置，激活时只换色不产生抖动 */
+  background: var(--sc-mermaid-code-bg, #f6f7f9);
+  border: 1px solid transparent;
+  overflow: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  box-sizing: border-box;
+  transition: background 0.2s, border-color 0.2s;
+}
+/* 激活（聚焦编辑）态：光标落入本块时 BlockShell 会给外壳加 is-focused。
+ * 编辑器采用嵌套 contentEditable，DOM 焦点恒在 Root CE 上，:focus-within 命中不到
+ * 代码盒子内的元素，因此改用 is-focused 祖先类判定。
+ * 聚焦时外层卡片 border 换编辑器主题蓝（--sc-text-blue）并叠加 inset 描边 + 外阴影，
+ * 视觉提示当前块处于编辑焦点。 */
+/* 共用排版变量：行号 + 编辑层必须严格一致才能行级对齐 */
+.sc-mermaid-line-numbers,
+.sc-mermaid-editable {
+  font-family: 'SFMono-Regular', Consolas, 'PT Mono', 'Liberation Mono', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 2;
+}
+/* 行号侧栏 */
+.sc-mermaid-line-numbers {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  user-select: none;
+  text-align: right;
+  color: var(--sc-text-grey);
+  /* 至少容纳 2 位数字，避免 1→10 时整体抖动 */
+  min-width: 2ch;
+}
+.sc-mermaid-line-numbers .sc-mermaid-line-number {
+  display: block;
+}
+.sc-mermaid-preview-pane {
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+@media (pointer: coarse) {
+  .sc-mermaid-preview-pane {
+    user-select: none;
+  }
+}
+.sc-mermaid-preview-pane .sc-mermaid-preview,
+.sc-mermaid-preview-pane .sc-mermaid-preview-empty,
+.sc-mermaid-preview-pane .sc-mermaid-preview-error {
+  flex: 1 1 100%;
+  min-height: 100%;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+}
+/* 共用预览渲染容器 */
+.sc-mermaid-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-x: auto;
+}
+.sc-mermaid-preview svg {
+  max-width: 100%;
+  height: auto;
+}
+.sc-mermaid-preview-empty,
+.sc-mermaid-preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  color: var(--sc-mermaid-muted-fg);
+  font-size: 13px;
+  text-align: center;
+}
+.sc-mermaid-preview-empty__hint {
+  color: var(--sc-mermaid-muted-fg);
+}
+.sc-mermaid-preview-error__title {
+  color: var(--sc-mermaid-error-title-fg);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.sc-mermaid-preview-error__hint {
+  color: var(--sc-mermaid-muted-fg);
+  margin-bottom: 8px;
+}
+.sc-mermaid-preview-error__detail {
+  width: 100%;
+  max-width: 600px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--sc-mermaid-error-detail-bg);
+  color: var(--sc-mermaid-muted-fg);
+  font-family: 'SFMono-Regular', Consolas, 'PT Mono', 'Liberation Mono', Courier, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+/* 代码编辑层（BlockLeafEditable plainText）—— 字体 / 行高 / tab-size 已在
+ * `.sc-mermaid-line-numbers, .sc-mermaid-editable` 共享块中声明，此处只声明
+ * 编辑特有的样式（颜色 / 选区背景 / 自动换行）。 */
+.sc-mermaid-editable {
+  flex: 1;
+  min-height: 200px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--sc-text-default);
+  caret-color: var(--sc-text-default);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sc-mermaid-editable::selection {
+  background: var(--sc-color-selection);
+}
+/* ── Hover 悬浮工具栏（PC 端，形似链接 hover 卡片）─────────────── */
+.sc-mermaid-hover-toolbar {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: all;
+  height: 22px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--sc-mermaid-toolbar-border);
+  background: var(--sc-mermaid-toolbar-bg);
+  box-shadow: var(--sc-mermaid-toolbar-shadow);
+  user-select: none;
+  color: var(--sc-mermaid-toolbar-color);
+  box-sizing: content-box;
+  /* 视图切换触发按钮：文案 + chevron */
+  /* 竖向分隔线 */
+  /* 图标按钮（复制 / 下载）*/
+}
+.sc-mermaid-hover-toolbar__view {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.sc-mermaid-hover-toolbar__view[data-state='open'] {
+  background: var(--sc-mermaid-toolbar-hover-bg);
+}
+@media (hover: hover) {
+  .sc-mermaid-hover-toolbar__view:hover {
+    background: var(--sc-mermaid-toolbar-hover-bg);
+  }
+}
+.sc-mermaid-hover-toolbar__chevron {
+  color: var(--sc-text-grey);
+  flex-shrink: 0;
+}
+.sc-mermaid-hover-toolbar__divider {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: var(--sc-mermaid-toolbar-divider);
+  flex-shrink: 0;
+}
+.sc-mermaid-hover-toolbar__icon-btn.sc-mermaid-hover-toolbar__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+}
+@media (hover: hover) {
+  .sc-mermaid-hover-toolbar__icon-btn.sc-mermaid-hover-toolbar__icon-btn:hover:not(:disabled) {
+    background: var(--sc-mermaid-toolbar-hover-bg);
+  }
+}
+.sc-mermaid-hover-toolbar__icon-btn.sc-mermaid-hover-toolbar__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* 拖拽预览：隐藏内部卡片边框 / 阴影 / 背景，由 .sc-drag-preview 统一提供外框，
+ * 避免拖拽时出现双重边框（与 callout 等 block 行为一致）。
+ * 需覆盖 is-focused / is-selected 态（clone 可能携带这些 class）。
+ * background 也需置透明：drag preview 是半透明磨砂背景，mermaid 卡片白底会在
+ * 内部形成可见边缘，视觉上仍像第二层边框。 */
+.sc-drag-preview .sc-mermaid-editor,
+.sc-drag-preview .is-focused .sc-mermaid-editor,
+.sc-drag-preview .is-selected .sc-mermaid-editor {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+}
+/* 移动端浮动工具栏中的下拉箭头 */
+.sc-mermaid-mobile-chevron {
+  color: var(--sc-text-grey);
+}
+/* ── Dropdown Menu 容器 ─────────────────────────────────── */
+.sc-mermaid-view-dropdown.sc-mermaid-view-dropdown {
+  padding: 4px;
+  border: 1px solid var(--sc-mermaid-toolbar-border);
+  border-radius: 8px;
+  min-width: auto;
+  width: auto;
+}
+/* ── Dropdown Menu（视图切换选项）──────────────────────────── */
+.sc-mermaid-menu-item.sc-mermaid-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 7px;
+  font-size: 12px;
+  line-height: 30px;
+  height: 30px;
+  width: 88px;
+  color: var(--sc-mermaid-toolbar-color);
+  cursor: pointer;
+  box-sizing: content-box;
+  border-radius: 6px;
+  /* 去掉 radix 默认的蓝色聚焦/选中边框 */
+}
+@media (hover: hover) {
+  .sc-mermaid-menu-item.sc-mermaid-menu-item:hover {
+    background: var(--sc-mermaid-toolbar-hover-bg);
+  }
+}
+.sc-mermaid-menu-item.sc-mermaid-menu-item:focus,
+.sc-mermaid-menu-item.sc-mermaid-menu-item[data-highlighted] {
+  outline: none;
+  border: none;
+  box-shadow: none;
+  background: var(--sc-mermaid-toolbar-hover-bg);
+}
+.sc-mermaid-menu-item.sc-mermaid-menu-item__label {
+  flex: 1;
+}
+.sc-mermaid-menu-item.sc-mermaid-menu-item__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--sc-mermaid-toolbar-check-color);
+  flex-shrink: 0;
+}
+/* ── Legacy Toolbar (kept for mobile floating toolbar) ───── */
+.sc-mermaid-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: var(--sc-bg-grey_background);
+  border: 1px solid var(--sc-divider-light_grey_divider);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-size: 13px;
+  color: var(--sc-text-default);
+  user-select: none;
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__btn[data-state='open'] {
+  background: var(--sc-inline-code-bg);
+}
+@media (hover: hover) {
+  .sc-mermaid-toolbar .sc-mermaid-toolbar__btn:hover {
+    background: var(--sc-inline-code-bg);
+  }
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__btn[disabled],
+.sc-mermaid-toolbar .sc-mermaid-toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__icon-only {
+  padding: 4px 6px;
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__icon-btn {
+  padding: 4px 6px;
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__icon-btn.is-active {
+  color: var(--sc-text-blue);
+  background: var(--sc-inline-code-bg);
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__divider {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--sc-divider-light_grey_divider);
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__suffix {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--sc-text-grey);
+}
+.sc-mermaid-toolbar .sc-mermaid-toolbar__check {
+  margin-left: 8px;
+  color: var(--sc-text-blue);
+}

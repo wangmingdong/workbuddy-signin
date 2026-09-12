@@ -1,0 +1,112 @@
+@charset "UTF-8";
+/**
+ * 登录过期弹窗样式
+ *
+ * 基于 foundation Modal（wb 设计系统，light 主题）做视觉补丁，对齐交互稿：
+ *   - 卡片：radius 16 / padding 24，柔和阴影
+ *   - 头部：橙色圆形锁图标 + 标题 + 描述（图标与文字左对齐成一行）
+ *   - 底部：「稍后」(grey, 占 1) + 「立即重新登录」(primary 黑底, 占 2)
+ *   - 右上角关闭按钮（× 圆形热区）
+ *
+ * 仅作用于本弹窗，类名带 `wb-login-expired` 前缀，避免污染全局。
+ */
+.wb-modal.wb-login-expired {
+  padding: 24px;
+  border-radius: 16px;
+}
+
+/* 右上角关闭按钮（card 无 header，自绘 ×） */
+.wb-login-expired__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--wb-text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--wb-motion-duration-fast) var(--wb-motion-easing-standard), color var(--wb-motion-duration-fast) var(--wb-motion-easing-standard);
+}
+.wb-login-expired__close:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-secondary);
+}
+.wb-login-expired__close:focus-visible {
+  outline: 2px solid var(--wb-border-focus);
+  outline-offset: 2px;
+}
+
+/* 头部：图标 + 文案 */
+.wb-login-expired__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  /* 给右上角关闭按钮留出避让空间 */
+  padding-right: 24px;
+}
+
+.wb-login-expired__icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 暖色调底 + 锁图标，传递「鉴权 / 安全」语义（复用 foundation warning badge token） */
+  background: var(--wb-badge-warning-bg);
+  color: var(--wb-badge-warning-fg);
+}
+
+.wb-login-expired__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wb-login-expired__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+  color: var(--wb-text-primary);
+}
+
+.wb-login-expired__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--wb-text-secondary);
+}
+
+/* 底部按钮：稍后(1) : 立即重新登录(2) */
+.wb-login-expired__footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  /* 只锚定 foundation 稳定的 .wb-button 标识 */
+}
+.wb-login-expired__footer .wb-button {
+  flex: 1;
+  width: 100%;
+  /* 对齐交互稿圆角 8px：仅在本弹窗内局部覆盖 foundation 按钮消费的圆角 token，
+     不动全局 --wb-radius-full（默认胶囊），也无需 !important / 提升选择器优先级 */
+  --wb-radius-full: 8px;
+}
+.wb-login-expired__footer .wb-login-expired__btn-confirm {
+  flex: 2;
+  /* 确认按钮配色对齐交互稿 #1F2937 / hover #111827：
+     局部覆盖 foundation primary 消费的 token，作用域仅限本按钮，不影响全局 primary */
+  --wb-button-primary-bg: rgb(31, 41, 55);
+  --wb-button-primary-bg-hover: #111827;
+  --wb-button-primary-bg-active: #111827;
+}

@@ -1,18 +1,12 @@
-# ===== 敏感 / 运行时文件（绝不入库）=====
+# 密钥与运行时文件（含敏感信息，禁止入库）
 token.info
-*.info
-balance_history.json
 last_run.json
-checkin.log
-.env
+balance_history.json
+*.info
 
-# Python
+# 含 ECS root 密码的部署脚本，禁止入库
+deploy*.py
+
+# Python 缓存
 __pycache__/
 *.pyc
-*.pyo
-
-# ===== 含 ECS root 密码的部署脚本，不入库（本地保留即可）=====
-deploy.py
-deploy_key.py
-deploy_inspect.py
-deploy_usage.py

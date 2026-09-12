@@ -1,0 +1,164 @@
+@charset "UTF-8";
+/**
+ * 对话流位置卡片共享样式（genie#52769 阶段四→批次 B 精修）
+ *
+ * 覆盖 PoiAuthCard（授权卡 475:1458）/ PoiAddressPickerCard（地址单选 485:72）/
+ * PoiLocationFormCard（内嵌表单 475:1563）。外层不使用 margin（间距由父容器管理），
+ * flex 创建 BFC 防 margin 溢出。颜色统一 --wb-* token（评审 M3）。
+ */
+.poi-dialog-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.poi-dialog-card__title {
+  padding: 0 12px 8px;
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+  line-height: 24px;
+}
+.poi-dialog-card__desc {
+  padding: 0 12px 8px;
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+}
+.poi-dialog-card__options {
+  display: flex;
+  flex-direction: column;
+}
+.poi-dialog-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 12px 0;
+}
+.poi-dialog-card__actions .wb-button {
+  flex-shrink: 0;
+  display: flex;
+  padding: 7px 12px;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--wb-radius-lg);
+}
+
+.poi-address-picker-card__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--wb-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  position: relative;
+}
+.poi-address-picker-card__option::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 1px;
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.04));
+  pointer-events: none;
+}
+.poi-address-picker-card__option:hover {
+  background: var(--wb-bg-hover);
+}
+.poi-address-picker-card__option:hover .poi-address-picker-card__index {
+  background: var(--wb-bg-active, rgba(0, 0, 0, 0.08));
+}
+.poi-address-picker-card__index {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--wb-bg-tertiary, var(--wb-bg-hover));
+  color: var(--wb-color-text-primary);
+  font-size: 14px;
+  line-height: 14px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+.poi-address-picker-card__option-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.poi-address-picker-card__option-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.poi-address-picker-card__option-address {
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.poi-address-picker-card__option-contact {
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poi-location-form-card__header {
+  display: flex;
+  align-items: center;
+}
+.poi-location-form-card__rows {
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px;
+}
+.poi-location-form-card__row {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  gap: 12px;
+}
+.poi-location-form-card__row:last-child {
+  border-bottom: none;
+}
+.poi-location-form-card__row-label {
+  flex-shrink: 0;
+  width: 70px;
+  color: var(--wb-color-text-secondary);
+  font-size: 13px;
+}
+.poi-location-form-card__row-value {
+  flex: 1;
+  min-width: 0;
+}
+.poi-location-form-card__error {
+  color: var(--wb-status-error);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.poi-location-form-card__banner {
+  padding: 6px 10px;
+  margin: 0 12px;
+  border-radius: 6px;
+  background: var(--wb-status-error-soft);
+  color: var(--wb-status-error);
+  font-size: 12px;
+}

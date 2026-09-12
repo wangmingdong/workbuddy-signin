@@ -1,0 +1,69 @@
+@charset "UTF-8";
+/**
+ * PoiResultRenderer 样式（genie#52769 阶段四，设计稿 475:1591）
+ *
+ * 外层不使用 margin（间距由父容器管理）；用 flex 创建 BFC 防 margin 溢出。
+ * 颜色统一 --wb-* token（评审 M3）。
+ */
+.poi-result {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 4px 0;
+}
+.poi-result--loading .poi-result__loading-text {
+  color: var(--wb-color-text-tertiary);
+}
+.poi-result--cancelled, .poi-result--failed {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+.poi-result--cancelled .poi-result__status-text, .poi-result--failed .poi-result__status-text {
+  color: var(--wb-color-text-tertiary);
+}
+.poi-result--cancelled .poi-result__reason, .poi-result--failed .poi-result__reason {
+  color: var(--wb-color-text-tertiary);
+  font-size: 12px;
+}
+.poi-result--success {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+}
+.poi-result__thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  color: var(--wb-color-text-secondary);
+  background: var(--wb-bg-tertiary);
+}
+.poi-result__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.poi-result__name {
+  color: var(--wb-color-text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.poi-result__address {
+  color: var(--wb-color-text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
