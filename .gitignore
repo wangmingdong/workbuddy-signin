@@ -1,6 +1,7 @@
 # 密钥与运行时文件（含敏感信息，禁止入库）
 token.info
 last_run.json
+settings.json
 *.info
 
 # 本地环境变量（含 ECS 密码 / 访问口令，禁止入库；.env.example 保留为模板）

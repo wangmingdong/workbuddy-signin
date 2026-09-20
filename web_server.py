@@ -99,6 +99,132 @@ _SSL_CTX.check_hostname = False
 _SSL_CTX.verify_mode = ssl.CERT_NONE
 
 
+# ============================ 运行设置（傻瓜式配置，持久化于 settings.json） ============================
+SETTINGS_FILE = os.environ.get("WB_SETTINGS_FILE", os.path.join(BASE_DIR, "settings.json"))
+
+PLATFORM_TITLES = {
+    "workbuddy": "WorkBuddy",
+    "qianfan": "百度千帆",
+    "minimax": "MiniMax Code",
+    "qoder": "Qoder",
+    "linkai": "Link AI",
+    "lingxi": "WPS 灵犀",
+    "trae": "Trae Work",
+    "huawei": "华为码道",
+}
+
+
+def _default_settings():
+    return {
+        "schedule_enabled": True,
+        "schedule_time": "08:35",
+        "access_key": "",          # 留空=沿用环境变量 WB_ACCESS_KEY；填写则覆盖
+        "platforms": {k: True for k in PLATFORM_TITLES},
+        "notify_webhook": "",
+        "notify_on": False,
+    }
+
+
+def load_settings():
+    d = _default_settings()
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as _f:
+            saved = json.loads(_f.read() or "{}")
+        for k in d:
+            if k in saved:
+                d[k] = saved[k]
+        saved_plat = saved.get("platforms") or {}
+        for k in d["platforms"]:
+            if k in saved_plat:
+                d["platforms"][k] = bool(saved_plat[k])
+    except Exception:
+        pass
+    return d
+
+
+def save_settings(d):
+    base = _default_settings()
+    out = {}
+    for k in base:
+        if k == "platforms":
+            out[k] = {pk: bool((d.get("platforms") or {}).get(pk, True)) for pk in base[k]}
+        else:
+            out[k] = d.get(k, base[k])
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as _f:
+        _f.write(json.dumps(out, ensure_ascii=False, indent=2))
+    return out
+
+
+SETTINGS = load_settings()
+_sched_wake = threading.Event()
+
+
+def current_key():
+    return SETTINGS.get("access_key") or ACCESS_KEY
+
+
+def platform_enabled(name):
+    return bool(SETTINGS.get("platforms", {}).get(name, True))
+
+
+def reschedule():
+    _sched_wake.set()
+
+
+def notify_summary(text):
+    url = SETTINGS.get("notify_webhook", "")
+    if not url or not SETTINGS.get("notify_on"):
+        return
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps({
+                "text": text,
+                "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=8, context=_SSL_CTX)
+    except Exception as e:
+        print("[notify] 推送失败: %s" % e)
+
+
+def _scheduler_loop():
+    """内置定时调度器：按 settings.schedule_time 每日自动跑 run_daily_all。
+    被 reschedule() 唤醒时可热更新时间，无需重启进程。"""
+    while True:
+        try:
+            if SETTINGS.get("schedule_enabled") and SETTINGS.get("schedule_time"):
+                try:
+                    hh, mm = (SETTINGS["schedule_time"].split(":"))[:2]
+                    now = datetime.datetime.now()
+                    target = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+                    if target <= now:
+                        target = target + datetime.timedelta(days=1)
+                    wait = (target - now).total_seconds()
+                except Exception:
+                    time.sleep(60)
+                    continue
+                print("[scheduler] 下次自动签到: %s（约 %.0f 秒后）" % (
+                    target.strftime("%Y-%m-%d %H:%M"), wait))
+                if _sched_wake.wait(wait):
+                    _sched_wake.clear()
+                    continue
+                print("[scheduler] 触发定时签到")
+                try:
+                    run_daily_all()
+                except Exception as e:
+                    print("[scheduler] 定时签到异常: %s" % e)
+                continue
+            else:
+                _sched_wake.wait(60)
+                _sched_wake.clear()
+        except Exception as e:
+            print("[scheduler] 异常: %s" % e)
+            time.sleep(60)
+
+
 def _http_json(url, method="GET", timeout=20, headers=None):
     """服务端发起 JSON 请求（用于调用千帆等外部签到 API）。"""
     req = urllib.request.Request(
@@ -2065,7 +2191,9 @@ def run_daily_background():
 
 def get_center():
     items = [fn() for fn in ADAPTERS.values()]
-    signed = sum(1 for it in items if it.get("checked"))
+    for it in items:
+        it["disabled"] = not platform_enabled(it.get("name"))
+    signed = sum(1 for it in items if it.get("checked") and not it.get("disabled"))
     # 成长中心 / 每日任务 都属于 WorkBuddy：作为 WorkBuddy 卡片内的入口，不单独成卡
     g_entry = d_entry = None
     try:
@@ -2301,6 +2429,24 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
 .entry .earrow{color:#cbd5d2;font-size:15px;font-weight:700;line-height:1;flex:0 0 auto;}
 .entry:hover{background:#eef7f4;}
 .entry:active{opacity:.7;}
+/* 设置页 */
+.gear{margin-left:auto;flex:0 0 auto;width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.4);
+  background:rgba(255,255,255,.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;
+  text-decoration:none;cursor:pointer;}
+.gear:active{transform:scale(.94);}
+.settings{max-width:680px;margin:0 auto;}
+.settings .fgroup h4{display:flex;align-items:center;gap:6px;}
+.fld{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.fld.col{flex-direction:column;align-items:stretch;}
+.fld > span{font-size:14px;font-weight:600;}
+.fld input[type=time],.fld input[type=text],.fld input[type=password]{margin-top:8px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;font-size:14px;width:100%;box-sizing:border-box;background:#fbfdfc;}
+.fld input[type=checkbox]{width:20px;height:20px;accent-color:var(--c,#00C29A);}
+.fval{font-size:13px;color:var(--sub);}
+.ftip{font-size:12px;color:var(--sub);line-height:1.6;margin:10px 0 2px;}
+.row-toggle{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;}
+.row-toggle input{width:20px;height:20px;accent-color:var(--c,#00C29A);}
+.card.disabled{opacity:.58;filter:grayscale(.5);}
+
 /* 独立功能页（?view=growth / ?view=daily） */
 .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--sub);
   text-decoration:none;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 14px;margin-bottom:12px;cursor:pointer;}
@@ -2341,6 +2487,7 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
       <h1>签到中心</h1>
       <p>多个签到一目了然 · 一键完成</p>
     </div>
+    <a class="gear" href="?view=settings" title="设置" aria-label="设置">⚙️</a>
   </div>
 
   <div class="summary">
@@ -2406,6 +2553,18 @@ function fmtLast(lr){
   return "暂无记录";
 }
 function cardHTML(it){
+  if(it.disabled){
+    var drows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
+    var dentries = entriesHTML(it);
+    return ''+
+      '<div class="card disabled" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
+        '<div class="card-main">'+
+          '<div class="card-top"><div class="cicon">'+iconFor(it)+'</div><div class="ctitle">'+esc(it.title)+'</div><span class="badge todo">已停用</span></div>'+
+          '<div class="rows">'+drows+'</div>'+
+          '<div class="card-acts"><button class="cta ghost" data-name="'+esc(it.name)+'">重新检查</button>'+dentries+'</div>'+
+        '</div>'+
+      '</div>';
+  }
   var needsAuth = it.needs_auth;
   var badge;
   if(it.checked) badge = '<span class="badge done">今天已签到 ✅</span>';
@@ -2772,12 +2931,78 @@ function showFocus(view){
   var sum=document.querySelector('.summary'); if(sum) sum.style.display='none';
   var cards=$('cards'); if(cards) cards.style.display='none';
   var hint=document.querySelector('.hint'); if(hint) hint.style.display='none';
-  var h1=document.querySelector('.brand h1'); if(h1) h1.textContent = (view==='growth'?'成长中心':'每日任务');
-  var p=document.querySelector('.brand p'); if(p) p.textContent = 'WorkBuddy 成长中心';
+  var h1=document.querySelector('.brand h1'); if(h1) h1.textContent = (view==='growth'?'成长中心':(view==='settings'?'设置':'每日任务'));
+  var p=document.querySelector('.brand p'); if(p) p.textContent = (view==='settings'?'傻瓜式配置你的签到中心':'WorkBuddy 成长中心');
   var el=$('focus'); el.style.display='block';
   el.innerHTML = '<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody"></div>';
   $('backBtn').addEventListener('click', function(){ location.href = location.pathname; });
-  if(view==='growth') focusGrowth(); else focusDaily();
+  if(view==='growth') focusGrowth();
+  else if(view==='settings') focusSettings();
+  else focusDaily();
+}
+var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道"};
+function focusSettings(){
+  var el=$('focus');
+  el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
+  $('backBtn').addEventListener('click', function(){ location.href = location.pathname; });
+  renderSettings();
+}
+function renderSettings(){
+  api("api/settings").then(function(s){
+    var plat=s.platforms||{};
+    var ph='';
+    Object.keys(PLATFORMS).forEach(function(k){
+      var on = (k in plat)? (!!plat[k]) : true;
+      ph+='<label class="row-toggle"><span>'+esc(PLATFORMS[k])+'</span><input type="checkbox" data-plat="'+k+'" '+(on?'checked':'')+'></label>';
+    });
+    var html=''
+      +'<div class="fgroup"><h4>⏰ 定时签到</h4>'
+      +'<label class="fld"><span>启用自动签到</span><input type="checkbox" id="schedOn" '+((s.schedule_enabled===false)?'':'checked')+'></label>'
+      +'<label class="fld"><span>每日签到时间</span><input type="time" id="schedTime" value="'+esc(s.schedule_time||"08:35")+'"></label>'
+      +'<p class="ftip">到点后自动跑全部已启用平台。若服务器另有 systemd 定时任务未关闭，会再跑一次，结果幂等无副作用。</p>'
+      +'</div>'
+      +'<div class="fgroup"><h4>🔑 中心访问口令</h4>'
+      +'<label class="fld"><span>当前状态</span><span class="fval">'+(s.key_set?'页面已单独设置':'沿用服务器环境变量')+'</span></label>'
+      +'<label class="fld col"><span>新口令（留空=不变）</span><input type="password" id="newKey" placeholder="输入新口令"></label>'
+      +'<p class="ftip">修改后立即生效；保存后本机需用新口令访问。</p>'
+      +'</div>'
+      +'<div class="fgroup"><h4>🎚 平台开关</h4>'+ph+'</div>'
+      +'<div class="fgroup"><h4>🔔 完成通知</h4>'
+      +'<label class="fld"><span>启用通知</span><input type="checkbox" id="notifyOn" '+(s.notify_on?'checked':'')+'></label>'
+      +'<label class="fld col"><span>Webhook 地址</span><input type="text" id="webhook" value="'+esc(s.notify_webhook||"")+'" placeholder="https://.../webhook"></label>'
+      +'<button class="btn-mini" id="testWebhook" type="button">测试推送</button>'
+      +'</div>'
+      +'<div style="text-align:center;padding:6px 0 18px"><button class="cta" id="saveSettings" type="button">💾 保存设置</button></div>';
+    $('fbody').innerHTML=html;
+    $('saveSettings').addEventListener('click', saveSettings);
+    $('testWebhook').addEventListener('click', testWebhook);
+  }).catch(function(e){ showMsg("读取设置失败："+(e&&e.message),"err"); });
+}
+function saveSettings(){
+  var plat={};
+  Array.prototype.forEach.call(document.querySelectorAll('input[data-plat]'), function(c){ plat[c.getAttribute('data-plat')]=c.checked; });
+  var body={
+    schedule_enabled: $('schedOn').checked,
+    schedule_time: $('schedTime').value || '08:35',
+    access_key: $('newKey').value || '',
+    platforms: plat,
+    notify_on: $('notifyOn').checked,
+    notify_webhook: ($('webhook').value||'').trim(),
+  };
+  api("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){
+    if(r.ok){
+      var nk=($('newKey').value||'').trim();
+      if(nk){ try{ localStorage.setItem(KEY_STORE, nk); }catch(e){} }
+      showMsg("设置已保存 ✅","ok");
+    } else showMsg("保存失败："+(r.error||"未知错误"),"err");
+  }).catch(function(e){ showMsg("保存失败："+(e&&e.message),"err"); });
+}
+function testWebhook(){
+  var url=($('webhook').value||'').trim();
+  if(!url){ showMsg("请先填写 Webhook 地址","err"); return; }
+  api("api/settings/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({webhook:url})}).then(function(r){
+    showMsg(r.ok?"测试推送已发送 ✅":("推送失败："+(r.error||"")),"ok");
+  }).catch(function(e){ showMsg("测试失败："+(e&&e.message),"err"); });
 }
 function showMsg(t,kind){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok"); }
 function hideMsg(){ $("msg").className="msg"; }
@@ -2862,7 +3087,7 @@ $("key").addEventListener("change", function(e){
     if(e.key === 'Escape' && m.classList.contains('show')) closeModal();
   });
 })();
-if(VIEW==="growth" || VIEW==="daily"){ showFocus(VIEW); } else { load(); }
+if(VIEW==="growth" || VIEW==="daily" || VIEW==="settings"){ showFocus(VIEW); } else { load(); }
 </script>
 </body>
 </html>
@@ -2901,10 +3126,10 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def _key_ok(self, query):
-        if not ACCESS_KEY:
+        if not current_key():
             return True
         got = (query.get("k", [""])[0]) or self.headers.get("X-Access-Key", "")
-        return got == ACCESS_KEY
+        return got == current_key()
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -2978,6 +3203,21 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, get_detail(name))
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/settings":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            self._json(200, {
+                "ok": True,
+                "schedule_enabled": bool(SETTINGS.get("schedule_enabled", True)),
+                "schedule_time": SETTINGS.get("schedule_time", "08:35"),
+                "key_set": bool(SETTINGS.get("access_key")),
+                "platforms": SETTINGS.get("platforms", {}),
+                "notify_on": bool(SETTINGS.get("notify_on", False)),
+                "notify_webhook": SETTINGS.get("notify_webhook", ""),
+            })
             return
         self._send(404, "not found", "text/plain; charset=utf-8")
 
@@ -3071,6 +3311,45 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
+        if u.path == "/api/settings":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                saved = save_settings(body)
+                SETTINGS.clear()
+                SETTINGS.update(saved)
+                reschedule()
+                self._json(200, {"ok": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/settings/test":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                url = (body.get("webhook") or "").strip()
+                if not url:
+                    self._json(200, {"ok": False, "error": "缺少 webhook 地址"})
+                    return
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps({"text": "【签到中心】Webhook 测试推送成功 ✅"}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(req, timeout=8, context=_SSL_CTX)
+                self._json(200, {"ok": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         self._send(404, "not found", "text/plain; charset=utf-8")
 
     def log_message(self, fmt, *args):
@@ -3093,6 +3372,7 @@ def main():
     if "--daily" in sys.argv:
         run_daily_all()
         return
+    threading.Thread(target=_scheduler_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
@@ -3134,6 +3414,9 @@ def run_daily_all():
     ]
     summary = []
     for key, label in order:
+        if not platform_enabled(key):
+            print("[%s] 已在设置中停用，跳过" % label)
+            continue
         try:
             card = run_checkin_for(key)
             checked = bool(card.get("checked"))
@@ -3151,6 +3434,10 @@ def run_daily_all():
     for s in summary:
         print(s)
     print(banner)
+    try:
+        notify_summary("【每日签到完成】\n" + "\n".join(summary))
+    except Exception:
+        pass
     sys.stdout.flush()
 
 
