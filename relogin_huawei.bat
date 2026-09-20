@@ -1,53 +1,124 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 setlocal
 cd /d "%~dp0"
+title »ªÎªÂëµÀÇ©µ½ - ÖØÐÂÊÚÈ¨
+
 set "NODE=C:\Users\54004\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"
 set "PY=D:\Dev\python.exe"
+set "WIN=%SystemRoot%\System32"
 
 echo ================================================================
-echo   åŽä¸ºç é“ç­¾åˆ° . ä¸€æ¬¡æ€§é‡æ–°æŽˆæƒ
+echo    »ªÎªÂëµÀÇ©µ½ / Ò»´ÎÐÔÖØÐÂÊÚÈ¨
 echo ================================================================
 echo.
-echo   1) ç¨åŽä¼šè‡ªåŠ¨å¼¹å‡ºä¸€ä¸ª Edge çª—å£ï¼ˆä¸“ç”¨é…ç½®ï¼Œä¸å½±å“ä½ æ—¥å¸¸æµè§ˆå™¨ï¼‰
-echo   2) åœ¨çª—å£é‡Œç™»å½•åŽä¸ºäº‘ï¼Œè¿›åˆ°ã€Œç é“ã€é¦–é¡µ
-echo   3) æœ¬çª—å£ä¼šè‡ªåŠ¨æ£€æµ‹ï¼Œå¹¶æŠŠä¼šè¯æŽ¨åˆ°æœåŠ¡å™¨
-echo      çœ‹åˆ°ã€ŒæŠ“åˆ°æœ‰æ•ˆä¼šè¯ï¼Œå·²æŽ¨é€ã€å°±æˆåŠŸäº†
+echo  ¡¾ÖØÒª¡¿ÂíÉÏ»áµ¯³öÒ»¸ö Edge ´°¿Ú£¬ÄÇÊÇ±¾¹¤¾ßµÄ×¨ÓÃ´°¿Ú£¬
+echo          ºÍÄúÆ½Ê±ÓÃµÄä¯ÀÀÆ÷¡¾²»ÊÇÍ¬Ò»¸ö¡¿¡£
+echo          ËùÒÔ£º¼´Ê¹ÄúÆ½Ê±ä¯ÀÀÆ÷ÀïÒÑ¾­µÇÂ¼¹ý»ªÎªÔÆ£¬
+echo          Ò²±ØÐëÔÚÕâ¸öÐÂ´°¿ÚÀï¡¾ÔÙµÇÂ¼Ò»´Î¡¿¡£
 echo.
-echo   æˆåŠŸåŽ Edge çª—å£å¯ä»¥æ‰‹åŠ¨å…³æŽ‰ï¼Œæœ¬çª—å£ç›´æŽ¥å…³æŽ‰ä¹Ÿè¡Œã€‚
+echo  ²Ù×÷²½Öè£º
+echo    1) ÔÚµ¯³öµÄ Edge ´°¿ÚÀïµÇÂ¼»ªÎªÔÆ£¨¿ÉÄÜÒªÊÕÒ»´Î¶ÌÐÅÑéÖ¤Âë£©
+echo    2) µÇÂ¼ºóÍ£ÔÚ¡¸ÂëµÀ¡¹Ê×Ò³¼´¿É£¬²»ÐèÒªÊÖ¶¯µãÇ©µ½
+echo    3) ±¾´°¿Ú»á×Ô¶¯¼ì²âµÇÂ¼Ì¬²¢ÍÆËÍµ½·þÎñÆ÷£¬
+echo       ¿´µ½¡¸×¥µ½ÓÐÐ§»á»°£¬ÒÑÍÆËÍ¡¹¾ÍÊÇ³É¹¦ÁË
+echo.
+echo  ³É¹¦ºó»áÍ×ÉÆ¹Ø±Õ×¨ÓÃ´°¿Ú£¬²¢×Ô¶¯À­Æð³£×¤ÊØ»¤¡£
 echo ================================================================
 echo.
 
-echo [1/3] æ¸…ç†å¯èƒ½æ®‹ç•™çš„å®ˆæŠ¤/æµè§ˆå™¨è¿›ç¨‹ ...
-wmic process where "name='node.exe' and commandline like '%%hw_keeper%%'" delete >nul 2>&1
-wmic process where "name='python.exe' and commandline like '%%hw_autopush%%'" delete >nul 2>&1
-wmic process where "name='msedge.exe' and commandline like '%%hw_profile%%'" delete >nul 2>&1
-timeout /t 2 /nobreak >nul
+rem ---------- Ç°ÖÃ¼ì²é ----------
+if not exist "%NODE%" goto NO_NODE
+if not exist "%PY%" goto NO_PY
+for %%F in (hw_capture.js hw_watch_login.py run_keeper.bat run_autopush.bat) do (
+  if not exist "%%F" goto NO_FILE
+)
 
-echo [2/3] æ‰“å¼€ç™»å½•çª—å£ ...
+echo [1/3] ÇåÀí²ÐÁôµÄÊØ»¤Óëä¯ÀÀÆ÷½ø³Ì ...
+call :KILL hw_keeper   node.exe
+call :KILL hw_autopush python.exe
+call :KILL hw_capture  node.exe
+call :KILL hw_profile  msedge.exe
+call :CLEANLOCK
+"%WIN%\timeout.exe" /t 3 /nobreak >nul 2>&1
+
+echo [2/3] ´ò¿ª×¨ÓÃµÇÂ¼´°¿Ú ...
 start "HW Capture" /min "%NODE%" hw_capture.js
-timeout /t 6 /nobreak >nul
+"%WIN%\timeout.exe" /t 8 /nobreak >nul 2>&1
 
-echo [3/3] ç­‰å¾…ç™»å½•å¹¶æŽ¨é€ï¼ˆæœ€é•¿ 40 åˆ†é’Ÿï¼‰...
-"%PY%" -X utf8 hw_watch_login.py 40
-set RC=%ERRORLEVEL%
-
+echo [3/3] µÈ´ýµÇÂ¼²¢ÍÆËÍ£¨×î³¤ 40 ·ÖÖÓ£¬Ã¿ 20 Ãë¼ì²éÒ»´Î£©...
 echo.
-if "%RC%"=="0" goto OK
-echo [X] æ²¡æ£€æµ‹åˆ°æœ‰æ•ˆç™»å½•ã€‚è¯·é‡è·‘æœ¬è„šæœ¬ï¼Œå¹¶ç¡®è®¤å·²åœ¨å¼¹å‡ºçš„ Edge çª—å£é‡Œç™»å½•åŽä¸ºäº‘ã€‚
+"%PY%" -X utf8 hw_watch_login.py 40
+set "RC=%ERRORLEVEL%"
+echo.
+if not "%RC%"=="0" goto NOTYET
+
+echo [OK] »á»°ÒÑÍÆËÍµ½·þÎñÆ÷£¬Ç©µ½¿¨Æ¬Ô¼ 10 Ãëºó±äÂÌ¡£
+echo.
+echo      ¹Ø±Õ×¨ÓÃä¯ÀÀÆ÷´°¿Ú£¨ËüÕ¼×ÅÅäÖÃ£¬²»¹Ø»áµ²×¡³£×¤ÊØ»¤£©...
+call :KILL hw_capture node.exe
+call :KILL hw_profile msedge.exe
+call :CLEANLOCK
+"%WIN%\timeout.exe" /t 4 /nobreak >nul 2>&1
+echo.
+echo      À­Æð³£×¤ÊØ»¤£¨±£³Ö³¤ÆÚ×Ô¶¯ÐøÆÚ£©...
+start "HW Keeper"   /min cmd /c run_keeper.bat
+"%WIN%\timeout.exe" /t 4 /nobreak >nul 2>&1
+start "HW Autopush" /min cmd /c run_autopush.bat
+echo.
+echo      ÒÑÆô¶¯Á½¸ö×îÐ¡»¯´°¿Ú£¬Çë²»Òª¹Ø±ÕËüÃÇ¡£
+echo      Ö»ÒªµçÄÔ¿ª×Å£¬Ç©µ½¿¨Æ¬¾Í»áÒ»Ö±±£³ÖÂÌÉ«¡£
+echo.
+echo      ÏëÃ¿´Î¿ª»ú×Ô¶¯Æô¶¯£ºË«»÷ install_keeper.bat ×°Ò»´Î¼´¿É¡£
+echo.
+echo ================================================================
+echo    Íê³É£¬¿ÉÒÔ¹Øµô±¾´°¿ÚÁË¡£
+echo ================================================================
+pause
+exit /b 0
+
+:NOTYET
+echo [X] 40 ·ÖÖÓÄÚÃ»ÓÐ¼ì²âµ½ÓÐÐ§µÇÂ¼¡£
+echo.
+echo     ³£¼ûÔ­Òò£º
+echo       1) ÍüÁËÔÚµ¯³öµÄÐÂ´°¿ÚÀïµÇÂ¼£¨ËüºÍÆ½Ê±ä¯ÀÀÆ÷²»ÊÇÒ»¸ö£©
+echo       2) µÇÂ¼ÁËµ«Ã»×ßµ½¡¸ÂëµÀ¡¹Ê×Ò³
+echo       3) ¿¨ÔÚ¶ÌÐÅÑéÖ¤ÂëÒ³ÃæÃ»ÌîÍê
+echo.
+echo     ×¨ÓÃ´°¿Ú»¹¿ª×ÅµÄ»°£¬¾ÍÔÚÀïÃæ¼ÌÐøµÇÂ¼£¬È»ºóÖØÅÜ±¾½Å±¾¡£
+echo     ÅÅ²éÏßË÷¼û×¥È¡ÈÕÖ¾£ºhw_capture.log
 echo.
 pause
 exit /b 1
 
-:OK
-echo [OK] ä¼šè¯å·²æŽ¨é€åˆ°æœåŠ¡å™¨ï¼Œç­¾åˆ°å¡ç‰‡çº¦ 10 ç§’åŽå˜ç»¿ã€‚
-echo.
-echo      ä¸‹é¢åœ¨æœ¬æœºåŽå°å¯åŠ¨ä¼šè¯å®ˆæŠ¤ï¼Œä¿æŒé•¿æœŸè‡ªåŠ¨ç»­æœŸ ...
-start "HW Keeper"   /min cmd /c run_keeper.bat
-start "HW Autopush" /min cmd /c run_autopush.bat
-echo      å·²å¯åŠ¨ï¼ˆä¸¤ä¸ªæœ€å°åŒ–çª—å£ï¼Œåˆ«å…³å®ƒä»¬ï¼‰ã€‚åªè¦ç”µè„‘å¼€ç€ï¼Œå¡ç‰‡å°±ä¼šä¸€ç›´ç»¿ã€‚
-echo.
-echo      æƒ³å¼€æœºè‡ªåŠ¨å¯åŠ¨ï¼šåŒå‡» install_keeper.bat è£…ä¸€æ¬¡å³å¯ã€‚
+:NO_NODE
+echo [X] ÕÒ²»µ½ node.exe
+echo     Â·¾¶£º%NODE%
+echo     WorkBuddy ¿ÉÄÜ¸üÐÂ¹ý°æ±¾£¬Çë°Ñ±¾½Å±¾Àï NODE Ò»ÐÐ¸Ä³ÉÏÖÓÐÂ·¾¶¡£
 echo.
 pause
+exit /b 1
+
+:NO_PY
+echo [X] ÕÒ²»µ½ python£º%PY%
+echo.
+pause
+exit /b 1
+
+:NO_FILE
+echo [X] È±ÉÙ±¾¹¤¾ßÒÀÀµµÄÎÄ¼þ£¨hw_capture.js / hw_watch_login.py /
+echo     run_keeper.bat / run_autopush.bat£©£¬ÇëÈ·ÈÏËüÃÇÓë±¾½Å±¾ÔÚÍ¬Ò»Ä¿Â¼¡£
+echo     µ±Ç°Ä¿Â¼£º%~dp0
+echo.
+pause
+exit /b 1
+
+:CLEANLOCK
+for %%L in (SingletonLock SingletonCookie SingletonSocket) do (
+  if exist "hw_profile\%%L" del /f /q "hw_profile\%%L" >nul 2>&1
+)
+exit /b 0
+
+:KILL
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq '%~2' -and $_.CommandLine -match '%~1' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 exit /b 0
