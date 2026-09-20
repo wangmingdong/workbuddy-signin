@@ -728,8 +728,9 @@ def get_trae_card():
             "metric_value": "已签到" if checked else "待签到",
             "last_run": lr,
             "rows": rows,
-            # 该账号（Free / web 端无签到入口）服务端拒绝签到，登录也未必能解；仍保留登录入口供刷新 Cookie
-            "extra_link": {"text": "🔑 重新登录 work.trae.cn（刷新 Cookie）",
+            # 说明：在本机浏览器登录 trae 并不会把登录态同步给服务器（Cookie 在服务器侧），
+            # 这个链接只用来核对账号状态，别让人误以为「点一下就能签到」。
+            "extra_link": {"text": "🔗 打开 work.trae.cn（登录态不会同步到服务器）",
                            "url": "https://work.trae.cn/?mode=mtc"},
             "error": None,
         }
@@ -972,6 +973,15 @@ if not LINKAI_TOKEN:
 #   状态流转：ELIGIBLE(待领) -> CLAIMED/CONFIRMED/CONSUMED(已签)
 HW_STATE_FILE = os.path.join(BASE_DIR, "hw_last_run.json")
 HW_BASE = "https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService"
+# 会话失效时的统一说明（很重要：签到用的是「服务器自己那份 Cookie」，
+# 用户在本人浏览器里登录华为云，服务器拿不到 —— 因为 J_SESSION_ID 是 HttpOnly，
+# 页面 JS 也读不到，只能靠本机守护把会话推上来）
+HW_SESSION_DEAD_MSG = (
+    "服务器侧华为会话已失效（HTTP 401）：签到由服务器携带自己保存的 Cookie 发起，"
+    "所以在你自己浏览器登录华为云并不会让本卡恢复。"
+    "恢复办法：在电脑上双击 relogin_huawei.bat，在弹出的窗口里登录一次华为云，"
+    "看到「已推送」即可（约 1 分钟，本卡自动变绿）。"
+)
 HW_COOKIE = os.environ.get("HW_COOKIE", "")
 if not HW_COOKIE:
     try:
@@ -1059,11 +1069,16 @@ def get_hw_card():
             "icon": "huawei",
             "checked": False,
             "needs_auth": True,
+            "badge": "未配置",
+            "hide_auth_link": True,
             "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
             "metric_label": "状态",
             "metric_value": "未配置",
             "last_run": None,
-            "rows": [{"k": "说明", "v": "点「前往登录」登录华为云；登录后点「我已登录，重新签到」即可重新执行"}],
+            "rows": [
+                {"k": "原因", "v": "服务器上还没有华为会话 Cookie（hw_cookie.txt 为空）"},
+                {"k": "如何恢复", "v": "在电脑上双击 relogin_huawei.bat，弹出的窗口里登录一次华为云"},
+            ],
             "error": None,
         }
     try:
@@ -1122,13 +1137,16 @@ def get_hw_card():
                 "icon": "huawei",
                 "checked": False,
                 "needs_auth": True,
+                "badge": "登录态过期",
+                "hide_auth_link": True,
                 "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
                 "metric_label": "登录态",
                 "metric_value": "已过期",
                 "last_run": _hw_read_last(),
                 "rows": [
-                    {"k": "原因", "v": "华为云登录态（会话 Cookie）已过期"},
-                    {"k": "如何恢复", "v": "点「前往登录」重新登录华为云，登录后点「我已登录，重新签到」重新执行"},
+                    {"k": "原因", "v": "服务器侧华为会话（Cookie）已失效，非配置错误"},
+                    {"k": "如何恢复", "v": "在电脑上双击 relogin_huawei.bat，弹出的窗口里登录一次华为云（一次性）"},
+                    {"k": "为什么登录没用", "v": "签到用服务器自己那份 Cookie；你在本人浏览器登录，服务器拿不到（HttpOnly）"},
                 ],
                 "error": None,
             }
@@ -1142,7 +1160,13 @@ def run_hw_checkin():
     if not HW_COOKIE:
         raise RuntimeError("未配置华为登录 Cookie（hw_cookie.txt 或 HW_COOKIE）")
     # 先看今天是否已签，避免重复领取报错
-    d = _hw_api("/v1/ops/delivery?channel=WEB")
+    try:
+        d = _hw_api("/v1/ops/delivery?channel=WEB")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            _hw_record(False, "会话失效 HTTP %s" % e.code)
+            raise RuntimeError(HW_SESSION_DEAD_MSG)
+        raise
     if d.get("code") != 0:
         raise RuntimeError(d.get("message") or "华为活动查询失败")
     items = (d.get("data") or {}).get("items") or []
@@ -1999,15 +2023,19 @@ function cardHTML(it){
   var needsAuth = it.needs_auth;
   var badge;
   if(it.checked) badge = '<span class="badge done">今天已签到 ✅</span>';
+  else if(it.badge) badge = '<span class="badge todo">'+esc(it.badge)+'</span>';
   else if(needsAuth) badge = '<span class="badge todo">未配置</span>';
   else badge = '<span class="badge todo">今天还没签</span>';
   var rows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
   var last = it.last_run ? fmtLast(it.last_run) : "暂无记录";
   var btn;
   if(needsAuth){
-    // 需要一个「手动入口」：登录完成后可点此重新执行签到（华为/Trae 等 cookie 类平台）
-    btn = '<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>'
-        + '<button class="cta" data-name="'+esc(it.name)+'" style="margin-top:8px">🔄 我已登录，重新签到</button>';
+    // cookie 类平台：签到用「服务器自己那份 Cookie」，在本人浏览器登录并不会推给服务器，
+    // 所以这里不摆「去登录」死路（hide_auth_link），只留一个诚实的「重新检查」。
+    var retry = '<button class="cta" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
+    btn = it.hide_auth_link
+      ? retry
+      : ('<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>' + retry);
   } else {
     btn = it.checked ? '<button class="cta" disabled>' : '<button class="cta" data-name="'+esc(it.name)+'">';
     if(!it.checked) btn += '立即签到'; else btn += '今日已签到';
@@ -2395,16 +2423,34 @@ function load(cb){
     else { showMsg("连接失败："+(e&&e.message),"err"); }
   });
 }
+// 在卡片内部留一条持久错误提示（不随 load 刷新消失，方便回看失败原因）
+function markCardErr(name,msg){
+  var c = document.querySelector('.card[data-name="'+name+'"]');
+  if(!c) return;
+  var cm = c.querySelector('.card-main');
+  if(!cm || cm.querySelector('.card-err.js')) return;
+  var d = document.createElement('div');
+  d.className = 'card-err js';
+  d.textContent = '⚠️ ' + msg;
+  cm.appendChild(d);
+}
 function doCheckin(name,btn){
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>签到中…'; }
   api("api/center/checkin?name="+encodeURIComponent(name),{method:"POST"}).then(function(d){
-    if(!d.ok){ showMsg(d.error||"签到失败","err"); }
-    else { showMsg((d.card&&d.card.title?d.card.title:"签到")+" 已更新 ✅","ok"); }
-    load();
+    var ok = !!d.ok;
+    var msg = ok ? ((d.card&&d.card.title?d.card.title:"签到")+" 已更新 ✅") : (d.error||"签到失败");
+    // 注意：load() 内部第一件事就是 hideMsg()，所以提示必须在刷新「之后」再显示。
+    // 旧写法先 showMsg 再 load，提示被瞬间清掉 —— 这就是「点了没反应」的根因。
+    load(function(){ showMsg(msg, ok?"ok":"err"); if(!ok) markCardErr(name,msg); });
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
-    else { showMsg("网络错误："+(e&&e.message),"err"); }
-    if(btn){ btn.disabled=false; btn.textContent="立即签到"; }
+    if(e&&e.needKey){
+      $("keybox").className="keybox show";
+      showMsg("请输入访问口令后回车","err");
+      if(btn){ btn.disabled=false; btn.textContent="重试"; }
+      return;
+    }
+    var msg = "网络错误："+((e&&e.message)||e);
+    load(function(){ showMsg(msg,"err"); markCardErr(name,msg); });
   });
 }
 var VIEW = null;

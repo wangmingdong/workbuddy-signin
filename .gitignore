@@ -31,6 +31,21 @@ hw_keeper.out.log
 hw_autopush.log
 hw_need_login.flag
 
+# 浏览器持久化 profile：内含登录态 Cookie，一旦入库等于把账号送出去
+hw_profile/
+trae_profile/
+hw_probe_profile/
+
+# 抓取/调试产物
+hw_capture.log
+hw_capture.out.log
+hw_netlog.jsonl
+hw_shot.png
+hw_shot.txt
+hw_chunks/
+*_probe*.json
+diag*.txt
+
 # 接口探测/调试产物（非交付物，排查接口时临时生成）
 probe*.py
 _asar/
