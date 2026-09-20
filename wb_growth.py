@@ -725,28 +725,104 @@ def run_daily(sess):
     return out
 
 
+# accept_status 语义（实测）：
+#   claimed      已完成且**奖励已领**（已领取）
+#   completed    进度达标、**奖励待领**（可领取）← 真正"可领"的就是这一类
+#   in_progress / accepted  进行中 / 待完成（进度未达）
+#   not_accepted 未开始
+STATUS_CN = {
+    "claimed": "已领取",
+    "completed": "待领取",
+    "in_progress": "进行中",
+    "accepted": "待完成",
+    "not_accepted": "未开始",
+}
+
+# 各任务「为何无法自动完成」的人话说明（服务器只校验真实产品交互，合成事件不推进进度）
+TASK_HINT = {
+    "wb_wechat_oa_subscribe_task": "需在微信里真实关注「腾讯 WorkBuddy」官方公众号",
+    "Expert_Philanthropy": "需真实参与公益捐赠（账户级动作，无法代做）",
+    "black_cat": "夜间限定活动，仅在 23:00–08:00 窗口可完成",
+    "expert_5": "需在客户端真实召唤并对话 5 次专家",
+    "Expert_team_use_3": "需在客户端真实使用 3 次专家团",
+    "Expert_lighthouse": "需在客户端真实召唤并使用「腾讯轻量云」专家",
+    "Buddy_App": "需在客户端打开「发现应用」并体验",
+    "Buddy_App_QQ": "需在客户端打开「企鹅教师助手」应用",
+    "template_5": "需在客户端真实使用 5 个模板",
+    "Model_chat_GLM5.2": "需真实调用 GLM-5.2 模型对话",
+    "create_canvas": "需「设计创意模式」里真实创建画布",
+    "Library_read": "需在网页端真实访问「资料库」文档",
+    "Hp_Appearance": "需在设置里真实应用主题",
+    "RichMeow_Chat": "需与 RichMeow 真实对话",
+    "chat_5": "需与 AI 真实聊天 5 次",
+    "first_buddy": "需真实领取一只 Buddy",
+    "skill_1": "需真实使用热门技能",
+    "automation_1": "需真实创建自动化任务",
+    "playbook_prompt": "需真实使用 Playbook 提示词",
+}
+GEN_HINT = "需在 WorkBuddy 客户端真实使用该功能后才会记功（服务端校验真实交互，接口上报不推进进度）"
+
+
+def claim_one(sess, code):
+    """按单个任务领奖（供成长中心页面「领取」按钮）。返回 (ok, msg)。"""
+    try:
+        s, b, already, credit, energy = claim_task(sess, code)
+        if s == 200 and already:
+            return True, "已领过（幂等）"
+        if s == 200 and (credit or energy):
+            return True, "领取成功 +%s 分 / +%s 能量" % (credit, energy)
+        if s == 200:
+            return True, "已领取"
+        raw = (b.get("msg") if isinstance(b, dict) else b) or ""
+        if s == 400 and "not completed" in str(raw):
+            return False, "进度未达标，需先在客户端完成该任务"
+        return False, "领取失败 http=%s %s" % (s, str(raw)[:80])
+    except Exception as e:
+        return False, "异常: %s" % e
+
+
 def get_growth_card(sess):
-    """供 web_server 的成长中心卡片数据。"""
+    """供 web_server 的成长中心页面数据（一次性成长任务）。"""
     try:
         prof = get_profile(sess)
         tasks = list_tasks(sess)
         rows = []
         claimable = 0
         for t in tasks:
+            code = t.get("task_code")
             p = t.get("progress") or {}
             cur, tgt = p.get("current", 0), p.get("target", 0)
-            done = (t.get("accept_status") == "claimed") and (tgt and cur >= tgt)
-            if done and t.get("has_reward"):
+            ast = t.get("accept_status")
+            prog_done = bool(tgt) and cur >= tgt
+            # 归一化状态
+            if ast == "claimed":
+                status = "claimed"
+            elif ast == "completed" or (prog_done and ast != "claimed"):
+                status = "completed"     # 进度达标但奖励未领 = 可领取
+            elif ast == "in_progress":
+                status = "in_progress"
+            elif ast == "accepted":
+                status = "accepted"
+            else:
+                status = "not_accepted"
+            if status == "completed":
                 claimable += 1
+            hint = ""
+            if status not in ("claimed", "completed"):
+                hint = TASK_HINT.get(code) or GEN_HINT
             rows.append({
-                "code": t.get("task_code"),
+                "code": code,
                 "title": t.get("title"),
                 "reward": t.get("reward_credit"),
                 "energy": t.get("reward_energy"),
-                "accept_status": t.get("accept_status"),
+                "accept_status": ast,
+                "status": status,
+                "status_cn": STATUS_CN.get(status, status),
                 "current": cur, "target": tgt,
-                "done": done,
-                "not_auto": t.get("task_code") in NOT_AUTO,
+                "can_claim": status == "completed",
+                "done": status == "claimed",
+                "not_auto": code in NOT_AUTO,
+                "hint": hint,
             })
         return {
             "name": "growth",
@@ -757,6 +833,8 @@ def get_growth_card(sess):
             "metric_label": "已完成任务",
             "metric_value": "%s / %s" % (prof.get("completed", 0), prof.get("total", 0)),
             "level": prof.get("level"),
+            "completed": prof.get("completed", 0),
+            "total": prof.get("total", 0),
             "claimable": claimable,
             "rows": rows,
             "error": None,
@@ -765,7 +843,7 @@ def get_growth_card(sess):
         return {"name": "growth", "title": "WorkBuddy 成长中心",
                 "brand": "#7C5CFF", "brand2": "#9D7BFF", "icon": "growth",
                 "checked": False, "metric_label": "已完成任务", "metric_value": "--",
-                "rows": [], "error": str(e)}
+                "claimable": 0, "rows": [], "error": str(e)}
 
 
 if __name__ == "__main__":

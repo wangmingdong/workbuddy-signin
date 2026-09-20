@@ -728,6 +728,9 @@ def get_trae_card():
             "metric_value": "已签到" if checked else "待签到",
             "last_run": lr,
             "rows": rows,
+            # 该账号（Free / web 端无签到入口）服务端拒绝签到，登录也未必能解；仍保留登录入口供刷新 Cookie
+            "extra_link": {"text": "🔑 重新登录 work.trae.cn（刷新 Cookie）",
+                           "url": "https://work.trae.cn/?mode=mtc"},
             "error": None,
         }
     except Exception as e:
@@ -1060,7 +1063,7 @@ def get_hw_card():
             "metric_label": "状态",
             "metric_value": "未配置",
             "last_run": None,
-            "rows": [{"k": "说明", "v": "请在浏览器登录后重新加载本页"}],
+            "rows": [{"k": "说明", "v": "点「前往登录」登录华为云；登录后点「我已登录，重新签到」即可重新执行"}],
             "error": None,
         }
     try:
@@ -1124,8 +1127,8 @@ def get_hw_card():
                 "metric_value": "已过期",
                 "last_run": _hw_read_last(),
                 "rows": [
-                    {"k": "原因", "v": "华为云登录态已过期，需重新登录后更新 Cookie"},
-                    {"k": "如何恢复", "v": "点下面按钮登录华为云 → 告诉小B 重新抓取"},
+                    {"k": "原因", "v": "华为云登录态（会话 Cookie）已过期"},
+                    {"k": "如何恢复", "v": "点「前往登录」重新登录华为云，登录后点「我已登录，重新签到」重新执行"},
                 ],
                 "error": None,
             }
@@ -1726,11 +1729,26 @@ def run_daily_background():
 def get_center():
     items = [fn() for fn in ADAPTERS.values()]
     signed = sum(1 for it in items if it.get("checked"))
-    for extra in (get_growth_card, get_daily_card):
-        try:
-            items.append(extra())
-        except Exception:
-            pass
+    # 成长中心 / 每日任务 都属于 WorkBuddy：作为 WorkBuddy 卡片内的入口，不单独成卡
+    g_entry = d_entry = None
+    try:
+        g = get_growth_card()
+        g_entry = ({"ok": False, "error": g.get("error")} if g.get("error")
+                   else {"ok": True, "completed": g.get("completed"), "total": g.get("total"),
+                         "claimable": g.get("claimable"), "level": g.get("level")})
+    except Exception as e:
+        g_entry = {"ok": False, "error": str(e)}
+    try:
+        dy = get_daily_card()
+        d_entry = ({"ok": False, "error": dy.get("error")} if dy.get("error")
+                   else {"ok": True, "todo": dy.get("claimable"), "streak_days": dy.get("streak_days"),
+                         "energy": dy.get("energy")})
+    except Exception as e:
+        d_entry = {"ok": False, "error": str(e)}
+    for it in items:
+        if it.get("name") == "workbuddy":
+            it["growth_entry"] = g_entry
+            it["daily_entry"] = d_entry
     return {
         "ok": True,
         "server_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1872,6 +1890,47 @@ button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
   .brand p{font-size:14px;}
   .summary .top{font-size:16px;}
 }
+/* 成长中心 / 每日任务 入口（嵌在 WorkBuddy 卡片内，点击新开页） */
+.entries{margin-top:12px;border-top:1px solid var(--line);}
+.entry{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line);
+  text-decoration:none;color:inherit;}
+.entry:last-child{border-bottom:0;}
+.entry .eic{font-size:20px;width:26px;text-align:center;flex:0 0 26px;}
+.entry .etx{flex:1;min-width:0;}
+.entry .etx b{font-size:14px;font-weight:700;display:block;}
+.entry .etx small{font-size:12px;color:var(--sub);}
+.entry .earrow{color:#cbd5d2;font-size:20px;font-weight:700;line-height:1;}
+.entry:active{opacity:.7;}
+/* 独立功能页（?view=growth / ?view=daily） */
+.back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--sub);
+  text-decoration:none;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 14px;margin-bottom:12px;cursor:pointer;}
+.fhead{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.07);
+  border:1px solid rgba(15,23,42,.04);border-top:4px solid var(--c,#00C29A);margin-bottom:14px;}
+.fhead h2{margin:0 0 6px;font-size:18px;font-weight:800;}
+.fhead .fmeta{font-size:13px;color:var(--sub);}
+.fhead .fstat{font-size:16px;font-weight:800;margin-top:8px;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.fnote{font-size:12px;color:var(--sub);line-height:1.6;background:#fff;border:1px dashed #dfe6e3;
+  border-radius:14px;padding:11px 13px;margin:12px 0;}
+.fgroup{background:#fff;border-radius:18px;padding:4px 16px 10px;box-shadow:0 10px 30px rgba(15,23,42,.06);
+  border:1px solid rgba(15,23,42,.04);margin-bottom:14px;}
+.fgroup > h4{margin:14px 0 2px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.3px;}
+.task{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);}
+.task:last-child{border-bottom:0;}
+.task .tt{flex:1;min-width:0;}
+.task .tt .t1{font-size:14px;font-weight:600;line-height:1.35;}
+.task .tt .t2{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.5;}
+.task .tr{flex:0 0 auto;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.st{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block;}
+.st.claimed{color:#00614D;background:rgba(0,194,154,.14);}
+.st.todo{color:#b54708;background:rgba(247,144,9,.14);}
+.st.locked{color:#64748b;background:rgba(100,116,139,.12);}
+.rew{font-size:12px;font-weight:700;color:#b54708;white-space:nowrap;}
+.rew.done{color:#00614D;}
+.btn-mini{border:0;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));cursor:pointer;white-space:nowrap;}
+.btn-mini[disabled]{background:#cbd5d2;}
+.btn-mini:active{transform:scale(.97);}
 </style>
 </head>
 <body>
@@ -1890,6 +1949,7 @@ button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
   </div>
 
   <div id="cards"><div class="loading">加载中…</div></div>
+  <div id="focus" style="display:none"></div>
 
   <div id="msg" class="msg"></div>
   <div id="keybox" class="keybox">
@@ -1936,8 +1996,6 @@ function fmtLast(lr){
   return "暂无记录";
 }
 function cardHTML(it){
-  if(it.growth) return growthCardHTML(it);
-  if(it.daily) return dailyCardHTML(it);
   var needsAuth = it.needs_auth;
   var badge;
   if(it.checked) badge = '<span class="badge done">今天已签到 ✅</span>';
@@ -1947,12 +2005,18 @@ function cardHTML(it){
   var last = it.last_run ? fmtLast(it.last_run) : "暂无记录";
   var btn;
   if(needsAuth){
-    btn = '<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>';
+    // 需要一个「手动入口」：登录完成后可点此重新执行签到（华为/Trae 等 cookie 类平台）
+    btn = '<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>'
+        + '<button class="cta" data-name="'+esc(it.name)+'" style="margin-top:8px">🔄 我已登录，重新签到</button>';
   } else {
     btn = it.checked ? '<button class="cta" disabled>' : '<button class="cta" data-name="'+esc(it.name)+'">';
     if(!it.checked) btn += '立即签到'; else btn += '今日已签到';
     btn += '</button>';
   }
+  var entries = entriesHTML(it);
+  var extraLink = it.extra_link
+    ? '<a class="cta-link" style="margin-top:8px;background:linear-gradient(135deg,#64748b,#94a3b8)" href="'+esc(it.extra_link.url)+'" target="_blank" rel="noopener">'+esc(it.extra_link.text)+'</a>'
+    : '';
   var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
   return ''+
     '<div class="card" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
@@ -1964,68 +2028,31 @@ function cardHTML(it){
         '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
         '<div class="rows">'+rows+'</div>'+
         '<div class="last">上次签到：'+last+'</div>'+
-        btn + err +
+        btn + extraLink + entries + err +
       '</div>'+
       '<div class="detail" id="detail-'+esc(it.name)+'"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
     '</div>';
 }
-function growthCardHTML(it){
-  var claimable = it.claimable||0;
-  var level = it.level ? ('Lv.'+esc(it.level)) : "";
-  var badge = claimable>0
-    ? '<span class="badge todo">可领 '+claimable+' 项</span>'
-    : '<span class="badge done">已领完 ✅</span>';
-  if(it.error){
-    badge = '<span class="badge todo">读取失败</span>';
+// WorkBuddy 卡片内的「成长中心 / 每日任务」入口（点击新标签页打开独立功能页）
+function entriesHTML(it){
+  var ge = it.growth_entry, de = it.daily_entry;
+  if(!ge && !de) return '';
+  var e = '';
+  if(ge){
+    var g = ge.ok
+      ? ((ge.completed||0)+'/'+(ge.total||0)+' 已完成'+(ge.claimable>0?(' · 可领 '+ge.claimable+' 项'):' · 暂无待领'))
+      : '暂不可用';
+    e += '<a class="entry" href="?view=growth" target="_blank" rel="noopener">'
+       + '<span class="eic">🌱</span><span class="etx"><b>成长中心</b><small>'+esc(g)+'</small></span><span class="earrow">›</span></a>';
   }
-  var btn = it.error
-    ? '<button class="cta growth-run" data-name="growth" disabled style="background:#cbd5d2">无法读取（见详情）</button>'
-    : '<button class="cta growth-run" data-name="growth">🚀 一键完成任务</button>';
-  var lvRow = level ? '<div class="rows"><div class="row"><span class="k">当前等级</span><span class="v">'+level+'</span></div></div>' : '';
-  var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
-  return ''+
-    '<div class="card growth-card" data-name="growth" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
-      '<div class="card-main">'+
-        '<div class="card-top">'+
-          '<div class="cicon">'+iconFor(it)+'</div>'+
-          '<div class="ctitle">'+esc(it.title)+'</div>'+ badge +
-        '</div>'+
-        '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
-        lvRow +
-        btn + err +
-      '</div>'+
-      '<div class="detail" id="detail-growth"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
-    '</div>';
-}
-function dailyCardHTML(it){
-  var todo = it.claimable||0;
-  var badge = it.error
-    ? '<span class="badge todo">读取失败</span>'
-    : (todo>0 ? '<span class="badge todo">可做 '+todo+' 项</span>' : '<span class="badge done">今日已清 ✅</span>');
-  var btn = it.error
-    ? '<button class="cta daily-run" data-name="daily" disabled style="background:#cbd5d2">无法读取（见详情）</button>'
-    : '<button class="cta daily-run" data-name="daily">🎯 一键做完每日任务</button>';
-  var extra = '';
-  if(!it.error && (it.streak_days || it.energy!=null)){
-    extra = '<div class="rows">'
-      + '<div class="row"><span class="k">连续登录</span><span class="v">'+(it.streak_days||0)+' 天</span></div>'
-      + '<div class="row"><span class="k">能量值</span><span class="v">'+(it.energy==null?'--':it.energy)+'</span></div>'
-      + '</div>';
+  if(de){
+    var d = de.ok
+      ? ((de.todo>0?('今日可做 '+de.todo+' 项'):'今日已全部完成')+(de.streak_days?(' · 连登 '+de.streak_days+' 天'):''))
+      : '暂不可用';
+    e += '<a class="entry" href="?view=daily" target="_blank" rel="noopener">'
+       + '<span class="eic">🎯</span><span class="etx"><b>每日任务</b><small>'+esc(d)+'</small></span><span class="earrow">›</span></a>';
   }
-  var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
-  return ''+
-    '<div class="card daily-card" data-name="daily" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
-      '<div class="card-main">'+
-        '<div class="card-top">'+
-          '<div class="cicon">'+iconFor(it)+'</div>'+
-          '<div class="ctitle">'+esc(it.title)+'</div>'+ badge +
-        '</div>'+
-        '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
-        extra +
-        btn + err +
-      '</div>'+
-      '<div class="detail" id="detail-daily"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
-    '</div>';
+  return '<div class="entries">'+e+'</div>';
 }
 function toggleDetail(name){
   var card = document.querySelector('.card[data-name="'+name+'"]');
@@ -2144,20 +2171,6 @@ function switchTab(el, name, tab){
 function loadDetail(name){
   var detail = $('detail-'+name);
   if(!detail) return;
-  if(name==="growth"){
-    detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
-    api("api/growth").then(function(d){ renderGrowth(d, name); }).catch(function(e){
-      detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
-    });
-    return;
-  }
-  if(name==="daily"){
-    detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
-    api("api/daily").then(function(d){ renderDaily(d, name); }).catch(function(e){
-      detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
-    });
-    return;
-  }
   detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
   api('api/detail?name='+encodeURIComponent(name)).then(function(d){
     renderDetail(d, name);
@@ -2165,55 +2178,78 @@ function loadDetail(name){
     detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
   });
 }
-function renderGrowth(d, name){
-  var detail = $('detail-'+name);
-  if(!detail) return;
-  if(!d.ok){ detail.innerHTML='<div class="card-err">⚠️ '+esc(d.error||'加载失败')+'</div>'; return; }
-  var card = d.card||{};
-  var rows = card.rows||[];
-  var html = '';
-  if(d.running){
-    html += '<div class="dloading" style="padding:14px 0"><span class="spin"></span> 任务后台执行中…</div>';
+// ===== 成长中心独立页（?view=growth）=====
+function focusBody(){ return $('fbody') || $('focus'); }
+function focusErr(e){
+  if(e&&e.needKey){ var kb=$("keybox"); if(kb) kb.className="keybox show"; return '<div class="fnote" style="color:#912018">需要访问口令，请在下方输入后回车</div>'; }
+  return '<div class="fnote" style="color:#912018">⚠️ '+esc((e&&e.message)||e||'加载失败')+'</div>';
+}
+function taskRow(t, right){
+  var meta = [];
+  if(t.target) meta.push('进度 '+t.current+'/'+t.target);
+  if(t.reward) meta.push('+'+t.reward+' 分');
+  if(t.energy) meta.push('+'+t.energy+' 能量');
+  var sub = meta.length ? ('<div class="t2">'+esc(meta.join(' · '))+'</div>') : '';
+  var hint = t.hint ? ('<div class="t2">💡 '+esc(t.hint)+'</div>') : '';
+  return '<div class="task"><div class="tt"><div class="t1">'+esc(t.title)+'</div>'+sub+hint+'</div><div class="tr">'+right+'</div></div>';
+}
+function focusGrowth(){
+  var el = focusBody();
+  el.innerHTML = '<div class="dloading" style="padding:40px 0"><span class="spin"></span> 加载成长中心…</div>';
+  api("api/growth").then(function(d){ renderGrowthFocus(d); }).catch(function(e){ el.innerHTML = focusErr(e); });
+}
+function renderGrowthFocus(d){
+  var el = focusBody();
+  if(!d.ok){ el.innerHTML = focusErr(d.error); return; }
+  var c = d.card||{};
+  var rows = c.rows||[];
+  var claim = rows.filter(function(t){ return t.status==="completed"; });
+  var pending = rows.filter(function(t){ return t.status!=="completed" && t.status!=="claimed"; });
+  var done = rows.filter(function(t){ return t.status==="claimed"; });
+  var html = ''
+    + '<div class="fhead" style="--c:#7C5CFF;--c2:#9D7BFF">'
+    +   '<h2>🌱 WorkBuddy 成长中心</h2>'
+    +   '<div class="fmeta">一次性成长任务 · 完成后领积分 / 能量</div>'
+    +   '<div class="fstat">已完成 '+(c.completed||0)+' / '+(c.total||0)+'　·　Lv.'+(c.level==null?'-':c.level)+'　·　待领 '+claim.length+' 项</div>'
+    + '</div>'
+    + (d.running ? '<div class="fnote" style="text-align:center">⏳ 正在后台执行，完成后自动刷新…</div>' : '')
+    + '<button class="btn-mini growth-run" style="width:100%;padding:14px;font-size:15px;--c:#7C5CFF;--c2:#9D7BFF">🚀 一键完成 / 领取</button>'
+    + '<div class="fnote">「一键」会自动尝试上报进度并领取<b>已完成</b>任务的奖励；但服务端会校验真实操作，'
+    + '<b>标 🔒 / 💡 的任务必须在 WorkBuddy 客户端真实操作</b>（召唤专家、打开应用、用模板、夜间访问等）后才会记功，接口上报不会推进进度。</div>';
+  if(claim.length){
+    html += '<div class="fgroup"><h4>🎁 可领取（'+claim.length+'）</h4>'
+      + claim.map(function(t){ return taskRow(t, '<button class="btn-mini claim" data-code="'+esc(t.code)+'">领取 +'+(t.reward||0)+'</button>'); }).join('')
+      + '</div>';
   }
-  html += '<div class="dsec on">';
-  if(!d.running){
-    html += '<button class="cta growth-run" data-name="growth" style="margin-bottom:10px">🚀 一键完成全部任务</button>';
-    html += '<div style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.5">已得奖励可一键领取；标注「需真实使用」的任务需在 WorkBuddy 客户端完成对应操作（如召唤专家、打开 Buddy 应用、使用模板、夜间访问）后才会记功，自动化仅做事件上报尝试。</div>';
+  if(pending.length){
+    html += '<div class="fgroup"><h4>⏳ 待完成（'+pending.length+'）</h4>'
+      + pending.map(function(t){ return taskRow(t, '<span class="st '+(t.not_auto?'locked':'todo')+'">'+(t.not_auto?'🔒 需手动':'待完成')+'</span>'); }).join('')
+      + '</div>';
   }
-  if(rows.length){
-    html += rows.map(function(t){
-      var st;
-      if(t.done) st = '<span style="color:#00614D;font-weight:700">✅ 已完成</span>';
-      else if(t.not_auto) st = '<span style="color:#b54708;font-weight:700">🔒 需手动</span>';
-      else st = '<span style="color:#b54708;font-weight:700">⏳ 待完成</span>';
-      var rw = t.reward ? ('+'+t.reward+'分') : '';
-      var en = (t.energy||0) ? (' · '+t.energy+'能量') : '';
-      return '<div class="drow"><span class="dk">'+esc(t.title)+'</span><span class="dv">'+st+'<br><small style="color:#64748b">'+rw+en+'</small></span></div>';
-    }).join('');
-  } else {
-    html += '<div class="dempty">暂无任务数据</div>';
+  if(done.length){
+    html += '<div class="fgroup"><h4>✅ 已领取（'+done.length+'）</h4>'
+      + done.map(function(t){ return taskRow(t, '<span class="st claimed">已领</span>'); }).join('')
+      + '</div>';
   }
   if(d.results && d.results.length){
     var ok=0; d.results.forEach(function(r){ if(r.ok) ok++; });
-    html += '<div class="drow" style="margin-top:6px"><span class="dk">上次执行</span><span class="dv">成功 '+ok+' / '+d.results.length+(d.updated?(' · '+esc(d.updated.slice(5))):'')+'</span></div>';
+    html += '<div class="fnote">上次一键执行：成功 '+ok+' / '+d.results.length+(d.updated?(' · '+esc(d.updated.slice(5))):'')+'</div>';
   } else if(d.run_error){
-    html += '<div class="card-err" style="margin-top:8px">⚠️ '+esc(d.run_error)+'</div>';
+    html += '<div class="fnote" style="color:#912018">⚠️ '+esc(d.run_error)+'</div>';
   }
-  html += '</div>';
-  detail.innerHTML = html;
-  var btns = detail.querySelectorAll('button.growth-run');
-  Array.prototype.forEach.call(btns, function(b){ b.addEventListener('click', function(){ runGrowth(b); }); });
+  el.innerHTML = html;
+  bindFocusButtons(el);
 }
 function runGrowth(btn){
-  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>任务进行中…'; }
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>执行中…'; }
   showMsg("成长中心任务正在后台执行，请稍候…","ok");
   api("api/growth/run",{method:"POST"}).then(function(d){
-    if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成全部任务"; } return; }
+    if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; } return; }
     pollGrowth();
   }).catch(function(e){
     if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
     else showMsg("网络错误："+(e&&e.message),"err");
-    if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成全部任务"; }
+    if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; }
   });
 }
 function pollGrowth(){
@@ -2223,51 +2259,70 @@ function pollGrowth(){
     (d.results||[]).forEach(function(r){ if(r.ok) ok++; });
     if(tot) showMsg("成长中心：成功 "+ok+" / "+tot+" 项 ✅","ok");
     else if(d.run_error) showMsg("执行出错："+d.run_error,"err");
-    load();
-    if(document.querySelector('.card.growth-card.expanded')){ loadDetail('growth'); }
+    renderGrowthFocus(d);
   }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
 }
-function renderDaily(d, name){
-  var detail = $('detail-'+name);
-  if(!detail) return;
-  if(!d.ok){ detail.innerHTML='<div class="card-err">⚠️ '+esc(d.error||'加载失败')+'</div>'; return; }
-  var card = d.card||{};
-  var rows = card.rows||[];
-  var html = '';
-  if(d.running){
-    html += '<div class="dloading" style="padding:14px 0"><span class="spin"></span> 每日任务后台执行中…</div>';
-  }
-  html += '<div class="dsec on">';
-  if(!d.running){
-    html += '<button class="cta daily-run" data-name="daily" style="margin-bottom:10px">🎯 一键做完每日任务</button>';
-    html += '<div style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.5">每日签到 / 连登兑换 / 补登卡 / 抽奖 / Buddy 盲盒，一键自动跑完可做的部分；已完成的会自动跳过。</div>';
-  }
+function claimTask(code, btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
+  api("api/growth/claim?code="+encodeURIComponent(code),{method:"POST"}).then(function(d){
+    if(d.ok) showMsg(d.msg||"领取成功 ✅","ok"); else showMsg(d.msg||d.error||"领取失败","err");
+    focusGrowth();
+  }).catch(function(e){
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    else showMsg("网络错误："+(e&&e.message),"err");
+    if(btn){ btn.disabled=false; }
+  });
+}
+// ===== 每日任务独立页（?view=daily）=====
+function focusDaily(){
+  var el = focusBody();
+  el.innerHTML = '<div class="dloading" style="padding:40px 0"><span class="spin"></span> 加载每日任务…</div>';
+  api("api/daily").then(function(d){ renderDailyFocus(d); }).catch(function(e){ el.innerHTML = focusErr(e); });
+}
+function renderDailyFocus(d){
+  var el = focusBody();
+  if(!d.ok){ el.innerHTML = focusErr(d.error); return; }
+  var c = d.card||{};
+  var rows = c.rows||[];
+  var html = ''
+    + '<div class="fhead" style="--c:#F79009;--c2:#FDB022">'
+    +   '<h2>🎯 成长中心 · 每日任务</h2>'
+    +   '<div class="fmeta">成长中心里「每天刷新」的部分，与上面的一次性成长任务互补，二者不重复</div>'
+    +   '<div class="fstat">连登 '+(c.streak_days||0)+' 天　·　能量 '+(c.energy==null?'--':c.energy)+'　·　今日可做 '+(c.claimable||0)+' 项</div>'
+    + '</div>'
+    + (d.running ? '<div class="fnote" style="text-align:center">⏳ 正在后台执行，完成后自动刷新…</div>' : '')
+    + '<button class="btn-mini daily-run" style="width:100%;padding:14px;font-size:15px;--c:#F79009;--c2:#FDB022">🎯 一键做完每日任务</button>'
+    + '<div class="fnote">每日动作：<b>每日签到</b>（领积分）、<b>连登兑换</b>（7/14/28 天档，每月各 1 次，给积分+能量+补登卡+抽奖次数）、'
+    + '<b>补登卡</b>（补当月断登、保住连登天数）、<b>任务轮盘</b>（抽奖）、<b>Buddy 盲盒</b>（消耗能量开盒）。已完成的会自动跳过。</div>'
+    + '<div class="fgroup"><h4>今日动作</h4>';
   if(rows.length){
     html += rows.map(function(t){
-      var st;
-      if(t.status==="done") st = '<span style="color:#00614D;font-weight:700">✅ 已完成</span>';
-      else if(t.status==="locked") st = '<span style="color:#7a7a7a;font-weight:700">🔒 未解锁</span>';
-      else st = '<span style="color:#b54708;font-weight:700">⏳ 待做</span>';
-      var rw = t.reward ? ('+'+t.reward) : '';
-      var nt = t.note ? (' · '+t.note) : '';
-      return '<div class="drow"><span class="dk">'+esc(t.title)+'</span><span class="dv">'+st+'<br><small style="color:#64748b">'+esc(rw+nt)+'</small></span></div>';
+      var st = t.status==="done" ? '<span class="st claimed">✅ 已完成</span>'
+             : t.status==="locked" ? '<span class="st locked">🔒 未解锁</span>'
+             : '<span class="st todo">⏳ 待做</span>';
+      var meta = [];
+      if(t.reward) meta.push(t.reward);
+      if(t.note) meta.push(t.note);
+      return '<div class="task"><div class="tt"><div class="t1">'+esc(t.title)+'</div>'
+        + (meta.length?('<div class="t2">'+esc(meta.join(' · '))+'</div>'):'')
+        + (t.detail?('<div class="t2">'+esc(t.detail)+'</div>'):'')
+        + '</div><div class="tr">'+st+'</div></div>';
     }).join('');
   } else {
     html += '<div class="dempty">暂无任务数据</div>';
   }
+  html += '</div>';
   if(d.results && d.results.length){
     var ok=0; d.results.forEach(function(r){ if(r.ok) ok++; });
-    html += '<div class="drow" style="margin-top:6px"><span class="dk">上次执行</span><span class="dv">成功 '+ok+' / '+d.results.length+(d.updated?(' · '+esc(d.updated.slice(5))):'')+'</span></div>';
+    html += '<div class="fnote">上次一键执行：成功 '+ok+' / '+d.results.length+(d.updated?(' · '+esc(d.updated.slice(5))):'')+'</div>';
   } else if(d.run_error){
-    html += '<div class="card-err" style="margin-top:8px">⚠️ '+esc(d.run_error)+'</div>';
+    html += '<div class="fnote" style="color:#912018">⚠️ '+esc(d.run_error)+'</div>';
   }
-  html += '</div>';
-  detail.innerHTML = html;
-  var btns = detail.querySelectorAll('button.daily-run');
-  Array.prototype.forEach.call(btns, function(b){ b.addEventListener('click', function(){ runDaily(b); }); });
+  el.innerHTML = html;
+  bindFocusButtons(el);
 }
 function runDaily(btn){
-  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>任务进行中…'; }
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>执行中…'; }
   showMsg("每日任务正在后台执行，请稍候…","ok");
   api("api/daily/run",{method:"POST"}).then(function(d){
     if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🎯 一键做完每日任务"; } return; }
@@ -2285,9 +2340,24 @@ function pollDaily(){
     (d.results||[]).forEach(function(r){ if(r.ok) ok++; });
     if(tot) showMsg("每日任务：成功 "+ok+" / "+tot+" 项 ✅","ok");
     else if(d.run_error) showMsg("执行出错："+d.run_error,"err");
-    load();
-    if(document.querySelector('.card.daily-card.expanded')){ loadDetail('daily'); }
+    renderDailyFocus(d);
   }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
+}
+function bindFocusButtons(el){
+  Array.prototype.forEach.call(el.querySelectorAll('button.growth-run'), function(b){ b.addEventListener('click', function(){ runGrowth(b); }); });
+  Array.prototype.forEach.call(el.querySelectorAll('button.daily-run'), function(b){ b.addEventListener('click', function(){ runDaily(b); }); });
+  Array.prototype.forEach.call(el.querySelectorAll('button.claim'), function(b){ b.addEventListener('click', function(){ claimTask(b.getAttribute('data-code'), b); }); });
+}
+function showFocus(view){
+  var sum=document.querySelector('.summary'); if(sum) sum.style.display='none';
+  var cards=$('cards'); if(cards) cards.style.display='none';
+  var hint=document.querySelector('.hint'); if(hint) hint.style.display='none';
+  var h1=document.querySelector('.brand h1'); if(h1) h1.textContent = (view==='growth'?'成长中心':'每日任务');
+  var p=document.querySelector('.brand p'); if(p) p.textContent = 'WorkBuddy 成长中心';
+  var el=$('focus'); el.style.display='block';
+  el.innerHTML = '<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody"></div>';
+  $('backBtn').addEventListener('click', function(){ location.href = location.pathname; });
+  if(view==='growth') focusGrowth(); else focusDaily();
 }
 function showMsg(t,kind){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok"); }
 function hideMsg(){ $("msg").className="msg"; }
@@ -2307,20 +2377,14 @@ function renderCenter(d){
     c.addEventListener('click', function(e){
       var name = c.getAttribute('data-name');
       if(!name) return;
-// 避免按钮/链接/tab切换点击触发卡片展开
-      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.dtab')) return;
+      // 避免按钮/链接（含成长/每日任务入口）/tab 点击触发卡片展开
+      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.dtab') || e.target.closest('a.entry')) return;
       toggleDetail(name);
     });
   });
-  // 按钮签到（成长中心 / 每日任务 按钮单独走 runGrowth/runDaily，不参与签到逻辑）
+  // 按钮签到（排除成长/每日任务等特殊按钮）
   Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.growth-run):not(.daily-run)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll("button.growth-run"), function(b){
-    b.addEventListener("click", function(){ runGrowth(b); });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll("button.daily-run"), function(b){
-    b.addEventListener("click", function(){ runDaily(b); });
   });
 }
 function load(cb){
@@ -2343,11 +2407,13 @@ function doCheckin(name,btn){
     if(btn){ btn.disabled=false; btn.textContent="立即签到"; }
   });
 }
+var VIEW = null;
+try { VIEW = new URLSearchParams(location.search).get("view"); } catch(e){}
 $("key").addEventListener("change", function(e){
   try { localStorage.setItem(KEY_STORE, e.target.value.trim()); } catch(err){}
-  load();
+  if(VIEW==="growth") focusGrowth(); else if(VIEW==="daily") focusDaily(); else load();
 });
-load();
+if(VIEW==="growth" || VIEW==="daily"){ showFocus(VIEW); } else { load(); }
 </script>
 </body>
 </html>
@@ -2512,6 +2578,28 @@ class Handler(BaseHTTPRequestHandler):
                 t = threading.Thread(target=run_growth_background, daemon=True)
                 t.start()
                 self._json(200, {"ok": True, "started": True, "running": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/growth/claim":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            code = (q.get("code") or [""])[0]
+            if not code:
+                self._json(200, {"ok": False, "error": "缺少 code 参数"})
+                return
+            try:
+                if wb_growth is None:
+                    self._json(200, {"ok": False, "error": "成长中心模块未加载"})
+                    return
+                sess = _load_session_safe()
+                if not sess or not sess.get("access_token"):
+                    self._json(200, {"ok": False, "error": "未找到本地会话 token（WB_TOKEN_FILE 需指向明文 token.info）"})
+                    return
+                ok, msg = wb_growth.claim_one(sess, code)
+                self._json(200, {"ok": ok, "code": code, "msg": msg})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
