@@ -10,13 +10,20 @@ WorkBuddy 每日签到 · 手机网页版（纯标准库，零第三方依赖）
 
 复用 workbuddy_checkin.py 里已验证的 find_token_file / load_session / call。
 """
+
 import os
 import sys
 import json
+import ssl
 import socket
+import hashlib
+import time
 import datetime
+import urllib.request
+import urllib.error
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode
 
 # 计划任务/后台运行时，stdout 可能是 GBK，强制 UTF-8 避免中文崩溃
 try:
@@ -31,12 +38,66 @@ if BASE_DIR not in sys.path:
 
 from workbuddy_checkin import find_token_file, load_session, call
 
+try:
+    import wb_growth
+except Exception:
+    wb_growth = None
+
+try:
+    from wb_icon import CENTER_SVG, WB_SVG, QF_SVG, MM_SVG, TRAE_SVG, LX_SVG, LK_SVG, HW_SVG
+except Exception:
+    CENTER_SVG = ""
+    WB_SVG = ""
+    QF_SVG = ""
+    MM_SVG = ""
+    TRAE_SVG = ""
+    LX_SVG = ""
+    LK_SVG = ""
+    HW_SVG = ""
+    QF_SVG = ""
+    MM_SVG = ""
+    TRAE_SVG = ""
+    LX_SVG = ""
+
+# WorkBuddy 成长中心图标（紫色渐变火箭，对应成长中心品牌色 #7C5CFF）
+GROWTH_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="grGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#9D7BFF"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#grGrad)"/><path d="M32 10c6 5 7 14 4 23l-4 7h0l-4-7c-3-9-2-18 4-23z" fill="#fff"/><circle cx="32" cy="24" r="4.5" fill="#7C5CFF"/><path d="M24 33l-6 9 7-4z" fill="#fff"/><path d="M40 33l6 9-7-4z" fill="#fff"/><path d="M29 40l3 12 3-12z" fill="#FFE255"/><circle cx="47" cy="18" r="2.6" fill="#fff"/><circle cx="17" cy="21" r="1.8" fill="#fff"/><circle cx="44" cy="40" r="1.6" fill="#fff"/></svg>"""
+
 PORT = int(os.environ.get("WB_PORT", "8765"))
 HOST = os.environ.get("WB_HOST", "0.0.0.0")
-ACCESS_KEY = os.environ.get("WB_ACCESS_KEY", "")   # 留空 = 不校验口令；非空则手机首次访问需输入一次（生产环境由 systemd service 的 WB_ACCESS_KEY 注入）
+ACCESS_KEY = os.environ.get(
+    "WB_ACCESS_KEY", ""
+)  # 留空 = 不校验口令；非空则手机首次访问需输入一次（生产环境由 systemd service 的 WB_ACCESS_KEY 注入）
 
 # 最近一次签到结果（由 workbuddy_checkin.py 写入；自动定时与手动点击都会记）
 STATE_FILE = os.environ.get("WB_STATE_FILE", os.path.join(BASE_DIR, "last_run.json"))
+
+# ============================ 千帆签到适配器配置 ============================
+# 千帆服务部署在另一台 ECS（SERVER_IP_121），nginx 已把 /checkin/ 反代出去，
+# 本服务在服务端直接调用它的 API（带 token，避开浏览器跨域），不搬动千帆代码。
+# 千帆服务在 SERVER_IP_121，其 /checkin/ 反代挂在「IP 默认 server」上（SERVICE_DOMAIN 域名 443 被中捷应用中心 SPA 占用），
+# 故必须用 IP 直连 http://SERVER_IP_121/checkin/ 才能打到千帆 8021。可用 QF_BASE_URL 环境变量覆盖。
+QIANFAN_BASE = os.environ.get("QF_BASE_URL", "http://SERVER_IP_121/checkin").rstrip("/")
+# 千帆口令优先级：环境变量 QF_ACCESS_TOKEN > 同目录 qf_token.txt（部署时由 deploy_ui.py 写入，便于不改 systemd）
+QIANFAN_TOKEN = os.environ.get("QF_ACCESS_TOKEN", "")
+if not QIANFAN_TOKEN:
+    try:
+        with open(os.path.join(BASE_DIR, "qf_token.txt"), "r", encoding="utf-8") as _f:
+            QIANFAN_TOKEN = _f.read().strip()
+    except Exception:
+        QIANFAN_TOKEN = ""
+
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
+
+
+def _http_json(url, method="GET", timeout=20, headers=None):
+    """服务端发起 JSON 请求（用于调用千帆等外部签到 API）。"""
+    req = urllib.request.Request(
+        url, method=method, headers=headers or {"User-Agent": "WBCheckinCenter/1.0"}
+    )
+    with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
 
 
 # ============================ 业务逻辑 ============================
@@ -55,16 +116,47 @@ def _base(sess):
 
 
 def read_last_run():
-    """读取最近一次签到结果（自动定时 / 手动点击都记在这里）。"""
+    """读取最近一次签到结果（自动定时 / 手动点击都记在这里）。
+
+    兼容历史文件两种形态：旧版单条 dict，新版数组（按时间正序追加，最新在末尾）。
+    """
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if isinstance(data, list):
+            return data[-1] if data else None
+        return data
     except Exception:
         return None
 
 
+def _append_rec(path, rec, limit=30):
+    """把一条签到记录追加到历史文件（保留最近 limit 条，最新在末尾）。
+
+    兼容旧版单条 dict 文件：读入后自动转成数组再追加。
+    """
+    try:
+        data = None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+        if isinstance(data, list):
+            data.append(rec)
+        elif isinstance(data, dict):
+            data = [data, rec]
+        else:
+            data = [rec]
+        data = data[-limit:]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
 def _record_state(ok, message, st, source="web"):
-    """把本页手动签到的结果也记进状态文件，保证页面记录统一。"""
+    """把本页手动签到的结果也记进状态文件，保持页面记录统一（追加式历史）。"""
     try:
         s = st or {}
         rec = {
@@ -78,8 +170,7 @@ def _record_state(ok, message, st, source="web"):
             "checked": bool(s.get("checked")),
             "source": source,
         }
-        with open(STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(rec, f, ensure_ascii=False)
+        _append_rec(STATE_FILE, rec, 30)
     except Exception:
         pass
 
@@ -89,7 +180,9 @@ def get_remaining():
     sess = _session()
     base = _base(sess)
     body = {
-        "PageNumber": 1, "PageSize": 100, "ProductCode": "p_tcaca",
+        "PageNumber": 1,
+        "PageSize": 100,
+        "ProductCode": "p_tcaca",
         "Status": [0, 3],
         "PackageStartTimeRangeBegin": "2024-12-01 21:25:00",
         "PackageStartTimeRangeEnd": "2026-12-31 23:59:59",
@@ -105,12 +198,14 @@ def get_remaining():
     for a in accounts:
         rem = float(a.get("CapacityRemainPrecise") or 0)
         total += rem
-        pkgs.append({
-            "name": a.get("PackageName"),
-            "remain": round(rem, 2),
-            "used": round(float(a.get("CapacityUsedPrecise") or 0), 2),
-            "capacity": round(float(a.get("CapacitySizePrecise") or 0), 2),
-        })
+        pkgs.append(
+            {
+                "name": a.get("PackageName"),
+                "remain": round(rem, 2),
+                "used": round(float(a.get("CapacityUsedPrecise") or 0), 2),
+                "capacity": round(float(a.get("CapacitySizePrecise") or 0), 2),
+            }
+        )
     return {"remaining": round(total, 2), "packages": pkgs}
 
 
@@ -140,7 +235,7 @@ def _fetch_usage_day(sess, day):
         if s != 200:
             raise RuntimeError("查询消耗明细返回 HTTP %s" % s)
         d = json.loads(b)
-        recs = ((d.get("data") or {}).get("data") or [])
+        recs = (d.get("data") or {}).get("data") or []
         if not recs:
             break
         for r in recs:
@@ -171,7 +266,7 @@ def get_status():
     s, b = call(_base(sess), "/checkin-activity-status", sess, {})
     if s != 200:
         raise RuntimeError("查询签到状态返回 HTTP %s" % s)
-    d = (json.loads(b).get("data") or {})
+    d = json.loads(b).get("data") or {}
     st = {
         "activity": d.get("activity_name"),
         "theme": d.get("theme_name"),
@@ -206,7 +301,11 @@ def do_checkin():
     st = get_status()
     if st["checked"]:
         _record_state(True, "今天已经签到过了", st, "web")
-        return {"already": True, "message": "今天已经签到过了，无需重复操作", "status": st}
+        return {
+            "already": True,
+            "message": "今天已经签到过了，无需重复操作",
+            "status": st,
+        }
 
     s, b = call(_base(sess), "/daily-checkin", sess, {})
     try:
@@ -215,7 +314,7 @@ def do_checkin():
         resp = {}
     code = resp.get("code")
     if code in (0, 10001):
-        already = (code == 10001)
+        already = code == 10001
         if already:
             msg = "今天已经签到过了，无需重复操作"
         else:
@@ -228,169 +327,1875 @@ def do_checkin():
     raise RuntimeError("签到被拒绝：code=%s msg=%s" % (code, resp.get("msg")))
 
 
+# ============================ MiniMax Code 签到适配器 ============================
+# 官方接口（从 agent.minimax.cn 网页端前端 bundle 逆向 + 实测确认）：
+#   签到面板  GET  https://agent.minimax.cn/minimax-cloud/api/v1/signin/status
+#   领取奖励  POST https://agent.minimax.cn/minimax-cloud/api/v1/signin/claim  body {}
+#   鉴权（网页端 Web 会话，非桌面端 OAuth 链）：
+#     - URL 查询参数携带 token=<网页 JWT> + 设备标识参数（client=web&region=cn 等）
+#     - Header: x-timestamp=<秒级时间戳>、x-signature=<MD5 签名>
+#     - x-signature = MD5(f"{秒级时间戳}I*7Cf%WZ#S&%1RlZJ&C2{body字符串}")
+#   token 来源：agent.minimax.cn 网页端登录后 localStorage._token（有效期约 40 天，
+#   快到期时在浏览器重新登录一次即可，无需 refresh 链）。
+# 返回结构: {base_resp:{status_code,status_msg}, data:{days:[{day_no,points,is_today,status}]}}
+#   status: 1=Upcoming 2=Claimable 3=Claimed；claim 返回 claim_result: 1=新领取 2=已签到
+# 凭据优先级：环境变量 MM_WEB_TOKEN > 同目录 mm_web_token.json
+MM_WEB_TOKEN = os.environ.get("MM_WEB_TOKEN", "")
+if not MM_WEB_TOKEN:
+    try:
+        with open(
+            os.path.join(BASE_DIR, "mm_web_token.json"), "r", encoding="utf-8"
+        ) as _f:
+            _mt = json.load(_f)
+        MM_WEB_TOKEN = MM_WEB_TOKEN or _mt.get("access_token", "")
+    except Exception:
+        pass
+MM_STATE_FILE = os.path.join(BASE_DIR, "mm_last_run.json")
+
+
+def _mm_sign_headers(now_s, body_str):
+    """计算 MiniMax 网页端请求签名所需的 Header。"""
+    sig = hashlib.md5(
+        ("%dI*7Cf%%WZ#S&%%1RlZJ&C2%s" % (now_s, body_str)).encode("utf-8")
+    ).hexdigest()
+    return {"x-timestamp": str(now_s), "x-signature": sig}
+
+
+def _mm_api(path, method="GET", body=None):
+    """访问 MiniMax 签到 API（网页端 Web 会话鉴权）。返回解析后的 JSON dict。"""
+    if not MM_WEB_TOKEN:
+        raise RuntimeError(
+            "未配置 MiniMax Code 网页登录凭据（mm_web_token.json 或 MM_WEB_TOKEN）"
+        )
+    now_ms = int(time.time() * 1000)
+    now_s = now_ms // 1000
+    params = {
+        "device_platform": "web",
+        "biz_id": "3",
+        "app_id": "3001",
+        "version_code": "22201",
+        "unix": str(now_ms),
+        "timezone_offset": "28800",
+        "sys_language": "zh",
+        "lang": "zh",
+        "uuid": "9f344780-29b5-4a7b-985c-9db6957960d0",
+        "device_id": "81828527",
+        "os_name": "Windows",
+        "browser_name": "Chrome",
+        "device_memory": "32",
+        "cpu_core_num": "20",
+        "browser_language": "zh-CN",
+        "browser_platform": "Win32",
+        "user_id": "555802743632904195",
+        "screen_width": "1707",
+        "screen_height": "1067",
+        "token": MM_WEB_TOKEN,
+        "client": "web",
+        "region": "cn",
+    }
+    body_str = ""
+    data = None
+    if body is not None:
+        body_str = json.dumps(body)
+        data = body_str.encode("utf-8")
+    url = "https://agent.minimax.cn/minimax-cloud/api/v1%s?%s" % (
+        path,
+        urlencode(params),
+    )
+    headers = {"Content-Type": "application/json"}
+    headers.update(_mm_sign_headers(now_s, body_str))
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _mm_record(ok, message):
+    _append_rec(
+        MM_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": bool(ok),
+            "message": message,
+        },
+        30,
+    )
+
+
+def _mm_read_last():
+    try:
+        with open(MM_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data[-1] if data else None
+        return data
+    except Exception:
+        return None
+
+
+def _mm_panel():
+    """拉取签到面板，解析成结构化数据。"""
+    d = _mm_api("/signin/status")
+    br = d.get("base_resp") or {}
+    if br.get("status_code") != 0:
+        raise RuntimeError("MiniMax: %s" % (br.get("status_msg") or "status 获取失败"))
+    days = (d.get("data") or {}).get("days") or []
+    today = next((x for x in days if x.get("is_today")), None)
+    claimed_today = bool(today and today.get("status") == 3)
+    claimable_today = bool(today and today.get("status") == 2)
+    claimed_count = sum(1 for x in days if x.get("status") == 3)
+    return {
+        "days": days,
+        "today": today,
+        "claimed_today": claimed_today,
+        "claimable_today": claimable_today,
+        "claimed_count": claimed_count,
+        "cycle_points": sum(x.get("points", 0) for x in days),
+    }
+
+
+def get_mm_card():
+    try:
+        p = _mm_panel()
+        lr = _mm_read_last()
+        today = p["today"] or {}
+        rows = [
+            {"k": "本轮已签", "v": "%s / 7 天" % p["claimed_count"]},
+            {"k": "今日奖励", "v": "+%s 积分" % (today.get("points") or "—")},
+            {"k": "本轮总奖励", "v": "%s 积分" % p["cycle_points"]},
+        ]
+        if lr:
+            rows.append(
+                {
+                    "k": "上次签到",
+                    "v": "%s %s"
+                    % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
+                }
+            )
+        return {
+            "name": "minimax",
+            "title": "MiniMax Code 每日签到",
+            "brand": "#7C3AED",
+            "brand2": "#A855F7",
+            "icon": "mm",
+            "checked": p["claimed_today"],
+            "metric_label": "本轮已签",
+            "metric_value": "%s / 7 天" % p["claimed_count"],
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return _card_error(
+            "minimax", "MiniMax Code 每日签到", "#7C3AED", "#A855F7", "mm", e
+        )
+
+
+def run_mm_checkin():
+    """执行 MiniMax Code 签到，返回最新卡片。已签/重复领均幂等。"""
+    p = _mm_panel()
+    if p["claimed_today"]:
+        _mm_record(True, "今天已经签到过了")
+        return get_mm_card()
+    d = _mm_api("/signin/claim", method="POST", body={})
+    br = d.get("base_resp") or {}
+    if br.get("status_code") != 0:
+        raise RuntimeError(
+            "MiniMax 领取失败：%s" % (br.get("status_msg") or "未知错误")
+        )
+    data = d.get("data") or {}
+    result = data.get("claim_result")
+    if result == 1:
+        _mm_record(True, "签到成功！今日 +%s 积分" % data.get("points"))
+    elif result == 2:
+        _mm_record(True, "今天已经签到过了")
+    else:
+        raise RuntimeError("MiniMax 领取失败：claim_result=%s" % result)
+    return get_mm_card()
+
+
+# ============================ Trae Work 签到适配器 ============================
+# 官方接口（Trae 工作台，work.trae.cn）：
+#   换发 Token  POST https://api.trae.cn/cloudide/api/v3/common/GetUserToken  （凭 cookie 会话换取 8h JWT，无 body）
+#   签到面板  POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/status
+#   领取奖励  POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/claim
+#   鉴权      Authorization: Cloud-IDE-JWT <jwt>（登录态 JWT，来自 work.trae.cn）
+#   请求体    {"req_source": 3}（网页渠道固定为 3）
+#   实测事实   claim 仅 code=0 为成功；9004="submitted order parameters are incorrect"
+#             （订单参数错误，与"已签"无关）；真实签到状态以 status 接口 checked_in 为准
+# 凭据优先级：环境变量 TRAE_COOKIE > 同目录 trae_cookie.txt（HttpOnly+cookie 串，约 14 天）
+#            -> 每日先 GetUserToken 换新 JWT；无 cookie 时降级用 TRAE_JWT / trae_jwt.txt（8h 短期）
+TRAE_COOKIE = os.environ.get("TRAE_COOKIE", "")
+if not TRAE_COOKIE:
+    try:
+        with open(
+            os.path.join(BASE_DIR, "trae_cookie.txt"), "r", encoding="utf-8"
+        ) as _f:
+            TRAE_COOKIE = _f.read().strip()
+    except Exception:
+        TRAE_COOKIE = ""
+TRAE_JWT = os.environ.get("TRAE_JWT", "")
+if not TRAE_JWT:
+    try:
+        with open(os.path.join(BASE_DIR, "trae_jwt.txt"), "r", encoding="utf-8") as _f:
+            TRAE_JWT = _f.read().strip()
+    except Exception:
+        TRAE_JWT = ""
+TRAE_STATE_FILE = os.path.join(BASE_DIR, "trae_last_run.json")
+TRAE_API = "https://api.trae.cn/trae/api/v2/ug/checkin_credits"
+TRAE_UG_BASE = "https://api.trae.cn/trae/api/v2/ug"
+TRAE_TOKEN_API = "https://api.trae.cn/cloudide/api/v3/common/GetUserToken"
+
+
+def _trae_get_token():
+    """优先用 cookie 换发新 JWT（约 8h 有效）；无 cookie 时返回配置的静态 JWT。"""
+    if TRAE_COOKIE:
+        req = urllib.request.Request(
+            TRAE_TOKEN_API,
+            data=b"",
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Cookie": TRAE_COOKIE,
+                "Origin": "https://work.trae.cn",
+                "Referer": "https://work.trae.cn/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
+            j = json.loads(r.read().decode("utf-8", "replace"))
+        tok = (j.get("Result") or {}).get("Token") or ""
+        if tok:
+            return tok
+    if TRAE_JWT:
+        return TRAE_JWT
+    return ""
+
+
+def _trae_post(url, body):
+    """统一的 Trae POST 调用（带 JWT + 浏览器同款头）。"""
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={
+            "Authorization": "Cloud-IDE-JWT %s" % _trae_get_token(),
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Origin": "https://work.trae.cn",
+            "Referer": "https://work.trae.cn/",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _trae_api(action, req_source=3):
+    return _trae_post("%s/%s" % (TRAE_API, action), {"req_source": req_source})
+
+
+def _trae_activity_action(activity_id, req_source=3):
+    """官方新版「商业活动」接口（front-end 现用此路径）。
+
+    POST /trae/api/v2/ug/activity/action  body {"activity_id":..., "req_source":3}
+    签到活动 id = checkin_credits。返回 code=0 即成功；9090 表示活动暂不可用。
+    """
+    return _trae_post(
+        "%s/activity/action" % TRAE_UG_BASE,
+        {"activity_id": activity_id, "req_source": req_source},
+    )
+
+
+def _trae_activity_info(req_source=3):
+    return _trae_post(
+        "%s/activity/info" % TRAE_UG_BASE, {"req_source": req_source}
+    )
+
+
+def _trae_record(ok, message):
+    _append_rec(
+        TRAE_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": bool(ok),
+            "message": message,
+        },
+        30,
+    )
+
+
+def _trae_read_last():
+    try:
+        with open(TRAE_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data[-1] if data else None
+        return data
+    except Exception:
+        return None
+
+
+def get_trae_card():
+    if not (TRAE_COOKIE or TRAE_JWT):
+        return {
+            "name": "trae",
+            "title": "Trae Work 每日签到",
+            "brand": "#111827",
+            "brand2": "#374151",
+            "icon": "trae",
+            "checked": False,
+            "needs_auth": True,
+            "auth_url": "https://work.trae.cn/?mode=mtc",
+            "metric_label": "状态",
+            "metric_value": "未配置",
+            "last_run": None,
+            "rows": [{"k": "说明", "v": "请在浏览器登录后重新加载本页"}],
+            "error": None,
+        }
+    # 主动探测 cookie 是否仍有效；有 cookie 却换不出 token = 已过期
+    try:
+        if TRAE_COOKIE and not _trae_get_token():
+            lr = _trae_read_last()
+            return {
+                "name": "trae",
+                "title": "Trae Work 每日签到",
+                "brand": "#111827",
+                "brand2": "#374151",
+                "icon": "trae",
+                "checked": False,
+                "needs_auth": True,
+                "auth_url": "https://work.trae.cn/?mode=mtc",
+                "metric_label": "状态",
+                "metric_value": "Cookie 已过期",
+                "last_run": lr,
+                "rows": [
+                    {
+                        "k": "说明",
+                        "v": "登录 cookie 已失效，请重新在浏览器登录 work.trae.cn 后导出 trae_cookie.txt",
+                    },
+                    {
+                        "k": "上次执行",
+                        "v": ("%s ⚠️" % str(lr.get("ts"))[5:16]) if lr else "无记录",
+                    },
+                ],
+                "error": None,
+            }
+    except Exception:
+        pass
+    try:
+        d = _trae_api("status", 3)
+        lr = _trae_read_last()
+        checked = bool(d.get("checked_in"))
+        credits = d.get("credits") or 0
+        extra = d.get("extra_credits") or 0
+        rows = [
+            {
+                "k": "每日奖励",
+                "v": "+%s work_credits%s"
+                % (credits, ("（会员+%s）" % extra) if extra else ""),
+            },
+            {"k": "签到状态", "v": "✅ 今日已签" if checked else "待签到"},
+        ]
+        if lr:
+            rows.append(
+                {
+                    "k": "上次执行",
+                    "v": "%s %s"
+                    % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
+                }
+            )
+        # 自动签到失败时明确提示真实原因，避免"账户已签但没跑成"或"cookie 过期"的误判
+        if lr and not lr.get("ok"):
+            last_msg = (lr.get("message") or "")[:60]
+            rows.insert(
+                0,
+                {
+                    "k": "⚠️ 自动签到",
+                    "v": ("上次失败：%s" % last_msg)
+                    if last_msg
+                    else "上次失败（原因未记录）",
+                },
+            )
+        return {
+            "name": "trae",
+            "title": "Trae Work 每日签到",
+            "brand": "#111827",
+            "brand2": "#374151",
+            "icon": "trae",
+            "checked": checked,
+            "metric_label": "今日状态",
+            "metric_value": "已签到" if checked else "待签到",
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return _card_error(
+            "trae", "Trae Work 每日签到", "#111827", "#374151", "trae", e
+        )
+
+
+def run_trae_checkin():
+    """执行 Trae Work 每日签到（网页渠道 req_source=3）。
+
+    注意：claim 仅 code=0 算签到成功；9004/其它非 0 code 均为接口拒绝
+    （实测为"订单参数错误/未通过校验"，绝非"今日已签"幂等），必须如实记为失败，
+    不能误报已签。签到是否成功以 status 接口 checked_in 为准。
+    """
+    if not (TRAE_COOKIE or TRAE_JWT):
+        raise RuntimeError(
+            "未配置 Trae 凭据（trae_cookie.txt / TRAE_JWT 或 trae_jwt.txt）"
+        )
+    # 前置校验：cookie 失效时尽早给出明确告警，避免静默误判
+    tok = _trae_get_token()
+    if not tok:
+        _trae_record(
+            False,
+            "登录 cookie 已过期，请重新在浏览器登录 work.trae.cn 后导出 trae_cookie.txt",
+        )
+        raise RuntimeError(
+            "Trae 登录 cookie 已过期，请重新导出 trae_cookie.txt（详见签到中心 Trae 卡片说明）"
+        )
+    results = []
+    claimed = False
+    try:
+        d = _trae_api("claim", 3)
+        if isinstance(d, dict):
+            br = d.get("code")
+            if br == 0:
+                claimed = True
+                results.append("签到成功（checkin_credits/claim）")
+            else:
+                msg = d.get("message") or br
+                # 9004 实测 = "submitted order parameters are incorrect"。
+                # 该账户（Free、web 端无签到入口）未开通签到活动，属服务端拒绝，
+                # 与"今日已签"无关、也非 cookie 过期，刷新 cookie 无解。
+                results.append(
+                    "claim 接口拒绝:code=%s %s（服务端未开通该账户签到活动）"
+                    % (br, msg)
+                )
+        else:
+            results.append("未知响应")
+    except Exception as e:
+        results.append("claim 调用异常:%s" % e)
+    # claim 失败时再尝试官方新版「商业活动」接口（部分账户走此路径）
+    if not claimed:
+        try:
+            a = _trae_activity_action("checkin_credits", 3)
+            if isinstance(a, dict):
+                ac = a.get("code")
+                if ac == 0:
+                    claimed = True
+                    results.append("签到成功（activity/action）")
+                else:
+                    amsg = a.get("message") or ac
+                    # 9090 实测 = "活动暂不可用"，同样为服务端未开通
+                    results.append(
+                        "activity/action 拒绝:code=%s %s（活动暂不可用）" % (ac, amsg)
+                    )
+        except Exception as e:
+            results.append("activity/action 调用异常:%s" % e)
+    # 防误报：仅有接口明确返回 code=0 才算签到成功；否则一律记为失败
+    ok = claimed
+    _trae_record(ok, "；".join(results))
+    return get_trae_card()
+
+
+# ============================ WPS 灵犀签到适配器 ============================
+# 官方接口（lingxi.wps.cn）：
+#   任务面板  GET https://lingxi.wps.cn/api/public/v1/tasks?date=YYYY-MM-DD
+#            返回 data.tasks[]（含 daily_check_in 每日任务：reward_amount=100, status=claimed/incomplete/locked）
+#   每日签到  POST https://lingxi.wps.cn/api/public/v1/tasks/daily_check_in/claim?date=YYYY-MM-DD  body {}
+#            返回 data（task_key/trade_no/total_claimed_credits），已签幂等（重复返回 200）
+#   鉴权      需登录 Cookie（*.wps.cn，核心会话为 HttpOnly）；每日任务 +100 智点
+# 凭据优先级：环境变量 LX_COOKIE > 同目录 lx_cookie.txt
+LX_COOKIE = os.environ.get("LX_COOKIE", "")
+if not LX_COOKIE:
+    try:
+        with open(os.path.join(BASE_DIR, "lx_cookie.txt"), "r", encoding="utf-8") as _f:
+            LX_COOKIE = _f.read().strip()
+    except Exception:
+        LX_COOKIE = ""
+LX_STATE_FILE = os.path.join(BASE_DIR, "lx_last_run.json")
+LX_TASK_API = "https://lingxi.wps.cn/api/public/v1/tasks"
+
+
+def _lx_api(path, method="GET", body=None):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://lingxi.wps.cn/",
+    }
+    if LX_COOKIE:
+        headers["Cookie"] = LX_COOKIE
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        "%s%s" % (LX_TASK_API, path), data=data, method=method, headers=headers
+    )
+    with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _lx_record(ok, message):
+    _append_rec(
+        LX_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": bool(ok),
+            "message": message,
+        },
+        30,
+    )
+
+
+def _lx_read_last():
+    try:
+        with open(LX_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data[-1] if data else None
+        return data
+    except Exception:
+        return None
+
+
+def get_lx_card():
+    if not LX_COOKIE:
+        return {
+            "name": "lingxi",
+            "title": "WPS 灵犀每日签到",
+            "brand": "#10B981",
+            "brand2": "#059669",
+            "icon": "lx",
+            "checked": False,
+            "needs_auth": True,
+            "auth_url": "https://lingxi.wps.cn/",
+            "metric_label": "状态",
+            "metric_value": "未配置",
+            "last_run": None,
+            "rows": [{"k": "说明", "v": "请在浏览器登录后重新加载本页"}],
+            "error": None,
+        }
+    try:
+        today = datetime.date.today().isoformat()
+        d = _lx_api("/?date=%s" % today)
+        lr = _lx_read_last()
+        data = d.get("data") or {}
+        tasks = data.get("tasks") or []
+        daily = None
+        for t in tasks:
+            if isinstance(t, dict) and t.get("task_key") == "daily_check_in":
+                daily = t
+                break
+        daily = daily or {}
+        claimed = daily.get("status") == "claimed"
+        checked = bool(daily.get("checked") or claimed)
+        reward = daily.get("reward_amount") or 100
+        rows = [
+            {"k": "今日智点", "v": "+%s" % reward},
+            {"k": "累计智点", "v": "暂无法获取"},
+            {
+                "k": "签到状态",
+                "v": "✅ 今日已签" if checked else ("已领取" if claimed else "待签到"),
+            },
+        ]
+        if lr:
+            rows.append(
+                {
+                    "k": "上次执行",
+                    "v": "%s %s"
+                    % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
+                }
+            )
+        return {
+            "name": "lingxi",
+            "title": "WPS 灵犀每日签到",
+            "brand": "#10B981",
+            "brand2": "#059669",
+            "icon": "lx",
+            "checked": checked,
+            "metric_label": "今日状态",
+            "metric_value": "已签到" if checked else "待签到",
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return _card_error("lingxi", "WPS 灵犀每日签到", "#10B981", "#059669", "lx", e)
+
+
+def run_lx_checkin():
+    """执行 WPS 灵犀每日签到（幂等：已签重复领取仍返回 200）。"""
+    if not LX_COOKIE:
+        raise RuntimeError("未配置灵犀登录 Cookie（lx_cookie.txt 或 LX_COOKIE）")
+    today = datetime.date.today().isoformat()
+    d = _lx_api("/daily_check_in/claim?date=%s" % today, method="POST", body={})
+    data = d.get("data") or {}
+    reward = data.get("reward_amount") or 100
+    total = data.get("total_claimed_credits")
+    msg = "今日 +%s 智点" % reward
+    if total is not None:
+        msg += "（累计 %s）" % total
+    _lx_record(True, msg)
+    return get_lx_card()
+
+
+# ============================ Link AI 签到适配器 ============================
+# 官方接口（link-ai.tech）：
+#   签到     GET https://link-ai.tech/api/chat/web/app/user/sign/in
+#   鉴权     Authorization: Bearer {token}
+#   重复签到 code:870 "签到失败"
+# 凭据优先级：环境变量 LINKAI_TOKEN > 同目录 linkai_token.txt
+LINKAI_TOKEN = os.environ.get("LINKAI_TOKEN", "")
+if not LINKAI_TOKEN:
+    try:
+        with open(
+            os.path.join(BASE_DIR, "linkai_token.txt"), "r", encoding="utf-8"
+        ) as _f:
+            LINKAI_TOKEN = _f.read().strip()
+    except Exception:
+        LINKAI_TOKEN = ""
+
+
+# ============================ 华为码道（DevCloud）签到适配器 ============================
+# 官方接口（华为 DevCloud 码道 chat）：
+#   查询活动   GET  https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService/v1/ops/delivery?channel=WEB
+#   签到领取   POST .../v1/ops/claim        body {"campaignId":1,"idempotentKey":"claim_1_<ts>","channel":"WEB"}
+#   确认       POST .../v1/ops/confirm     body {"campaignId":1}
+#   鉴权       Cookie: devclouddevuibjJ_SESSION_ID=... （Edge 登录态；凭据优先级：环境变量 HW_COOKIE > hw_cookie.txt）
+#   每日签到活动：campaignId=1 type=USER_LOGIN，benefitAmount=1000 CREDIT
+#   状态流转：ELIGIBLE(待领) -> CLAIMED/CONFIRMED/CONSUMED(已签)
+HW_STATE_FILE = os.path.join(BASE_DIR, "hw_last_run.json")
+HW_BASE = "https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService"
+HW_COOKIE = os.environ.get("HW_COOKIE", "")
+if not HW_COOKIE:
+    try:
+        with open(os.path.join(BASE_DIR, "hw_cookie.txt"), "r", encoding="utf-8") as _f:
+            HW_COOKIE = _f.read().strip()
+    except Exception:
+        HW_COOKIE = ""
+
+
+def _hw_api(path, method="GET", body=None):
+    # 必须带浏览器同款头，否则华为网关会把接口请求当普通页面访问、
+    # 返回 SPA 的 HTML 而非 JSON（导致解析失败）。实测关键头：
+    #   x-requested-with / agent-type / x-language / language / accept + GET 的 _ 缓存戳
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+        "agent-type": "PromptCenter",
+        "x-language": "zh-cn",
+        "language": "zh-cn",
+        "x-requested-with": "XMLHttpRequest",
+        "accept": "application/json, text/plain, */*",
+        "referer": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
+        "Cookie": HW_COOKIE,
+    }
+    # 华为 CSRF 令牌以 header 名 "cftk" 下发（从登录 Cookie devclouddevuibjtcftk 取值）
+    for _part in HW_COOKIE.split(";"):
+        _part = _part.strip()
+        if _part.startswith("devclouddevuibjtcftk="):
+            headers["cftk"] = _part.split("=", 1)[1]
+            break
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    # GET 请求附加浏览器同款 _ 缓存戳，确保服务端返回 JSON 而非 SPA HTML
+    url = "%s%s" % (HW_BASE, path)
+    if method == "GET":
+        sep = "&" if "?" in url else "?"
+        url += "%s_=%d" % (sep, int(time.time() * 1000))
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    with urllib.request.urlopen(req, timeout=25, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _hw_record(ok, message):
+    _append_rec(
+        HW_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": bool(ok),
+            "message": message,
+        },
+        30,
+    )
+
+
+def _hw_read_last():
+    try:
+        with open(HW_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data[-1] if data else None
+        return data
+    except Exception:
+        return None
+
+
+def _hw_find_daily(items):
+    """从活动列表里挑出每日签到活动（campaignId=1 / USER_LOGIN）。"""
+    if not isinstance(items, list):
+        return None
+    for x in items:
+        if not isinstance(x, dict):
+            continue
+        if x.get("campaignId") == 1 or x.get("type") in ("USER_LOGIN", "DAILY_CLAIM"):
+            return x
+    return None
+
+
+def get_hw_card():
+    if not HW_COOKIE:
+        return {
+            "name": "huawei",
+            "title": "华为码道每日签到",
+            "brand": "#804FED",
+            "brand2": "#6A35D6",
+            "icon": "huawei",
+            "checked": False,
+            "needs_auth": True,
+            "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
+            "metric_label": "状态",
+            "metric_value": "未配置",
+            "last_run": None,
+            "rows": [{"k": "说明", "v": "请在浏览器登录后重新加载本页"}],
+            "error": None,
+        }
+    try:
+        d = _hw_api("/v1/ops/delivery?channel=WEB")
+        if d.get("code") != 0:
+            raise RuntimeError(d.get("message") or "华为活动查询失败")
+        items = (d.get("data") or {}).get("items") or []
+        camp = _hw_find_daily(items)
+        if not camp:
+            raise RuntimeError("未找到每日签到活动")
+        status = camp.get("status")
+        claimable = camp.get("claimable", False)
+        checked = status in ("CLAIMED", "CONFIRMED", "CONSUMED")
+        amount = camp.get("benefitAmount")
+        unit = camp.get("benefitUnit") or "CREDIT"
+        unit_cn = "积分" if unit == "CREDIT" else unit
+        lr = _hw_read_last()
+        rows = [
+            {"k": "今日福利", "v": "%s %s" % (amount, unit_cn)},
+            {
+                "k": "签到状态",
+                "v": "✅ 今日已签" if checked else ("可领取" if claimable else "暂不可领"),
+            },
+            {"k": "活动标题", "v": camp.get("title") or "每日签到"},
+        ]
+        if lr:
+            rows.append(
+                {
+                    "k": "上次执行",
+                    "v": "%s %s"
+                    % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
+                }
+            )
+        metric_value = ("已领 %s" % amount) if checked else ("%s %s" % (amount, unit_cn))
+        return {
+            "name": "huawei",
+            "title": "华为码道每日签到",
+            "brand": "#804FED",
+            "brand2": "#6A35D6",
+            "icon": "huawei",
+            "checked": checked,
+            "metric_label": "今日积分",
+            "metric_value": metric_value,
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except urllib.error.HTTPError as e:
+        # 401/403 = 华为云登录态（会话 cookie）已过期，需要本人重新登录，非配置错误
+        if e.code in (401, 403):
+            return {
+                "name": "huawei",
+                "title": "华为码道每日签到",
+                "brand": "#804FED",
+                "brand2": "#6A35D6",
+                "icon": "huawei",
+                "checked": False,
+                "needs_auth": True,
+                "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
+                "metric_label": "登录态",
+                "metric_value": "已过期",
+                "last_run": _hw_read_last(),
+                "rows": [
+                    {"k": "原因", "v": "华为云登录态已过期，需重新登录后更新 Cookie"},
+                    {"k": "如何恢复", "v": "点下面按钮登录华为云 → 告诉小B 重新抓取"},
+                ],
+                "error": None,
+            }
+        return _card_error("huawei", "华为码道每日签到", "#804FED", "#6A35D6", "huawei", e)
+    except Exception as e:
+        return _card_error("huawei", "华为码道每日签到", "#804FED", "#6A35D6", "huawei", e)
+
+
+def run_hw_checkin():
+    """执行华为码道每日签到（campaignId=1），已签则幂等跳过。"""
+    if not HW_COOKIE:
+        raise RuntimeError("未配置华为登录 Cookie（hw_cookie.txt 或 HW_COOKIE）")
+    # 先看今天是否已签，避免重复领取报错
+    d = _hw_api("/v1/ops/delivery?channel=WEB")
+    if d.get("code") != 0:
+        raise RuntimeError(d.get("message") or "华为活动查询失败")
+    items = (d.get("data") or {}).get("items") or []
+    camp = _hw_find_daily(items)
+    if camp and camp.get("status") in ("CLAIMED", "CONFIRMED", "CONSUMED"):
+        _hw_record(True, "今日已签到（幂等跳过）")
+        return get_hw_card()
+    ts = int(time.time() * 1000)
+    claim = _hw_api(
+        "/v1/ops/claim",
+        method="POST",
+        body={"campaignId": 1, "idempotentKey": "claim_1_%s" % ts, "channel": "WEB"},
+    )
+    if claim.get("code") != 0:
+        raise RuntimeError(claim.get("message") or "华为签到领取失败")
+    conf = _hw_api("/v1/ops/confirm", method="POST", body={"campaignId": 1})
+    if conf.get("code") != 0:
+        raise RuntimeError(conf.get("message") or "华为签到确认失败")
+    _hw_record(True, "今日签到成功 +1000 积分")
+    return get_hw_card()
+LK_STATE_FILE = os.path.join(BASE_DIR, "lk_last_run.json")
+LK_API_BASE = "https://link-ai.tech/api/chat/web/app/user"
+
+
+def _lk_api(path, method="GET", body=None):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://link-ai.tech/console/account",
+        "Accept": "application/json",
+    }
+    if LINKAI_TOKEN:
+        headers["Authorization"] = "Bearer %s" % LINKAI_TOKEN
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        "%s%s" % (LK_API_BASE, path), data=data, method=method, headers=headers
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        try:
+            return json.loads(body)
+        except Exception:
+            return {"success": False, "code": e.code, "message": body[:200]}
+    except Exception as e:
+        return {"success": False, "code": -1, "message": str(e)}
+
+
+def _lk_record(ok, msg):
+    _append_rec(
+        LK_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": ok,
+            "message": msg,
+            "source": "auto",
+        },
+        30,
+    )
+
+
+def get_lk_card():
+    if not LINKAI_TOKEN:
+        return {
+            "name": "linkai",
+            "title": "Link AI 每日签到",
+            "brand": "#3B82F6",
+            "brand2": "#2563EB",
+            "icon": "lk",
+            "checked": False,
+            "needs_auth": True,
+            "auth_url": "https://link-ai.tech/console/account",
+            "metric_label": "状态",
+            "metric_value": "未配置",
+            "last_run": None,
+            "rows": [
+                {"k": "说明", "v": "请在浏览器登录后获取 token 写入 linkai_token.txt"}
+            ],
+            "error": None,
+        }
+    try:
+        d = _lk_api("/sign/in")
+        lr = _lk_read_last()
+        checked = False
+        if not d.get("success"):
+            if d.get("code") == 870:
+                checked = True
+            else:
+                raise RuntimeError(d.get("message") or "状态查询失败")
+        else:
+            checked = True
+        # 查积分余额
+        bal = "--"
+        try:
+            r = _lk_api("/get/balance")
+            if r.get("success"):
+                bal = r.get("data", {}).get(
+                    "score", r.get("data", {}).get("balance", "--")
+                )
+        except Exception:
+            pass
+        rows = [
+            {
+                "k": "签到状态",
+                "v": "\u2705 \u4eca\u65e5\u5df2\u7b7e"
+                if checked
+                else "\u5f85\u7b7e\u5230",
+            },
+        ]
+        if lr:
+            rows.append(
+                {
+                    "k": "上次执行",
+                    "v": "%s %s"
+                    % (
+                        str(lr.get("ts"))[5:16],
+                        "\u2705" if lr.get("ok") else "\u26a0\ufe0f",
+                    ),
+                }
+            )
+        return {
+            "name": "linkai",
+            "title": "Link AI 每日签到",
+            "brand": "#3B82F6",
+            "brand2": "#2563EB",
+            "icon": "lk",
+            "checked": checked,
+            "metric_label": "可用积分",
+            "metric_value": bal,
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return _card_error("linkai", "Link AI 每日签到", "#3B82F6", "#2563EB", "lk", e)
+
+
+def run_lk_checkin():
+    if not LINKAI_TOKEN:
+        raise RuntimeError("未配置 Link AI Token（linkai_token.txt 或 LINKAI_TOKEN）")
+    d = _lk_api("/sign/in")
+    if d.get("success"):
+        points = (
+            d.get("data", {}).get("points") or d.get("data", {}).get("score") or "?"
+        )
+        _lk_record(True, "今日 +%s 积分" % points)
+        return get_lk_card()
+    code = d.get("code")
+    if code == 870:
+        _lk_record(True, "今日已签到")
+        return get_lk_card()
+    raise RuntimeError(d.get("message") or "Link AI 签到失败 (code=%s)" % code)
+
+
+def _lk_read_last():
+    try:
+        with open(LK_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list) and data:
+            return data[-1]
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return None
+
+
+def get_lk_detail():
+    if not LINKAI_TOKEN:
+        raise RuntimeError("未配置 Link AI Token")
+    history = _load_json_records(LK_STATE_FILE, 30)
+    bal = "--"
+    try:
+        r = _lk_api("/get/balance")
+        if r.get("success"):
+            bal = r.get("data", {}).get("score", r.get("data", {}).get("balance", "--"))
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "name": "linkai",
+        "title": "Link AI 每日签到",
+        "signin": {
+            "history": history,
+            "checked": get_lk_card().get("checked"),
+        },
+        "consumption": {
+            "balance": bal,
+        },
+    }
+
+
+# ============================ 签到中心：多平台适配器 ============================
+def _card_error(name, title, brand, brand2, icon, err):
+    return {
+        "name": name,
+        "title": title,
+        "brand": brand,
+        "brand2": brand2,
+        "icon": icon,
+        "checked": False,
+        "metric_label": "—",
+        "metric_value": "—",
+        "last_run": None,
+        "rows": [],
+        "error": str(err),
+    }
+
+
+def get_wb_card():
+    try:
+        st = get_status()
+        lr = read_last_run()
+        rows = [
+            {
+                "k": "今日已得",
+                "v": ("+%s 分" % st["today"]) if st.get("today") is not None else "--",
+            },
+            {
+                "k": "资源余额",
+                "v": ("%s 分" % st["remaining"])
+                if st.get("remaining") is not None
+                else "--",
+            },
+            {
+                "k": "连续签到",
+                "v": ("%s 天" % st["streak"]) if st.get("streak") is not None else "--",
+            },
+            {"k": "活动截止", "v": st.get("end_time") or "--"},
+        ]
+        return {
+            "name": "workbuddy",
+            "title": "WorkBuddy加油站",
+            "brand": "#00C29A",
+            "brand2": "#00C885",
+            "icon": "wb",
+            "checked": bool(st.get("checked")),
+            "metric_label": "累计积分",
+            "metric_value": st.get("total"),
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return _card_error(
+            "workbuddy", "WorkBuddy加油站", "#00C29A", "#00C885", "wb", e
+        )
+
+
+def get_qf_card():
+    try:
+        if not QIANFAN_TOKEN:
+            raise RuntimeError("未配置千帆访问口令（QF_ACCESS_TOKEN）")
+        d = _http_json("%s/api/status?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN))
+        if not d.get("ok"):
+            raise RuntimeError(d.get("error") or "千帆状态获取失败")
+        data = d.get("data") or {}
+        signin = data.get("signin") or {}
+        points = data.get("points") or {}
+        # 最近一次签到：从 history 取最新一条
+        last_run = None
+        try:
+            h = _http_json(
+                "%s/api/history?days=7&token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN)
+            )
+            hs = h.get("data") or []
+            if hs:
+                rec = hs[0]
+                last_run = {
+                    "ts": rec.get("date"),
+                    "ok": rec.get("status") == "success",
+                    "message": rec.get("message"),
+                    "source": "qianfan",
+                }
+        except Exception:
+            pass
+        rows = [
+            {"k": "累计积分", "v": points.get("totalPoints", "--")},
+            {"k": "已签天数", "v": signin.get("totalTimes", "--")},
+            {"k": "已用积分", "v": points.get("usedPoints", "--")},
+        ]
+        return {
+            "name": "qianfan",
+            "title": "百度千帆每日签到",
+            "brand": "#4E6EF2",
+            "brand2": "#2932E1",
+            "icon": "qf",
+            "checked": bool(signin.get("signedToday")),
+            "metric_label": "可用积分",
+            "metric_value": points.get("available", "--"),
+            "last_run": last_run,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return _card_error("qianfan", "百度千帆每日签到", "#4E6EF2", "#2932E1", "qf", e)
+
+
+ADAPTERS = {
+    "workbuddy": get_wb_card,
+    "qianfan": get_qf_card,
+    "minimax": get_mm_card,
+    "lingxi": get_lx_card,
+    "linkai": get_lk_card,
+    "huawei": get_hw_card,
+    "trae": get_trae_card,
+}
+
+
+def _load_json_records(path, limit=30):
+    """读取本地 JSON 历史记录文件（列表），返回最近 limit 条（倒序，最新在前）。"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            # 正序文件：尾部是最新；反转后最新在前
+            data = data[-limit:]
+            return list(reversed(data))
+        if isinstance(data, dict):
+            return [data]
+        return []
+    except Exception:
+        return []
+
+
+def get_detail(name):
+    """返回某个平台的详细数据（签到历史 + 消耗/余额详情）。"""
+    if name == "workbuddy":
+        st = get_status()
+        history = _load_json_records(os.path.join(BASE_DIR, "last_run.json"), 30)
+        return {
+            "ok": True,
+            "name": name,
+            "title": "WorkBuddy 加油站",
+            "signin": {
+                "total": st.get("total"),
+                "today": st.get("today"),
+                "streak": st.get("streak"),
+                "checked": st.get("checked"),
+                "activity": st.get("activity"),
+                "end_time": st.get("end_time"),
+                "history": history,
+            },
+            "consumption": {
+                "remaining": st.get("remaining"),
+                "usage_yesterday": st.get("usage"),
+                "packages": st.get("packages", []),
+            },
+        }
+
+    if name == "qianfan":
+        if not QIANFAN_TOKEN:
+            raise RuntimeError("未配置千帆访问口令")
+        # 拉取最近 7 天签到历史
+        h = _http_json(
+            "%s/api/history?days=30&token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN)
+        )
+        hs = h.get("data") or []
+        d = _http_json("%s/api/status?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN))
+        data = d.get("data") or {}
+        points = data.get("points") or {}
+        signin = data.get("signin") or {}
+        # 千帆远程历史是正序旧→新，统一反转成最新在前
+        return {
+            "ok": True,
+            "name": name,
+            "title": "百度千帆",
+            "signin": {
+                "total_days": signin.get("totalTimes"),
+                "signed_today": signin.get("signedToday"),
+                "history": [
+                    {
+                        "date": x.get("date"),
+                        "status": x.get("status"),
+                        "message": x.get("message"),
+                    }
+                    for x in hs
+                ],
+            },
+            "consumption": {
+                "total_points": points.get("totalPoints"),
+                "available": points.get("available"),
+                "used": points.get("usedPoints"),
+            },
+        }
+
+    if name == "minimax":
+        p = _mm_panel()
+        history = _load_json_records(MM_STATE_FILE, 30)
+        days = p.get("days", [])
+        return {
+            "ok": True,
+            "name": name,
+            "title": "MiniMax Code",
+            "signin": {
+                "cycle_claimed": p.get("claimed_count"),
+                "cycle_total": len(days),
+                "cycle_points": p.get("cycle_points"),
+                "today_points": (p.get("today") or {}).get("points"),
+                "today_claimed": p.get("claimed_today"),
+                "history": history,
+            },
+            "consumption": {
+                "note": "MiniMax 暂未提供资源消耗查询接口",
+            },
+        }
+
+    if name == "trae":
+        history = _load_json_records(TRAE_STATE_FILE, 30)
+        # 获取当前 token 状态
+        credits = extra = checked = None
+        try:
+            d = _trae_api("status", 3)
+            checked = d.get("checked_in")
+            credits = d.get("credits")
+            extra = d.get("extra_credits")
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "name": name,
+            "title": "Trae Work",
+            "signin": {
+                "checked_today": checked,
+                "daily_credits": credits,
+                "extra_credits": extra,
+                "history": history,
+            },
+            "consumption": {
+                "note": "Trae 暂未提供资源消耗查询接口",
+            },
+        }
+
+    if name == "lingxi":
+        history = _load_json_records(LX_STATE_FILE, 30)
+        today = datetime.date.today().isoformat()
+        d = _lx_api("/?date=%s" % today)
+        data = d.get("data") or {}
+        tasks = data.get("tasks") or []
+        daily = next((t for t in tasks if t.get("task_key") == "daily_check_in"), {})
+        all_tasks = [
+            {
+                "key": t.get("task_key"),
+                "title": t.get("title"),
+                "reward": t.get("reward_amount"),
+                "status": t.get("status"),
+            }
+            for t in tasks
+        ]
+        return {
+            "ok": True,
+            "name": name,
+            "title": "WPS 灵犀",
+            "signin": {
+                "checked_today": daily.get("status") == "claimed",
+                "reward": daily.get("reward_amount", 100),
+                "history": history,
+                "tasks": all_tasks,
+            },
+            "consumption": {
+                "total_claimed": daily.get("total_claimed_credits"),
+            },
+        }
+
+    if name == "linkai":
+        return get_lk_detail()
+
+    if name == "huawei":
+        history = _load_json_records(HW_STATE_FILE, 30)
+        d = _hw_api("/v1/ops/delivery?channel=WEB")
+        items = (d.get("data") or {}).get("items") or []
+        camp = _hw_find_daily(items) or {}
+        checked = camp.get("status") in ("CLAIMED", "CONFIRMED", "CONSUMED")
+        return {
+            "ok": True,
+            "name": name,
+            "title": "华为码道每日签到",
+            "signin": {
+                "checked_today": checked,
+                "campaign_id": camp.get("campaignId"),
+                "benefit": "%s %s"
+                % (camp.get("benefitAmount"), camp.get("benefitUnit") or "CREDIT"),
+                "status": camp.get("status"),
+                "history": history,
+            },
+            "consumption": {
+                "note": "华为码道暂未提供资源消耗查询接口",
+            },
+        }
+
+    raise RuntimeError("未知平台：%s" % name)
+
+
+# ============================ 成长中心（一键完成任务） ============================
+# 复用 wb_growth 模块（纯标准库）。需要本地会话 token；服务端用 WB_TOKEN_FILE 指向明文 token.info。
+_GROWTH_RUN = {"running": False, "results": None, "updated": None, "error": None}
+
+
+def _load_session_safe():
+    try:
+        return load_session(find_token_file())
+    except Exception:
+        return None
+
+
+def get_growth_card():
+    """成长中心卡片（供签到中心网格展示）。失败返回错误卡，绝不抛异常。"""
+    if wb_growth is None:
+        return {"name": "growth", "title": "WorkBuddy 成长中心", "brand": "#7C5CFF",
+                "brand2": "#9D7BFF", "icon": "growth", "growth": True, "checked": False,
+                "metric_label": "已完成任务", "metric_value": "--", "rows": [],
+                "error": "成长中心模块未加载（wb_growth.py 缺失）"}
+    sess = _load_session_safe()
+    if not sess or not sess.get("access_token"):
+        return {"name": "growth", "title": "WorkBuddy 成长中心", "brand": "#7C5CFF",
+                "brand2": "#9D7BFF", "icon": "growth", "growth": True, "checked": False,
+                "metric_label": "已完成任务", "metric_value": "--", "rows": [],
+                "error": "未找到本地会话 token（服务器需 WB_TOKEN_FILE 指向明文 token.info）"}
+    card = wb_growth.get_growth_card(sess)
+    card["growth"] = True
+    return card
+
+
+def run_growth_background():
+    """后台执行一键完成任务，避免长连接被 nginx 代理超时打断。"""
+    global _GROWTH_RUN
+    _GROWTH_RUN["running"] = True
+    _GROWTH_RUN["error"] = None
+    try:
+        sess = _load_session_safe()
+        if not sess or not sess.get("access_token"):
+            _GROWTH_RUN["error"] = "未找到本地会话 token（WB_TOKEN_FILE 需指向明文 token.info）"
+            return
+        _GROWTH_RUN["results"] = wb_growth.run_all(sess)
+    except Exception as e:
+        _GROWTH_RUN["error"] = str(e)
+    finally:
+        _GROWTH_RUN["running"] = False
+        _GROWTH_RUN["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def get_center():
+    items = [fn() for fn in ADAPTERS.values()]
+    signed = sum(1 for it in items if it.get("checked"))
+    try:
+        items.append(get_growth_card())
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "server_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "signed_count": signed,
+        "total_count": len(ADAPTERS),
+        "items": items,
+    }
+
+
+def run_checkin_for(name):
+    """执行某个平台的签到，返回该平台最新卡片（已含本次结果）。"""
+    if name == "workbuddy":
+        do_checkin()  # 会写 last_run；失败抛异常
+        return get_wb_card()
+    if name == "qianfan":
+        if not QIANFAN_TOKEN:
+            raise RuntimeError("未配置千帆访问口令（QF_ACCESS_TOKEN）")
+        d = _http_json(
+            "%s/api/checkin/run?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN), method="POST"
+        )
+        if not d.get("ok"):
+            raise RuntimeError(d.get("error") or "千帆签到失败")
+        return get_qf_card()
+    if name == "minimax":
+        return run_mm_checkin()
+    if name == "trae":
+        return run_trae_checkin()
+    if name == "lingxi":
+        return run_lx_checkin()
+    if name == "linkai":
+        return run_lk_checkin()
+    if name == "huawei":
+        return run_hw_checkin()
+    raise RuntimeError("未知签到平台：%s" % name)
+
+
 # ============================ 手机页面 ============================
-PAGE = r"""<!DOCTYPE html>
+PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#6366f1">
-<title>Buddy 加油站 · 签到</title>
+<meta name="theme-color" content="#00C29A">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📋%3C/text%3E%3C/svg%3E">
+<title>签到中心</title>
 <style>
-:root{--bg1:#f6f7fb;--bg2:#eef1ff;--card:#fff;--ink:#1f2430;--sub:#7b8496;--line:#eceef4;--accent:#6366f1;--accent2:#8b5cf6;--ok:#12b76a;}
+:root{
+  --wb-brand-8:#00C29A;--wb-grad-a:#0EC7A8;--wb-grad-b:#00C885;
+  --bg1:#f4fbf9;--bg2:#e4f6f1;--card:#fff;
+  --ink:#0f172a;--sub:#64748b;--line:#eef2f5;
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;min-height:100%;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   background:linear-gradient(160deg,var(--bg1),var(--bg2));color:var(--ink);
-  display:flex;justify-content:center;padding:24px 16px 40px;}
-.wrap{width:100%;max-width:420px;}
-.brand{display:flex;align-items:center;gap:10px;margin:4px 4px 18px;}
-.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  display:flex;align-items:center;justify-content:center;font-size:21px;box-shadow:0 6px 16px rgba(99,102,241,.35);}
-.brand h1{font-size:17px;margin:0;font-weight:700;}
-.brand p{margin:3px 0 0;font-size:12px;color:var(--sub);}
-.card{background:var(--card);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(31,36,48,.08);}
-.hero{text-align:center;padding:6px 0 2px;}
-.hero .label{font-size:13px;color:var(--sub);}
-.hero .num{font-size:46px;font-weight:800;line-height:1.1;margin:6px 0 8px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
-.hero .unit{font-size:15px;color:var(--sub);margin-left:4px;-webkit-text-fill-color:var(--sub);}
-.badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:5px 13px;border-radius:999px;}
-.badge.done{color:var(--ok);background:rgba(18,183,106,.1);}
+  display:flex;justify-content:center;padding:22px 14px 44px;}
+.wrap{width:100%;max-width:440px;}
+.brand{display:flex;align-items:center;gap:11px;margin:2px 4px 14px;}
+.logo{width:42px;height:42px;flex:0 0 42px;font-size:36px;line-height:42px;text-align:center;}
+.brand h1{font-size:18px;margin:0;font-weight:800;letter-spacing:-.2px;}
+.brand p{margin:2px 0 0;font-size:12px;color:var(--sub);}
+.summary{background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:14px;
+  box-shadow:0 8px 24px rgba(0,97,77,.08);border:1px solid rgba(0,194,154,.1);}
+.summary .top{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700;}
+.summary .top .n{color:var(--wb-brand-8);}
+.bar{height:8px;border-radius:999px;background:#eef2f0;margin-top:10px;overflow:hidden;}
+.bar > i{display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(135deg,var(--wb-grad-a),var(--wb-grad-b));transition:width .5s ease;}
+#cards{display:flex;flex-direction:column;gap:14px;}
+.card{background:var(--card);border-radius:20px;padding:18px;
+  box-shadow:0 10px 30px rgba(15,23,42,.07);border:1px solid rgba(15,23,42,.04);
+  border-top:4px solid var(--c,#00C29A);
+  display:flex;flex-direction:column;}
+.card-main{display:flex;flex-direction:column;flex:1;min-height:0;gap:10px;}
+.card-main .cta,.card-main .cta-link{margin-top:auto;}
+.card-top{display:flex;align-items:center;gap:11px;}
+.cicon{width:40px;height:40px;flex:0 0 40px;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));}
+.cicon svg{display:block;width:100%;height:100%;}
+.ctitle{font-size:16px;font-weight:800;flex:1;}
+.badge{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;}
+.badge.done{color:#00614D;background:rgba(0,194,154,.14);}
 .badge.todo{color:#b54708;background:rgba(247,144,9,.14);}
-.rows{margin-top:16px;border-top:1px solid var(--line);}
-.row{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line);font-size:14px;}
+.metric{margin:14px 0 4px;}
+.metric .mlabel{font-size:12px;color:var(--sub);}
+.metric .mval{font-size:30px;font-weight:800;line-height:1.2;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+.rows{margin-top:8px;border-top:1px solid var(--line);}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line);font-size:13.5px;}
 .row:last-child{border-bottom:0;}
 .row .k{color:var(--sub);}
 .row .v{font-weight:600;}
-button.cta{width:100%;margin-top:18px;border:0;border-radius:16px;padding:17px;font-size:17px;font-weight:700;color:#fff;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 10px 22px rgba(99,102,241,.35);
+.last{font-size:12px;color:var(--sub);margin-top:10px;}
+button.cta{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));box-shadow:0 8px 18px rgba(0,0,0,.12);
   transition:transform .08s ease,opacity .2s ease;cursor:pointer;}
 button.cta:active{transform:scale(.985);}
-button.cta[disabled]{background:#c7cbd6;box-shadow:none;opacity:.9;}
-.hint{text-align:center;font-size:12px;color:var(--sub);margin-top:14px;line-height:1.6;}
-.msg{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14px;display:none;}
+button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
+.cta-link{display:block;width:100%;margin-top:14px;border-radius:14px;padding:15px;font-size:16px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,#64748b,#94a3b8);box-shadow:0 8px 18px rgba(0,0,0,.08);
+  text-align:center;text-decoration:none;cursor:pointer;}
+.card{cursor:pointer;transition:box-shadow .2s ease,transform .15s ease;}
+.card:hover{box-shadow:0 14px 40px rgba(15,23,42,.12);transform:translateY(-1px);}
+.card.expanded{cursor:default;transform:none;box-shadow:0 10px 30px rgba(15,23,42,.07);}
+.card .detail{display:none;margin-top:14px;padding-top:14px;border-top:2px solid var(--line);}
+.card.expanded .detail{display:block;}
+.card .detail .dtab{display:flex;gap:14px;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--sub);}
+.card .detail .dtab span{cursor:pointer;padding:4px 2px;border-bottom:2px solid transparent;}
+.card .detail .dtab span.on{color:var(--c,#00C29A);border-color:var(--c,#00C29A);}
+.card .detail .dsec{display:none;}
+.card .detail .dsec.on{display:block;}
+.card .detail .drow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+.card .detail .drow:last-child{border-bottom:0;}
+.card .detail .drow .dk{color:var(--sub);}
+.card .detail .drow .dv{font-weight:600;}
+.card .detail .dsec h4{margin:0 0 8px;font-size:13px;color:var(--c);opacity:.8;}
+.card .detail .dempty{text-align:center;padding:20px 0;color:var(--sub);font-size:12px;}
+.dloading{display:flex;align-items:center;justify-content:center;padding:24px 0;color:var(--sub);font-size:13px;}
+.dloading .spin{margin-right:8px;border-color:rgba(0,0,0,.15);border-top-color:var(--c,#00C29A);}
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--sub);padding:40px 0;font-size:14px;width:100%;grid-column:1 / -1;}
+.loading .spin{margin-right:0;border-color:rgba(0,0,0,.12);border-top-color:var(--wb-brand-8);}
+.msg{margin-top:14px;padding:11px 14px;border-radius:12px;font-size:14px;display:none;}
 .msg.show{display:block;}
-.msg.ok{background:rgba(18,183,106,.1);color:#05603a;}
+.msg.ok{background:rgba(0,194,154,.12);color:#00614D;}
 .msg.err{background:rgba(240,68,56,.1);color:#912018;}
 .keybox{display:none;margin-top:14px;}
 .keybox.show{display:block;}
 .keybox input{width:100%;padding:13px;border-radius:12px;border:1px solid #dfe3ec;font-size:16px;}
-.spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
-  border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:8px;}
+.keybox input:focus{outline:none;border-color:var(--wb-brand-8);box-shadow:0 0 0 3px rgba(0,194,154,.15);}
+.hint{text-align:center;font-size:12px;color:var(--sub);margin-top:16px;line-height:1.6;}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
+  border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:7px;}
 @keyframes sp{to{transform:rotate(360deg)}}
+@media (min-width:1024px){
+  .wrap{max-width:1200px;}
+  #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px;}
+  .brand h1{font-size:22px;}
+  .brand p{font-size:14px;}
+  .summary .top{font-size:16px;}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="brand">
-    <div class="logo">🐵</div>
+    <div class="logo">📋</div>
     <div>
-      <h1>Buddy 加油站 · 每日签到</h1>
-      <p id="sub">正在读取活动状态…</p>
+      <h1>签到中心</h1>
+      <p>多个签到一目了然 · 一键完成</p>
     </div>
   </div>
 
-  <div class="card">
-    <div class="hero">
-      <div class="label">当前累计积分</div>
-      <div class="num"><span id="total">--</span><span class="unit">分</span></div>
-      <div id="badge" class="badge todo">读取中…</div>
-    </div>
-    <div class="rows">
-      <div class="row"><span class="k">今日已得</span><span class="v" id="today">--</span></div>
-      <div class="row"><span class="k">资源余额</span><span class="v" id="remaining">--</span></div>
-      <div class="row"><span class="k">昨日用量</span><span class="v" id="usage">--</span></div>
-      <div class="row"><span class="k">连续签到</span><span class="v" id="streak">--</span></div>
-      <div class="row"><span class="k">活动截止</span><span class="v" id="end">--</span></div>
-      <div class="row"><span class="k">上次签到</span><span class="v" id="last">--</span></div>
-    </div>
-    <button id="btn" class="cta" disabled>读取中…</button>
-    <div id="msg" class="msg"></div>
-    <div id="keybox" class="keybox">
-      <input id="key" type="password" inputmode="numeric" placeholder="输入访问口令后回车">
-    </div>
+  <div class="summary">
+    <div class="top"><span>今日签到进度</span><span class="n" id="summary">-- / --</span></div>
+    <div class="bar"><i id="prog"></i></div>
   </div>
-  <div class="hint">服务器已开启 <b>每天 09:10 自动签到</b><br>你随时来看看记录就行 · 下方按钮是手动备用</div>
+
+  <div id="cards"><div class="loading">加载中…</div></div>
+
+  <div id="msg" class="msg"></div>
+  <div id="keybox" class="keybox">
+    <input id="key" type="password" inputmode="numeric" placeholder="输入访问口令后回车">
+  </div>
+
+  <div class="hint">所有签到均在服务端执行，数据来自各平台官方接口<br>新增签到只需在服务端加一个适配器，本页自动多出一张卡</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260916-1</div>
 </div>
 
 <script>
-var KEY_STORE = "wb_checkin_key";
+var KEY_STORE = "wb_center_key";
 function $(id){ return document.getElementById(id); }
 function getKey(){ try { return localStorage.getItem(KEY_STORE) || ""; } catch(e){ return ""; } }
-function setSub(t){ $("sub").textContent = t; }
-function showMsg(t, kind){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok"); }
-function hideMsg(){ $("msg").className = "msg"; }
-function nz(v, d){ return (v===null || v===undefined) ? d : v; }
+function nz(v,d){ return (v===null||v===undefined)?d:v; }
+function esc(s){ s=String(s==null?"":s); return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-function api(path, opts){
-  // 用相对路径（不带开头 /），这样无论挂在 http://ip:8765/ 还是 https://域名/buddy/ 下都能正确请求
-  var k = getKey();
-  var url = path + (k ? (path.indexOf("?")>=0 ? "&" : "?") + "k=" + encodeURIComponent(k) : "");
-  return fetch(url, opts || {}).then(function(r){
-    if (r.status === 401){ var e = new Error("need key"); e.needKey = true; throw e; }
-    return r.json();
+var ICON_WB = `__WB_SVG__`;
+var ICON_QF = `__QF_SVG__`;
+var ICON_MM = `__MM_SVG__`;
+var ICON_TRAE = `__TRAE_SVG__`;
+var ICON_LK = `__LK_SVG__`;
+var ICON_LX = `__LX_SVG__`;
+var ICON_HW = `__HW_SVG__`;
+var ICON_GROWTH = `__GROWTH_SVG__`;
+function iconFor(it){
+  if(it.icon==="wb") return ICON_WB;
+  if(it.icon==="qf") return ICON_QF;
+  if(it.icon==="mm") return ICON_MM;
+  if(it.icon==="trae") return ICON_TRAE;
+  if(it.icon==="lk") return ICON_LK;
+  if(it.icon==="lx") return ICON_LX;
+  if(it.icon==="huawei") return ICON_HW;
+  if(it.icon==="growth") return ICON_GROWTH;
+  return '<div style="font-size:20px">🪙</div>';
+}
+function fmtLast(lr){
+  if(lr&&lr.ts){
+    var tag = (lr.source==="web")?"手动":(lr.source==="qianfan")?"百度千帆":"自动";
+    return (lr.ok?"✅ ":"⚠️ ")+tag+" "+String(lr.ts).slice(5,16);
+  }
+  return "暂无记录";
+}
+function cardHTML(it){
+  if(it.growth) return growthCardHTML(it);
+  var needsAuth = it.needs_auth;
+  var badge;
+  if(it.checked) badge = '<span class="badge done">今天已签到 ✅</span>';
+  else if(needsAuth) badge = '<span class="badge todo">未配置</span>';
+  else badge = '<span class="badge todo">今天还没签</span>';
+  var rows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
+  var last = it.last_run ? fmtLast(it.last_run) : "暂无记录";
+  var btn;
+  if(needsAuth){
+    btn = '<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>';
+  } else {
+    btn = it.checked ? '<button class="cta" disabled>' : '<button class="cta" data-name="'+esc(it.name)+'">';
+    if(!it.checked) btn += '立即签到'; else btn += '今日已签到';
+    btn += '</button>';
+  }
+  var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
+  return ''+
+    '<div class="card" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
+      '<div class="card-main">'+
+        '<div class="card-top">'+
+          '<div class="cicon">'+iconFor(it)+'</div>'+
+          '<div class="ctitle">'+esc(it.title)+'</div>'+ badge +
+        '</div>'+
+        '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
+        '<div class="rows">'+rows+'</div>'+
+        '<div class="last">上次签到：'+last+'</div>'+
+        btn + err +
+      '</div>'+
+      '<div class="detail" id="detail-'+esc(it.name)+'"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
+    '</div>';
+}
+function growthCardHTML(it){
+  var claimable = it.claimable||0;
+  var level = it.level ? ('Lv.'+esc(it.level)) : "";
+  var badge = claimable>0
+    ? '<span class="badge todo">可领 '+claimable+' 项</span>'
+    : '<span class="badge done">已领完 ✅</span>';
+  if(it.error){
+    badge = '<span class="badge todo">读取失败</span>';
+  }
+  var btn = it.error
+    ? '<button class="cta growth-run" data-name="growth" disabled style="background:#cbd5d2">无法读取（见详情）</button>'
+    : '<button class="cta growth-run" data-name="growth">🚀 一键完成任务</button>';
+  var lvRow = level ? '<div class="rows"><div class="row"><span class="k">当前等级</span><span class="v">'+level+'</span></div></div>' : '';
+  var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
+  return ''+
+    '<div class="card growth-card" data-name="growth" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
+      '<div class="card-main">'+
+        '<div class="card-top">'+
+          '<div class="cicon">'+iconFor(it)+'</div>'+
+          '<div class="ctitle">'+esc(it.title)+'</div>'+ badge +
+        '</div>'+
+        '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
+        lvRow +
+        btn + err +
+      '</div>'+
+      '<div class="detail" id="detail-growth"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
+    '</div>';
+}
+function toggleDetail(name){
+  var card = document.querySelector('.card[data-name="'+name+'"]');
+  if(!card) return;
+  var isExpanded = card.classList.contains('expanded');
+  Array.prototype.forEach.call(document.querySelectorAll('.card.expanded'), function(c){
+    if(c !== card){
+      c.classList.remove('expanded');
+      var dn = c.querySelector('.detail');
+      if(dn) dn.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+    }
+  });
+  if(isExpanded){
+    card.classList.remove('expanded');
+    var dn = card.querySelector('.detail');
+    if(dn) dn.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+  } else {
+    card.classList.add('expanded');
+    loadDetail(name);
+  }
+}
+function renderDetail(d, name){
+  var detail = $('detail-'+name);
+  if(!detail) return;
+  if(!d.ok){
+    detail.innerHTML = '<div class="card-err">⚠️ '+esc(d.error||'加载失败')+'</div>';
+    return;
+  }
+  var signin = d.signin || {};
+  var consumption = d.consumption || {};
+  var signinHTML = '';
+  if(d.name === 'workbuddy'){
+    signinHTML += '<div class="drow"><span class="dk">累计积分</span><span class="dv">'+esc(signin.total||'--')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">今日已得</span><span class="dv">+'+esc(signin.today||'0')+' 分</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">连续签到</span><span class="dv">'+esc(signin.streak||'0')+' 天</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">当前活动</span><span class="dv">'+esc(signin.activity||'--')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">活动截止</span><span class="dv">'+esc(signin.end_time||'--')+'</span></div>';
+  } else if(d.name === 'qianfan'){
+    signinHTML += '<div class="drow"><span class="dk">累计签到天数</span><span class="dv">'+esc(signin.total_days||'--')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">今日已签</span><span class="dv">'+(signin.signed_today?'✅ 已签':'❌ 未签')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">积分总量</span><span class="dv">'+esc(consumption.total_points||'--')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">可用积分</span><span class="dv">'+esc(consumption.available||'--')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">已用积分</span><span class="dv">'+esc(consumption.used||'--')+'</span></div>';
+  } else if(d.name === 'minimax'){
+    signinHTML += '<div class="drow"><span class="dk">本轮签到</span><span class="dv">'+esc(signin.cycle_claimed||'0')+' / '+esc(signin.cycle_total||'7')+' 天</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">本轮总奖励</span><span class="dv">'+esc(signin.cycle_points||'0')+' 积分</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">今日奖励</span><span class="dv">+'+esc(signin.today_points||'--')+' 积分</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">'+(signin.today_claimed?'✅ 已签':'❌ 未签')+'</span></div>';
+  } else if(d.name === 'trae'){
+    signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">'+(signin.checked_today?'✅ 已签':'❌ 未签')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">每日奖励</span><span class="dv">+'+esc(signin.daily_credits||'--')+' 积分</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">会员额外</span><span class="dv">+'+esc(signin.extra_credits||'--')+' 积分</span></div>';
+  } else if(d.name === 'lingxi'){
+    signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">'+(signin.checked_today?'✅ 已签':'❌ 未签')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">每日奖励</span><span class="dv">+'+esc(signin.reward||'100')+' 智点</span></div>';
+    var tasks = signin.tasks || [];
+    if(tasks.length){
+      signinHTML += '<div class="drow"><span class="dk">可用任务</span><span class="dv">'+tasks.length+' 个</span></div>';
+    }
+    if(consumption.total_claimed != null){
+      signinHTML += '<div class="drow"><span class="dk">累计签到</span><span class="dv">'+esc(consumption.total_claimed)+' 次</span></div>';
+    }
+  }
+  var history = signin.history || [];
+  var historyHTML = '';
+  if(history.length){
+historyHTML = '<h4>签到历史</h4>';
+historyHTML += history.slice(0,5).map(function(h){
+      var ok = h.ok===true || h.ok===1 || h.status==="signed" || h.status==="success" || h.status==="ok" || h.status===1 || h.status==="1";
+      return '<div class="drow"><span class="dk">'+esc(h.ts||h.date||'--')+'</span><span class="dv">'+(ok?'✅ ':'⚠️ ')+esc(h.message||(ok?'签到成功':'未签到'))+'</span></div>';
+    }).join('');
+  } else {
+    historyHTML = '<div class="dempty">暂无签到历史记录</div>';
+  }
+  var consumeHTML = '';
+  if(d.name === 'workbuddy'){
+    consumeHTML += '<div class="drow"><span class="dk">资源余额</span><span class="dv">'+esc(consumption.remaining||'--')+' 分</span></div>';
+    consumeHTML += '<div class="drow"><span class="dk">昨日消耗</span><span class="dv">'+esc(consumption.usage_yesterday||'--')+' 分</span></div>';
+    var pkgs = consumption.packages || [];
+    if(pkgs.length){
+      consumeHTML += '<h4>资源包</h4>';
+consumeHTML += pkgs.map(function(p){
+        return '<div class="drow"><span class="dk">'+esc(p.name||'资源包')+'</span><span class="dv">剩 '+esc(nz(p.remain,'--'))+' / 共 '+esc(nz(p.capacity,'--'))+'</span></div>';
+      }).join('');
+    }
+  } else if(d.name === 'qianfan'){
+    consumeHTML += '<div class="drow"><span class="dk">总积分</span><span class="dv">'+esc(consumption.total_points||'--')+'</span></div>';
+    consumeHTML += '<div class="drow"><span class="dk">可用积分</span><span class="dv">'+esc(consumption.available||'--')+'</span></div>';
+    consumeHTML += '<div class="drow"><span class="dk">已用积分</span><span class="dv">'+esc(consumption.used||'--')+'</span></div>';
+  } else if(d.name === 'minimax' || d.name === 'trae'){
+    consumeHTML += '<div class="dempty">'+esc(consumption.note||'暂无消耗数据')+'</div>';
+  } else if(d.name === 'lingxi'){
+    if(consumption.total_claimed != null){
+      consumeHTML += '<div class="drow"><span class="dk">累计智点</span><span class="dv">'+esc(consumption.total_claimed)+'</span></div>';
+    } else {
+      consumeHTML += '<div class="dempty">暂无消耗数据</div>';
+    }
+  }
+detail.innerHTML = ''+
+    '<div class="dtab"><span class="on" data-tab="signin">签到详情</span><span data-tab="consume">消耗详情</span></div>'+
+    '<div class="dsec on" id="dsec-'+name+'-signin">'+signinHTML+historyHTML+'</div>'+
+    '<div class="dsec" id="dsec-'+name+'-consume">'+consumeHTML+'</div>';
+  var tabs = detail.querySelectorAll('.dtab span');
+  Array.prototype.forEach.call(tabs, function(t){
+    t.addEventListener('click', function(){ switchTab(t, name, t.getAttribute('data-tab')); });
   });
 }
-
-function render(s){
-  if (!s) return;
-  $("total").textContent = nz(s.total, "--");
-  $("today").textContent = (s.today != null ? "+" + s.today : "--") + " 分";
-  $("remaining").textContent = (s.remaining != null ? s.remaining : "--") + " 分";
-  $("usage").textContent = (s.usage != null ? s.usage : "--") + " 分";
-  $("streak").textContent = nz(s.streak, "--") + " 天";
-  $("end").textContent = nz(s.end_time, "--");
-  var lr = s.last_run;
-  if (lr && lr.ts){
-    var tag = (lr.source === "web") ? "手动" : "自动";
-    $("last").textContent = (lr.ok ? "✅ " : "⚠️ ") + tag + " " + lr.ts.slice(5, 16);
-    $("last").title = lr.message || "";
-  } else {
-    $("last").textContent = "暂无记录";
-  }
-  var b = $("badge"), btn = $("btn");
-  if (s.checked){
-    b.className = "badge done"; b.textContent = "今天已签到 ✅";
-    btn.disabled = true; btn.textContent = "今日已签到";
-  } else {
-    b.className = "badge todo"; b.textContent = "今天还没签";
-    btn.disabled = false; btn.textContent = "立即签到";
-  }
-  var parts = [];
-  if (s.activity) parts.push(s.activity);
-  if (s.theme) parts.push("· " + s.theme);
-  if (s.season) parts.push("第" + s.season + "期");
-  setSub(parts.join(" ") || "WorkBuddy 签到活动");
+function switchTab(el, name, tab){
+  var tabs = el.parentElement.querySelectorAll('span');
+  Array.prototype.forEach.call(tabs, function(t){ t.className = ''; });
+  el.className = 'on';
+  var secs = document.querySelectorAll('#detail-'+name+' .dsec');
+  Array.prototype.forEach.call(secs, function(s){ s.className = 'dsec'; });
+  $('dsec-'+name+'-'+tab).className = 'dsec on';
 }
-
+function loadDetail(name){
+  var detail = $('detail-'+name);
+  if(!detail) return;
+  if(name==="growth"){
+    detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+    api("api/growth").then(function(d){ renderGrowth(d, name); }).catch(function(e){
+      detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
+    });
+    return;
+  }
+  detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+  api('api/detail?name='+encodeURIComponent(name)).then(function(d){
+    renderDetail(d, name);
+  }).catch(function(e){
+    detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
+  });
+}
+function renderGrowth(d, name){
+  var detail = $('detail-'+name);
+  if(!detail) return;
+  if(!d.ok){ detail.innerHTML='<div class="card-err">⚠️ '+esc(d.error||'加载失败')+'</div>'; return; }
+  var card = d.card||{};
+  var rows = card.rows||[];
+  var html = '';
+  if(d.running){
+    html += '<div class="dloading" style="padding:14px 0"><span class="spin"></span> 任务后台执行中…</div>';
+  }
+  html += '<div class="dsec on">';
+  if(!d.running){
+    html += '<button class="cta growth-run" data-name="growth" style="margin-bottom:10px">🚀 一键完成全部任务</button>';
+    html += '<div style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.5">已得奖励可一键领取；标注「需真实使用」的任务需在 WorkBuddy 客户端完成对应操作（如召唤专家、打开 Buddy 应用、使用模板、夜间访问）后才会记功，自动化仅做事件上报尝试。</div>';
+  }
+  if(rows.length){
+    html += rows.map(function(t){
+      var st;
+      if(t.done) st = '<span style="color:#00614D;font-weight:700">✅ 已完成</span>';
+      else if(t.not_auto) st = '<span style="color:#b54708;font-weight:700">🔒 需手动</span>';
+      else st = '<span style="color:#b54708;font-weight:700">⏳ 待完成</span>';
+      var rw = t.reward ? ('+'+t.reward+'分') : '';
+      var en = (t.energy||0) ? (' · '+t.energy+'能量') : '';
+      return '<div class="drow"><span class="dk">'+esc(t.title)+'</span><span class="dv">'+st+'<br><small style="color:#64748b">'+rw+en+'</small></span></div>';
+    }).join('');
+  } else {
+    html += '<div class="dempty">暂无任务数据</div>';
+  }
+  if(d.results && d.results.length){
+    var ok=0; d.results.forEach(function(r){ if(r.ok) ok++; });
+    html += '<div class="drow" style="margin-top:6px"><span class="dk">上次执行</span><span class="dv">成功 '+ok+' / '+d.results.length+(d.updated?(' · '+esc(d.updated.slice(5))):'')+'</span></div>';
+  } else if(d.run_error){
+    html += '<div class="card-err" style="margin-top:8px">⚠️ '+esc(d.run_error)+'</div>';
+  }
+  html += '</div>';
+  detail.innerHTML = html;
+  var btns = detail.querySelectorAll('button.growth-run');
+  Array.prototype.forEach.call(btns, function(b){ b.addEventListener('click', function(){ runGrowth(b); }); });
+}
+function runGrowth(btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>任务进行中…'; }
+  showMsg("成长中心任务正在后台执行，请稍候…","ok");
+  api("api/growth/run",{method:"POST"}).then(function(d){
+    if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成全部任务"; } return; }
+    pollGrowth();
+  }).catch(function(e){
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    else showMsg("网络错误："+(e&&e.message),"err");
+    if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成全部任务"; }
+  });
+}
+function pollGrowth(){
+  api("api/growth").then(function(d){
+    if(d.running){ setTimeout(pollGrowth, 2500); return; }
+    var ok=0, tot=(d.results||[]).length;
+    (d.results||[]).forEach(function(r){ if(r.ok) ok++; });
+    if(tot) showMsg("成长中心：成功 "+ok+" / "+tot+" 项 ✅","ok");
+    else if(d.run_error) showMsg("执行出错："+d.run_error,"err");
+    load();
+    if(document.querySelector('.card.growth-card.expanded')){ loadDetail('growth'); }
+  }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
+}
+function showMsg(t,kind){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok"); }
+function hideMsg(){ $("msg").className="msg"; }
+function api(path,opts){
+  var k=getKey();
+  var url=path+(k?(path.indexOf("?")>=0?"&":"?")+"k="+encodeURIComponent(k):"");
+  return fetch(url,opts||{}).then(function(r){ if(r.status===401){var e=new Error("need key");e.needKey=true;throw e;} return r.json(); });
+}
+function renderCenter(d){
+  if(!d.ok){ $("summary").textContent="读取失败"; showMsg(d.error||"读取失败","err"); return; }
+  $("summary").textContent = "已签 "+d.signed_count+" / "+d.total_count;
+  var pct = d.total_count ? Math.round(d.signed_count/d.total_count*100) : 0;
+  $("prog").style.width = pct+"%";
+  $("cards").innerHTML = d.items.map(cardHTML).join("");
+  // 卡片点击展开详情
+  Array.prototype.forEach.call(document.querySelectorAll('.card'), function(c){
+    c.addEventListener('click', function(e){
+      var name = c.getAttribute('data-name');
+      if(!name) return;
+// 避免按钮/链接/tab切换点击触发卡片展开
+      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.dtab')) return;
+      toggleDetail(name);
+    });
+  });
+  // 按钮签到（成长中心按钮单独走 runGrowth，不参与签到逻辑）
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.growth-run)"), function(b){
+    b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("button.growth-run"), function(b){
+    b.addEventListener("click", function(){ runGrowth(b); });
+  });
+}
 function load(){
   hideMsg();
-  api("api/status").then(function(d){
-    if (!d.ok){ setSub("读取失败"); showMsg(d.error || "读取失败", "err"); return; }
-    render(d);
-  }).catch(function(e){
-    if (e && e.needKey){ $("keybox").className = "keybox show"; setSub("需要访问口令"); showMsg("请输入访问口令后回车", "err"); }
-    else { setSub("网络错误"); showMsg("连接失败：" + (e && e.message), "err"); }
+  $("cards").innerHTML = '<div class="loading"><span class="spin"></span><span class="ld">加载中…</span></div>';
+  api("api/center").then(renderCenter).catch(function(e){
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    else { showMsg("连接失败："+(e&&e.message),"err"); }
   });
 }
-
-function checkin(){
-  var btn = $("btn");
-  hideMsg();
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>签到中…';
-  api("api/checkin", {method:"POST"}).then(function(d){
-    if (!d.ok){ showMsg(d.error || "签到失败", "err"); if (d.status) render(d.status); else btn.disabled=false, btn.textContent="立即签到"; }
-    else { showMsg(d.message, "ok"); render(d.status); }
+function doCheckin(name,btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>签到中…'; }
+  api("api/center/checkin?name="+encodeURIComponent(name),{method:"POST"}).then(function(d){
+    if(!d.ok){ showMsg(d.error||"签到失败","err"); }
+    else { showMsg((d.card&&d.card.title?d.card.title:"签到")+" 已更新 ✅","ok"); }
+    load();
   }).catch(function(e){
-    if (e && e.needKey){ $("keybox").className = "keybox show"; showMsg("请输入访问口令后回车", "err"); }
-    else { showMsg("网络错误：" + (e && e.message), "err"); }
-    btn.disabled = false; btn.textContent = "立即签到";
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    else { showMsg("网络错误："+(e&&e.message),"err"); }
+    if(btn){ btn.disabled=false; btn.textContent="立即签到"; }
   });
 }
-
-$("btn").addEventListener("click", checkin);
 $("key").addEventListener("change", function(e){
   try { localStorage.setItem(KEY_STORE, e.target.value.trim()); } catch(err){}
   load();
@@ -400,6 +2205,14 @@ load();
 </body>
 </html>
 """
+PAGE = PAGE.replace("__WB_SVG__", WB_SVG)
+PAGE = PAGE.replace("__QF_SVG__", QF_SVG)
+PAGE = PAGE.replace("__MM_SVG__", MM_SVG)
+PAGE = PAGE.replace("__TRAE_SVG__", TRAE_SVG)
+PAGE = PAGE.replace("__LK_SVG__", LK_SVG)
+PAGE = PAGE.replace("__LX_SVG__", LX_SVG)
+PAGE = PAGE.replace("__HW_SVG__", HW_SVG)
+PAGE = PAGE.replace("__GROWTH_SVG__", GROWTH_SVG)
 
 
 # ============================ HTTP 服务 ============================
@@ -419,7 +2232,9 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def _json(self, code, obj):
-        self._send(code, json.dumps(obj, ensure_ascii=False), "application/json; charset=utf-8")
+        self._send(
+            code, json.dumps(obj, ensure_ascii=False), "application/json; charset=utf-8"
+        )
 
     def _key_ok(self, query):
         if not ACCESS_KEY:
@@ -443,7 +2258,55 @@ class Handler(BaseHTTPRequestHandler):
                 r["server_time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 self._json(200, r)
             except Exception as e:
-                self._json(200, {"ok": False, "error": str(e), "last_run": read_last_run()})
+                self._json(
+                    200, {"ok": False, "error": str(e), "last_run": read_last_run()}
+                )
+            return
+        if u.path == "/api/center":
+            if not self._key_ok(parse_qs(u.query)):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                self._json(200, get_center())
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/growth":
+            if not self._key_ok(parse_qs(u.query)):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                card = get_growth_card()
+                self._json(200, {
+                    "ok": True,
+                    "card": card,
+                    "running": _GROWTH_RUN["running"],
+                    "results": _GROWTH_RUN["results"],
+                    "updated": _GROWTH_RUN["updated"],
+                    "run_error": _GROWTH_RUN["error"],
+                })
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/detail":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            name = (q.get("name") or [""])[0]
+            try:
+                self._json(200, get_detail(name))
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/growth":
+            if not self._key_ok(parse_qs(u.query)):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                self._json(200, get_growth_card())
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
             return
         self._send(404, "not found", "text/plain; charset=utf-8")
 
@@ -457,9 +2320,45 @@ class Handler(BaseHTTPRequestHandler):
                 r = do_checkin()
                 r["ok"] = True
                 r["last_run"] = read_last_run()
+                # 让响应结构与 /api/status 对齐：把 last_run 一并塞进 status，
+                # 这样前端 render(d.status) 也能正确显示「上次签到」（否则签到后显示暂无记录）
+                if isinstance(r.get("status"), dict):
+                    r["status"]["last_run"] = r["last_run"]
                 self._json(200, r)
             except Exception as e:
-                self._json(200, {"ok": False, "error": str(e), "last_run": read_last_run()})
+                self._json(
+                    200, {"ok": False, "error": str(e), "last_run": read_last_run()}
+                )
+            return
+        if u.path == "/api/center/checkin":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            name = (q.get("name") or [""])[0]
+            try:
+                card = run_checkin_for(name)
+                self._json(200, {"ok": True, "name": name, "card": card})
+            except Exception as e:
+                self._json(200, {"ok": False, "name": name, "error": str(e)})
+            return
+        if u.path == "/api/growth/run":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                if wb_growth is None:
+                    self._json(200, {"ok": False, "error": "成长中心模块未加载"})
+                    return
+                if _GROWTH_RUN["running"]:
+                    self._json(200, {"ok": True, "started": True, "running": True})
+                    return
+                t = threading.Thread(target=run_growth_background, daemon=True)
+                t.start()
+                self._json(200, {"ok": True, "started": True, "running": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
             return
         self._send(404, "not found", "text/plain; charset=utf-8")
 
@@ -480,6 +2379,9 @@ def lan_ip():
 
 
 def main():
+    if "--daily" in sys.argv:
+        run_daily_all()
+        return
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
@@ -500,6 +2402,44 @@ def main():
         print("\n已停止。")
     finally:
         httpd.server_close()
+
+
+def run_daily_all():
+    """--daily：按固定顺序执行全部平台签到（WorkBuddy/千帆/MiniMax/Trae/灵犀）。
+    每个平台失败不中断后续平台；逐项输出结果，供 systemd journal 查看。"""
+    banner = "=" * 56
+    print(banner)
+    print("多平台每日签到  %s" % datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    print(banner)
+    order = [
+        ("workbuddy", "WorkBuddy"),
+        ("qianfan", "百度千帆"),
+        ("minimax", "MiniMax Code"),
+        ("trae", "Trae Work"),
+        ("lingxi", "WPS 灵犀"),
+        ("linkai", "Link AI"),
+        ("huawei", "华为码道"),
+    ]
+    summary = []
+    for key, label in order:
+        try:
+            card = run_checkin_for(key)
+            checked = bool(card.get("checked"))
+            row = next(
+                (r for r in (card.get("rows") or []) if r.get("k") == "签到状态"), None
+            )
+            note = row.get("v", "") if row else ""
+            msg = "✅ 已签到" if checked else "⚠️ 未签到"
+            summary.append("%s %s%s" % (label, msg, ("（%s）" % note) if note else ""))
+            print("[%s] %s %s" % (label, msg, note))
+        except Exception as e:
+            summary.append("%s ❌ %s" % (label, e))
+            print("[%s] 失败: %s" % (label, e))
+    print(banner)
+    for s in summary:
+        print(s)
+    print(banner)
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":

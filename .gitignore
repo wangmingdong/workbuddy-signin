@@ -3,11 +3,32 @@ token.info
 last_run.json
 *.info
 
+# 本地环境变量（含 ECS 密码 / 访问口令，禁止入库；.env.example 保留为模板）
+.env
+.env.*
+!.env.example
+
+# 智能体私有数据（含明文口令笔记，禁止入库）
+.workbuddy/
+
+# 历史临时探测脚本（含 ECS 明文密码，非交付物，禁止入库）
+_trash/
+
 # 含 ECS root 密码的部署脚本，禁止入库
 deploy*.py
 change_key.py
 explore*.py
 verify*.py
+
+# 华为凭据与运行时产物（含敏感信息，禁止入库）
+hw_credentials.json
+hw_cookie.txt
+hw_cookies.json
+hw_keeper.heartbeat
+hw_keeper.log
+hw_keeper.out.log
+hw_autopush.log
+hw_need_login.flag
 
 # 接口探测/调试产物（非交付物，排查接口时临时生成）
 probe*.py
@@ -22,3 +43,7 @@ checkin.log
 # Python 缓存
 __pycache__/
 *.pyc
+mm_web_token.json
+mm_token.json
+trae_jwt.txt
+lx_cookie.txt
