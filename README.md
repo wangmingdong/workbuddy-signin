@@ -12,11 +12,15 @@ WorkBuddy 登录后，会把登录凭证（accessToken）以明文存在你电�
 | `workbuddy_checkin.py` | WorkBuddy 核心脚本：读 token → 查状态 → 未签则签到 |
 | `run_checkin.bat` | 启动器（自动找 Python，输出日志到 `checkin.log`） |
 | `setup_task.ps1` | 一键注册 Windows 计划任务（每天 09:10 自动跑） |
-| `web_server.py` | **手机网页版**服务（纯标准库；含 WorkBuddy/百度千帆/MiniMax Code/Trae Work/WPS 灵犀 5 个签到适配器；`--daily` 模式供服务器定时跑全部平台） |
+| `web_server.py` | **手机网页版**服务（纯标准库；含 WorkBuddy/百度千帆/MiniMax Code/Trae Work/WPS 灵犀/Link AI/华为码道/Qoder 8 个签到适配器；`--daily` 模式供服务器定时跑全部平台） |
 | `wb_icon.py` | 各平台官方图标（64×64 圆角内联 SVG/PNG） |
 | `mm_web_token.json` | MiniMax Code 网页登录 JWT（约 40 天，已配置） |
 | `trae_cookie.txt` | Trae Work 登录 Cookie 串（约 14 天，**待提供**） |
 | `lx_cookie.txt` | WPS 灵犀登录 Cookie 串（**待提供**） |
+| `linkai_token.txt` | Link AI 登录 token |
+| `hw_cookie.txt` | 华为码道登录 Cookie 串（由 `hw_autopush.py` 自动同步） |
+| `qoder_token.txt` | Qoder 登录 token（约 1 个月，由 `push_qoder.bat` 从本机客户端取出并推送） |
+| `push_qoder.bat` | 一键把本机 Qoder 客户端的最新 token 推到服务器（登录态失效时双击） |
 | `start_web.bat` | 启动网页版服务，并打印手机访问地址 |
 | `install_autostart.bat` | 可选：让网页版开机自动后台运行（无需管理员） |
 
@@ -28,7 +32,7 @@ WorkBuddy 登录后，会把登录凭证（accessToken）以明文存在你电�
 本项目**核心代码已配置化**：所有敏感信息（ECS 密码、网页访问口令、各平台 token/cookie）都从环境变量读取，不写死在代码里。
 
 - 服务端 `web_server.py` 等读取 `WB_ACCESS_KEY` / `QF_ACCESS_TOKEN` / `TRAE_COOKIE` / `HW_COOKIE` …（生产由 systemd 注入）。
-- 本地运维脚本（`check_112_hw.py` / `build_center_preview.py` / `hw_watch_login.py` / `hw_autopush.py` / `install_hw_keepalive.py` / `check_now.py`）统一从项目根目录的 `.env` 读取 `ECS_HOST` / `ECS_PORT` / `ECS_USER` / `ECS_PASS` / `ACCESS_KEY`，由 `envconf.py` 加载。
+- 本地运维脚本（`check_112_hw.py` / `build_center_preview.py` / `hw_watch_login.py` / `hw_autopush.py` / `install_hw_keepalive.py` / `qoder_push.py` / `check_now.py`）统一从项目根目录的 `.env` 读取 `ECS_HOST` / `ECS_PORT` / `ECS_USER` / `ECS_PASS` / `ACCESS_KEY`，由 `envconf.py` 加载。
 
 **别人拿到仓库后怎么配：**
 1. 复制 `.env.example` 为 `.env`：`cp .env.example .env`
@@ -77,28 +81,47 @@ schtasks /run /tn WorkBuddyDailyCheckin
 **签到已经由服务器自动完成**：服务器上的 systemd 定时器 `wb-checkin-daily.timer` **每天 09:10 自动签到**（若那一刻服务器不可用，恢复后会补跑），你什么都不用做。
 网页 `http://SERVER_IP_112/checkin/` 只是**用来看记录**（今天各平台是否已签 / 上次签到时间）；页面上的按钮是**手动备用**——万一定时没跑成功，点一下即可补签。
 
-**五个平台**：
+**八个平台**（下表顺序 = 手机页卡片顺序：WorkBuddy 固定第一，其后是「全自动」组，最后是「需偶尔维护凭据」组）：
+
 | 平台 | 地址 | 每日奖励 | 凭据（服务器端） | 维护 |
 |------|------|---------|------------------|------|
 | WorkBuddy | copilot.tencent.com | 100 积分 | `token.info` | 电脑上打开一次 WorkBuddy 自动续期 |
 | 百度千帆 | 千帆官网 | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
 | MiniMax Code | agent.minimax.cn | 400 智点 | `mm_web_token.json` | 约 40 天，快到期前在浏览器重新登录一次 |
-| Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | **约 14 天，需重新导出 Cookie** |
+| Qoder | qoder.com | 100 Credits | `qoder_token.txt` | 约 1 个月；失效时双击 `push_qoder.bat` |
+| Link AI | — | — | `linkai_token.txt` | 不定期 |
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | **不定期需重新导出 Cookie** |
+| Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | **约 14 天，需重新导出 Cookie** |
+| 华为码道 | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt` | 会话失效后双击 `relogin_huawei.bat`（`hw_autopush.py` 会自动同步） |
+
+> 卡片这一顺序由 `web_server.py` 里 `ADAPTERS` 字典的插入顺序决定（WorkBuddy → 全自动 → 需偶尔维护凭据），`AUTO_PLATFORMS` 决定每张卡归到哪一组。
+> 桌面端（≥760px）是两列等高等宽网格：8 张卡正好 4×2 不留空位，每行两张卡底部的按钮对齐在同一水平线上；展开的详情是浮层，不会把同一行的另一张卡拉长。手机端仍是单列折叠列表。
 
 > Trae / 灵犀的 Cookie 是长期登录态（HttpOnly），无法由代码生成，只能在**系统浏览器**登录对应网站后手动复制：
 > 1. 打开 Chrome/Edge，登录 `work.trae.cn` 和 `lingxi.kdocs.cn`；
 > 2. 按 F12 → Application（应用）→ Cookies，找到 `https://api.trae.cn`（或 `lingxi.wps.cn`）域下全部 cookie；
 > 3. 把每条复制成 `名字=值` 用 `; ` 连接成一行，分别存成 `trae_cookie.txt` / `lx_cookie.txt` 放到本地 `E:\workspace\workbuddy-signin`，再运行部署脚本即可。
 
+**Qoder 的领取时间窗（和其他平台不同，注意）**：
+Qoder 每日奖励**在 10:00（UTC+8）刷新**，窗口到**次日 09:59 截止，过期不能补领**。服务器定时器 09:10 跑的时候，窗口是「昨天 10:00 → 今天 09:59」，所以每天照常领一次没问题；
+万一定时那一刻失败（token 过期等），当天的窗口只能靠网页上手动点「立即签到」挽回（须赶在 09:59 前）。想更贴合刷新时间，可在服务器上把定时器改到 10:05：
+```bash
+systemctl edit wb-checkin-daily.timer   # 加 OnCalendar=*-*-* 10:05:00，再 systemctl daemon-reload
+```
+
+**Qoder 登录态维护**：token 由服务器携带发起领取，**服务端不会自动刷新**（刷新会顶掉你本机 Qoder 客户端的登录态）。
+有效期约 1 个月；卡片显示「登录态过期」时，在**本机**双击 `push_qoder.bat` 即可：
+它从本机 Qoder 客户端（需处于已登录状态）读出最新 token、校验接口可用后推到服务器，约 1 分钟卡片自动变绿（无需重启服务，也无需重新部署）。
+token 以 `qoder_token.txt` 存于服务器 `/opt/wb-checkin/`，该文件已被 `.gitignore` 忽略，不会入库。
+
 | 项目 | 值 |
 |------|----|
 | 查看地址 | **http://SERVER_IP_112/checkin/** |
 | 访问口令 | 由本地 `.env` 的 `ACCESS_KEY` 提供（或服务器 `WB_ACCESS_KEY` 环境变量注入），**不写在代码里**；`.env` 已被 .gitignore 忽略，分享仓库时只提交 `.env.example` 模板 |
-| 自动签到 | systemd `wb-checkin-daily.timer` → 每天 09:10 触发 `wb-checkin-daily.service`（执行 `web_server.py --daily`，一次跑完 5 个平台，任一失败不阻塞其余） |
+| 自动签到 | systemd `wb-checkin-daily.timer` → 每天 09:10 触发 `wb-checkin-daily.service`（执行 `web_server.py --daily`，一次跑完 8 个平台，任一失败不阻塞其余） |
 | 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790` |
 | nginx | `location /checkin/` 反代 |
-| 服务端文件 | `/opt/wb-checkin/`（web_server.py / wb_icon.py / workbuddy_checkin.py / token.info / last_run.json / mm_web_token.json / trae_cookie.txt / lx_cookie.txt / qf_token.txt）|
+| 服务端文件 | `/opt/wb-checkin/`（web_server.py / wb_icon.py / workbuddy_checkin.py / wb_growth.py / token.info / last_run.json / mm_web_token.json / trae_cookie.txt / lx_cookie.txt / linkai_token.txt / hw_cookie.txt / qoder_token.txt / qf_token.txt）|
 | 本地部署 | `python deploy_ui.py`（上传代码 + 凭据 + 切换定时任务 → 重启服务） |
 
 > 原理：签到由服务器自己读本地凭证、调官方接口完成，**完全不经过你的电脑**，所以电脑关机也无所谓。
@@ -111,7 +134,7 @@ systemctl status wb-checkin                     # 网页服务状态
 journalctl -u wb-checkin-daily.service -n 30    # 看自动签到日志
 systemctl start wb-checkin-daily.service        # 手动立刻跑一次（不影响定时）
 systemctl restart wb-checkin                    # 重启网页服务
-python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次 5 平台签到（前台看结果）
+python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次 8 平台签到（前台看结果）
 ```
 
 活动结束后想彻底移除：
@@ -126,7 +149,7 @@ nginx -t && systemctl reload nginx
 
 ## WorkBuddy 成长中心 · 一键完成任务
 
-签到中心网页新增「WorkBuddy 成长中心」卡片，可一键领取成长任务奖励、并显示每个任务的完成状态。
+签到中心网页的 WorkBuddy 卡片底部有两个入口胶囊：「成长中心」（打开 `?view=growth`）和「每日任务」（打开 `?view=daily`），都是新开页，可一键领取成长任务奖励、并显示每个任务的完成状态。
 
 **它能做什么**
 - 自动 `accept` 全部成长任务；
@@ -134,8 +157,8 @@ nginx -t && systemctl reload nginx
 - 对未完成的任务，尽力上报对应行为事件（best-effort），并在详情里清楚标出哪些还需手动操作。
 
 **怎么用**
-1. 打开 `http://SERVER_IP_112/checkin/`，找到紫色「WorkBuddy 成长中心」卡片；
-2. 点卡片展开详情，看每个任务状态（✅ 已完成 / ⏳ 待完成 / 🔒 需手动）；
+1. 打开 `http://SERVER_IP_112/checkin/`，在 WorkBuddy 卡片底部点「成长中心」（或直接访问 `http://SERVER_IP_112/checkin/?view=growth`）；
+2. 看每个任务状态（✅ 已完成 / ⏳ 待完成 / 🔒 需手动）；
 3. 点「🚀 一键完成全部任务」，后台自动跑（页面会轮询，跑完刷新状态）。
 
 **⚠️ 重要限制（务必了解）**
@@ -156,6 +179,8 @@ nginx -t && systemctl reload nginx
 - **今天已经签过**：脚本会识别并跳过（不会重复领），属正常现象。
 - **手机打不开网页**：① 确认手机和电脑连的是同一 WiFi；② 确认 `start_web.bat` 窗口还开着（关掉窗口=服务停止）；③ 首次运行请在电脑弹出的防火墙提示里点「允许」；④ 换个网络后电脑 IP 可能变化，回看 `start_web.bat` 窗口里最新打印的地址。
 - **网页版和计划任务冲突吗**：不冲突。两边都调用同一个签到接口，脚本是幂等的，谁先签都行，重复点也只会提示「今天已签到」。
+- **Qoder 卡片显示「登录态过期」**：本机双击 `push_qoder.bat` 重新推一次 token 即可（详见上文「Qoder 登录态维护」）。注意 Qoder 的窗口是 10:00 刷新、次日 09:59 截止且**不可补领**，过期后错过的那天无法找回。
+- **Qoder 早上 09:10 显示「今日 10:00 刷新后开放」**：说明昨天的窗口已经领过了，等 10:00 后让定时任务或手动点一次即可。
 
 ## 技术细节（给想了解的人）
 - 签到接口：`POST https://copilot.tencent.com/v2/billing/meter/daily-checkin`（body `{}`）
@@ -164,3 +189,9 @@ nginx -t && systemctl reload nginx
 - 消耗明细接口：`POST https://copilot.tencent.com/billing/meter/get-user-request-usage`（**路径不带 `/v2`**；body `{startTime,endTime,pageNum,pageSize}`，返回 `data.data[]` 每条含 `credit` 消耗值、`requestTime`、`model`、`client`；「昨日用量」= 取昨天全部记录对 `credit` 求和）
 - 鉴权头：`Authorization: Bearer <accessToken>` + `X-User-Id` + `X-Domain: copilot.tencent.com`
 - token 来源：`%LOCALAPPDATA%\CodeBuddyExtension\Data\Public\auth\workbuddy-desktop.info`
+
+Qoder（对应 `web_server.py` 的 `get_qd_card` / `run_qd_checkin`）：
+- 活动接口：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`（返回 `campaigns[]`，取 `actionType=="CLAIM_BENEFIT"` 那条）
+- 领取接口：`POST https://openapi.qoder.sh/sash/api/v1/me/campaigns/{campaignId}/claim`（body `{}`，幂等；`claimStatus` 变 `CLAIMED` 即成功）
+- 最小鉴权头：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
+- token 来源（本机）：`%APPDATA%\com.qoder.app.stable\auth.v1.dat`（Chromium `v10` 加密；密钥在 `Local State` 的 `os_crypt.encrypted_key`，经 DPAPI 解出后 AES-GCM 解密），由 `qoder_push.py` 读取

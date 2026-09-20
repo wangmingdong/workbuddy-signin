@@ -44,7 +44,17 @@ except Exception:
     wb_growth = None
 
 try:
-    from wb_icon import CENTER_SVG, WB_SVG, QF_SVG, MM_SVG, TRAE_SVG, LX_SVG, LK_SVG, HW_SVG
+    from wb_icon import (
+        CENTER_SVG,
+        WB_SVG,
+        QF_SVG,
+        MM_SVG,
+        TRAE_SVG,
+        LX_SVG,
+        LK_SVG,
+        HW_SVG,
+        QD_SVG,
+    )
 except Exception:
     CENTER_SVG = ""
     WB_SVG = ""
@@ -54,10 +64,7 @@ except Exception:
     LX_SVG = ""
     LK_SVG = ""
     HW_SVG = ""
-    QF_SVG = ""
-    MM_SVG = ""
-    TRAE_SVG = ""
-    LX_SVG = ""
+    QD_SVG = ""
 
 # WorkBuddy 成长中心图标（紫色渐变火箭，对应成长中心品牌色 #7C5CFF）
 GROWTH_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="grGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#9D7BFF"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#grGrad)"/><path d="M32 10c6 5 7 14 4 23l-4 7h0l-4-7c-3-9-2-18 4-23z" fill="#fff"/><circle cx="32" cy="24" r="4.5" fill="#7C5CFF"/><path d="M24 33l-6 9 7-4z" fill="#fff"/><path d="M40 33l6 9-7-4z" fill="#fff"/><path d="M29 40l3 12 3-12z" fill="#FFE255"/><circle cx="47" cy="18" r="2.6" fill="#fff"/><circle cx="17" cy="21" r="1.8" fill="#fff"/><circle cx="44" cy="40" r="1.6" fill="#fff"/></svg>"""
@@ -1187,6 +1194,284 @@ def run_hw_checkin():
         raise RuntimeError(conf.get("message") or "华为签到确认失败")
     _hw_record(True, "今日签到成功 +1000 积分")
     return get_hw_card()
+
+
+# ---------------- Qoder 每日领 100 Credits ----------------
+QD_STATE_FILE = os.path.join(BASE_DIR, "qoder_last_run.json")
+QD_TOKEN_FILE = os.path.join(BASE_DIR, "qoder_token.txt")
+QD_BASE = os.environ.get("QODER_BASE_URL", "https://openapi.qoder.sh")
+QD_AUTH_URL = "https://qoder.com/account/profile"
+QD_CAMPAIGN_PATH = "/sash/api/v1/me/campaigns"
+# 服务端绝不刷新 token（刷新会挤掉你本机 Qoder 客户端的登录态），只读着用；
+# token 过期只能靠本机脚本重新取一份推上来。
+QD_SESSION_DEAD_MSG = (
+    "服务器侧 Qoder 登录态已失效（HTTP 401）：领取由服务器携带自己保存的 token 发起，"
+    "服务端不会自动刷新 token（刷新会顶掉你本机 Qoder 客户端的登录态）。"
+    "恢复办法：在电脑上双击 push_qoder.bat，它从本机 Qoder 客户端取出最新 token 推送上来，"
+    "约 1 分钟本卡自动变绿。"
+)
+
+
+def _qd_token():
+    """读 Qoder access token：环境变量 QODER_TOKEN 优先，其次 qoder_token.txt。
+
+    每次调用都重新读文件，push_qoder.bat 推上新 token 后无需重启服务。
+    返回 (token, expires_at_iso)，未配置时返回 ("", None)。
+    """
+    tok = os.environ.get("QODER_TOKEN", "").strip()
+    exp = None
+    if not tok:
+        try:
+            with open(QD_TOKEN_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.lower().startswith("# expiresat="):
+                        exp = line.split("=", 1)[1].strip()
+                    elif not line.startswith("#") and not tok:
+                        tok = line
+        except Exception:
+            pass
+    return tok, exp
+
+
+def _qd_api(path, method="GET", body=None):
+    """调 Qoder 开放接口。最小可用头：Authorization + Cosy-ClientType + Accept + UA。"""
+    tok, _ = _qd_token()
+    headers = {
+        "Authorization": "Bearer %s" % tok,
+        "Cosy-ClientType": "10",
+        "Accept": "application/json",
+        "User-Agent": "Qoder",
+    }
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        "%s%s" % (QD_BASE, path), data=data, method=method, headers=headers
+    )
+    with urllib.request.urlopen(req, timeout=25, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _qd_record(ok, message):
+    _append_rec(
+        QD_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": bool(ok),
+            "message": message,
+        },
+        30,
+    )
+
+
+def _qd_read_last():
+    try:
+        with open(QD_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data[-1] if data else None
+        return data
+    except Exception:
+        return None
+
+
+def _qd_find_daily(payload):
+    """从 campaigns 里挑出「每日领 100 Credits」（actionType=CLAIM_BENEFIT）。
+
+    列表里还有 actionType=VIEW_DETAILS 的展示型活动，必须跳过；
+    已领取的那条优先，避免同 key 多条时误判成「可领」。
+    """
+    items = (payload or {}).get("campaigns") or []
+    best = None
+    for c in items:
+        if not isinstance(c, dict):
+            continue
+        if c.get("actionType") != "CLAIM_BENEFIT":
+            continue
+        if c.get("claimStatus") == "CLAIMED":
+            return c
+        if best is None:
+            best = c
+    return best
+
+
+def _qd_benefit_text(camp):
+    b = (camp or {}).get("benefit") or {}
+    amount = b.get("amount")
+    kind = (b.get("kind") or "CREDITS").upper()
+    unit = {"CREDITS": "Credits", "CREDIT": "Credits", "POINTS": "积分"}.get(
+        kind, kind.title()
+    )
+    return ("%s %s" % (amount, unit)) if amount is not None else "每日福利"
+
+
+def _qd_validity_text(camp):
+    v = ((camp or {}).get("benefit") or {}).get("validity") or {}
+    days = v.get("days")
+    if (v.get("mode") or "").upper() == "RELATIVE_DAYS" and days:
+        return "领取后 %s 天有效" % days
+    return "以活动说明为准"
+
+
+def _qd_window(camp):
+    """返回 (是否在领取窗口内, 状态文案)。窗口：每日 10:00(UTC+8) 刷新，次日 09:59 截止。"""
+    now = time.time()
+    start_at = (camp or {}).get("startAt")
+    end_at = (camp or {}).get("endAt")
+    if isinstance(start_at, (int, float)) and now < start_at:
+        return False, "今日 10:00 刷新后开放"
+    if isinstance(end_at, (int, float)) and now > end_at:
+        return False, "本期已截止（无补领）"
+    return True, "可领取"
+
+
+def get_qd_card():
+    tok, exp = _qd_token()
+    if not tok:
+        return {
+            "name": "qoder",
+            "title": "Qoder 每日领 100 Credits",
+            "brand": "#141414",
+            "brand2": "#4A4A4A",
+            "icon": "qd",
+            "checked": False,
+            "needs_auth": True,
+            "badge": "未配置",
+            "hide_auth_link": True,
+            "auth_url": QD_AUTH_URL,
+            "metric_label": "状态",
+            "metric_value": "未配置",
+            "last_run": None,
+            "rows": [
+                {"k": "原因", "v": "服务器上还没有 Qoder 登录态（qoder_token.txt 为空）"},
+                {
+                    "k": "如何配置",
+                    "v": "在电脑上双击 push_qoder.bat，自动从本机 Qoder 客户端取出 token 推送到服务器",
+                },
+            ],
+            "error": None,
+        }
+    try:
+        d = _qd_api(QD_CAMPAIGN_PATH)
+        camp = _qd_find_daily(d)
+        if not camp:
+            raise RuntimeError("未找到「每日领 100 Credits」活动（可能已下线或账号未参与）")
+        checked = camp.get("claimStatus") == "CLAIMED"
+        benefit = _qd_benefit_text(camp)
+        in_window, window_txt = _qd_window(camp)
+        lr = _qd_read_last()
+        rows = [
+            {"k": "今日福利", "v": benefit},
+            {
+                "k": "领取状态",
+                "v": "✅ 今日已领" if checked else window_txt,
+            },
+            {"k": "有效期限", "v": _qd_validity_text(camp)},
+            {"k": "领取窗口", "v": "每日 10:00 刷新，次日 09:59 截止（无补领）"},
+        ]
+        if exp:
+            rows.append({"k": "登录态", "v": "有效期至 %s" % str(exp)[:10]})
+        if lr:
+            rows.append(
+                {
+                    "k": "上次执行",
+                    "v": "%s %s"
+                    % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
+                }
+            )
+        amount = ((camp.get("benefit") or {}).get("amount"))
+        metric_value = ("已领 %s" % amount) if checked else str(amount)
+        return {
+            "name": "qoder",
+            "title": "Qoder 每日领 100 Credits",
+            "brand": "#141414",
+            "brand2": "#4A4A4A",
+            "icon": "qd",
+            "checked": checked,
+            "badge": None if (checked or in_window) else window_txt,
+            "metric_label": "今日 Credits",
+            "metric_value": metric_value,
+            "last_run": lr,
+            "rows": rows,
+            "error": None,
+        }
+    except urllib.error.HTTPError as e:
+        # 401/403 = Qoder 登录态（access token）过期，需要本机重新取一份，非配置错误
+        if e.code in (401, 403):
+            return {
+                "name": "qoder",
+                "title": "Qoder 每日领 100 Credits",
+                "brand": "#141414",
+                "brand2": "#4A4A4A",
+                "icon": "qd",
+                "checked": False,
+                "needs_auth": True,
+                "badge": "登录态过期",
+                "hide_auth_link": True,
+                "auth_url": QD_AUTH_URL,
+                "metric_label": "登录态",
+                "metric_value": "已过期",
+                "last_run": _qd_read_last(),
+                "rows": [
+                    {
+                        "k": "原因",
+                        "v": "服务器侧 Qoder token 已失效（HTTP %s），非配置错误" % e.code,
+                    },
+                    {
+                        "k": "如何恢复",
+                        "v": "在电脑上双击 push_qoder.bat，自动取本机 Qoder 客户端的最新 token 推上来",
+                    },
+                    {
+                        "k": "为什么自动刷新不行",
+                        "v": "刷新 token 会顶掉你本机客户端的登录态，所以服务端只读不刷新",
+                    },
+                ],
+                "error": None,
+            }
+        return _card_error("qoder", "Qoder 每日领 100 Credits", "#141414", "#4A4A4A", "qd", e)
+    except Exception as e:
+        return _card_error("qoder", "Qoder 每日领 100 Credits", "#141414", "#4A4A4A", "qd", e)
+
+
+def run_qd_checkin():
+    """执行 Qoder「每日领 100 Credits」领取，已领则幂等跳过。"""
+    tok, _ = _qd_token()
+    if not tok:
+        raise RuntimeError("未配置 Qoder 登录态（qoder_token.txt 或 QODER_TOKEN）")
+    try:
+        d = _qd_api(QD_CAMPAIGN_PATH)
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            _qd_record(False, "登录态失效 HTTP %s" % e.code)
+            raise RuntimeError(QD_SESSION_DEAD_MSG)
+        raise
+    camp = _qd_find_daily(d)
+    if not camp:
+        raise RuntimeError("未找到「每日领 100 Credits」活动")
+    if camp.get("claimStatus") == "CLAIMED":
+        _qd_record(True, "今日已领取（幂等跳过）")
+        return get_qd_card()
+    cid = camp.get("campaignId")
+    if not cid:
+        raise RuntimeError("活动缺少 campaignId，无法领取")
+    in_window, window_txt = _qd_window(camp)
+    if not in_window:
+        _qd_record(True, "领取窗口未开启：%s" % window_txt)
+        return get_qd_card()
+    r = _qd_api(
+        "%s/%s/claim" % (QD_CAMPAIGN_PATH, cid), method="POST", body={}
+    )
+    if (r or {}).get("status") != "CLAIMED":
+        msg = (r or {}).get("message") or "领取失败"
+        _qd_record(False, msg)
+        raise RuntimeError(msg)
+    _qd_record(True, "今日领取成功 +%s" % _qd_benefit_text(camp))
+    return get_qd_card()
+
+
 LK_STATE_FILE = os.path.join(BASE_DIR, "lk_last_run.json")
 LK_API_BASE = "https://link-ai.tech/api/chat/web/app/user"
 
@@ -1468,15 +1753,22 @@ def get_qf_card():
         return _card_error("qianfan", "百度千帆每日签到", "#4E6EF2", "#2932E1", "qf", e)
 
 
+# 本字典的插入顺序 = 手机页卡片顺序：WorkBuddy 固定第一，
+# 其余「服务器自持长效凭据、无需人工干预」的排前面，凭据短效/依赖本机的沉底。
 ADAPTERS = {
     "workbuddy": get_wb_card,
     "qianfan": get_qf_card,
     "minimax": get_mm_card,
-    "lingxi": get_lx_card,
+    "qoder": get_qd_card,
     "linkai": get_lk_card,
-    "huawei": get_hw_card,
+    # ↓ 凭据短效或依赖本机，失效后需人工处理
+    "lingxi": get_lx_card,
     "trae": get_trae_card,
+    "huawei": get_hw_card,
 }
+
+# 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai")
 
 
 def _load_json_records(path, limit=30):
@@ -1660,6 +1952,28 @@ def get_detail(name):
             },
         }
 
+    if name == "qoder":
+        history = _load_json_records(QD_STATE_FILE, 30)
+        d = _qd_api(QD_CAMPAIGN_PATH)
+        camp = _qd_find_daily(d) or {}
+        in_window, window_txt = _qd_window(camp)
+        return {
+            "ok": True,
+            "name": name,
+            "title": "Qoder 每日领 100 Credits",
+            "signin": {
+                "checked_today": camp.get("claimStatus") == "CLAIMED",
+                "benefit": _qd_benefit_text(camp),
+                "validity": _qd_validity_text(camp),
+                "window": window_txt if not in_window else "每日 10:00 刷新",
+                "campaign_id": camp.get("campaignId"),
+                "history": history,
+            },
+            "consumption": {
+                "note": "Qoder Credits 余额请在客户端用量面板查看",
+            },
+        }
+
     raise RuntimeError("未知平台：%s" % name)
 
 
@@ -1770,6 +2084,7 @@ def get_center():
     except Exception as e:
         d_entry = {"ok": False, "error": str(e)}
     for it in items:
+        it["group"] = "auto" if it.get("name") in AUTO_PLATFORMS else "manual"
         if it.get("name") == "workbuddy":
             it["growth_entry"] = g_entry
             it["daily_entry"] = d_entry
@@ -1806,6 +2121,8 @@ def run_checkin_for(name):
         return run_lk_checkin()
     if name == "huawei":
         return run_hw_checkin()
+    if name == "qoder":
+        return run_qd_checkin()
     raise RuntimeError("未知签到平台：%s" % name)
 
 
@@ -1821,76 +2138,99 @@ PAGE = """<!DOCTYPE html>
 <style>
 :root{
   --wb-brand-8:#00C29A;--wb-grad-a:#0EC7A8;--wb-grad-b:#00C885;
-  --bg1:#f4fbf9;--bg2:#e4f6f1;--card:#fff;
-  --ink:#0f172a;--sub:#64748b;--line:#eef2f5;
+  --bg1:#f7fcfa;--bg2:#e6f5f0;--card:#fff;
+  --ink:#0f172a;--sub:#6b7c8f;--line:#f0f4f3;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;min-height:100%;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  background:linear-gradient(160deg,var(--bg1),var(--bg2));color:var(--ink);
-  display:flex;justify-content:center;padding:22px 14px 44px;}
+  background:linear-gradient(165deg,var(--bg1) 0%,var(--bg2) 100%);color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  display:flex;justify-content:center;padding:24px 14px 46px;}
 .wrap{width:100%;max-width:440px;}
-.brand{display:flex;align-items:center;gap:11px;margin:2px 4px 14px;}
-.logo{width:42px;height:42px;flex:0 0 42px;font-size:36px;line-height:42px;text-align:center;}
-.brand h1{font-size:18px;margin:0;font-weight:800;letter-spacing:-.2px;}
-.brand p{margin:2px 0 0;font-size:12px;color:var(--sub);}
-.summary{background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:14px;
-  box-shadow:0 8px 24px rgba(0,97,77,.08);border:1px solid rgba(0,194,154,.1);}
+.brand{display:flex;align-items:center;gap:12px;margin:0 4px 16px;}
+.logo{width:44px;height:44px;flex:0 0 44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--wb-grad-a),var(--wb-grad-b));
+  box-shadow:0 9px 20px -9px rgba(0,194,154,.95);}
+.logo svg{width:25px;height:25px;display:block;}
+.brand h1{font-size:17px;margin:0;font-weight:800;letter-spacing:-.3px;}
+.brand p{margin:3px 0 0;font-size:12px;color:var(--sub);}
+.summary{background:#fff;border-radius:16px;padding:14px 16px 15px;margin-bottom:12px;
+  box-shadow:0 1px 2px rgba(15,23,42,.03),0 18px 34px -26px rgba(0,97,77,.85);
+  border:1px solid rgba(0,194,154,.1);}
 .summary .top{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700;}
-.summary .top .n{color:var(--wb-brand-8);}
-.bar{height:8px;border-radius:999px;background:#eef2f0;margin-top:10px;overflow:hidden;}
+.summary .top .n{color:var(--wb-brand-8);font-variant-numeric:tabular-nums;}
+.bar{height:7px;border-radius:999px;background:#edf3f1;margin-top:11px;overflow:hidden;}
 .bar > i{display:block;height:100%;width:0;border-radius:999px;
-  background:linear-gradient(135deg,var(--wb-grad-a),var(--wb-grad-b));transition:width .5s ease;}
-#cards{display:flex;flex-direction:column;gap:14px;}
-.card{background:var(--card);border-radius:20px;padding:18px;
-  box-shadow:0 10px 30px rgba(15,23,42,.07);border:1px solid rgba(15,23,42,.04);
-  border-top:4px solid var(--c,#00C29A);
-  display:flex;flex-direction:column;}
-.card-main{display:flex;flex-direction:column;flex:1;min-height:0;gap:10px;}
-.card-main .cta,.card-main .cta-link{margin-top:auto;}
+  background:linear-gradient(90deg,var(--wb-grad-a),var(--wb-grad-b));
+  transition:width .6s cubic-bezier(.22,.8,.28,1);}
+#cards{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;}
+.card{background:var(--card);border-radius:16px;padding:16px;
+  box-shadow:0 1px 2px rgba(15,23,42,.03),0 18px 34px -26px rgba(15,23,42,.75);
+  border:1px solid rgba(15,23,42,.045);
+  border-top:3px solid var(--c,#00C29A);
+  display:flex;flex-direction:column;min-width:0;}
+.card-main{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;gap:9px;}
+/* 底部动作组：整组贴住卡片底部；等高网格里短卡片不会把按钮浮在中间 */
+.card-acts{margin-top:auto;display:flex;flex-direction:column;gap:9px;}
+.card-main .card-acts > *{margin-top:0;}
 .card-top{display:flex;align-items:center;gap:11px;}
-.cicon{width:40px;height:40px;flex:0 0 40px;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));}
+.cicon{width:38px;height:38px;flex:0 0 38px;border-radius:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
+  box-shadow:0 7px 15px -9px var(--c,#00C29A);}
 .cicon svg{display:block;width:100%;height:100%;}
-.ctitle{font-size:16px;font-weight:800;flex:1;}
-.badge{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;}
-.badge.done{color:#00614D;background:rgba(0,194,154,.14);}
-.badge.todo{color:#b54708;background:rgba(247,144,9,.14);}
-.metric{margin:14px 0 4px;}
-.metric .mlabel{font-size:12px;color:var(--sub);}
-.metric .mval{font-size:30px;font-weight:800;line-height:1.2;
+.ctitle{font-size:15px;font-weight:700;letter-spacing:-.1px;line-height:1.35;flex:1;}
+.badge{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;}
+.badge.done{color:#00614D;background:rgba(0,194,154,.13);}
+.badge.todo{color:#b54708;background:rgba(247,144,9,.13);}
+.metric{margin:11px 0 2px;}
+.metric .mlabel{font-size:11.5px;color:#9dabba;letter-spacing:.4px;}
+.metric .mval{display:block;font-size:26px;font-weight:800;line-height:1.25;letter-spacing:-.6px;
+  font-variant-numeric:tabular-nums;
   background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
   -webkit-background-clip:text;background-clip:text;color:transparent;}
-.rows{margin-top:8px;border-top:1px solid var(--line);}
-.row{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line);font-size:13.5px;}
+.rows{margin-top:6px;border-top:1px solid var(--line);}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 1px;
+  border-bottom:1px solid var(--line);font-size:13px;}
 .row:last-child{border-bottom:0;}
-.row .k{color:var(--sub);}
-.row .v{font-weight:600;}
-.last{font-size:12px;color:var(--sub);margin-top:10px;}
-button.cta{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:700;color:#fff;
-  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));box-shadow:0 8px 18px rgba(0,0,0,.12);
-  transition:transform .08s ease,opacity .2s ease;cursor:pointer;}
-button.cta:active{transform:scale(.985);}
-button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
-.cta-link{display:block;width:100%;margin-top:14px;border-radius:14px;padding:15px;font-size:16px;font-weight:700;color:#fff;
-  background:linear-gradient(135deg,#64748b,#94a3b8);box-shadow:0 8px 18px rgba(0,0,0,.08);
+.row .k{color:var(--sub);white-space:nowrap;}
+.row .v{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere;}
+.last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
+button.cta{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
+  box-shadow:0 10px 20px -11px var(--c,rgba(0,194,154,.9));
+  transition:transform .08s ease,filter .2s ease;cursor:pointer;}
+button.cta:active{transform:scale(.985);filter:brightness(.96);}
+button.cta[disabled]{background:#eef2f1;color:#9faead;box-shadow:none;}
+/* 轻量次要按钮：已签到卡片的「重新检查」 */
+button.cta.ghost{width:auto;flex:0 0 auto;margin-top:0;padding:8px 14px;border-radius:999px;
+  font-size:12.5px;font-weight:700;color:#5b6b7c;background:#f5f8f7;border:1px solid var(--line);box-shadow:none;}
+button.cta.ghost:active{background:#eaf0ef;filter:none;}
+button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba(15,23,42,.15);border-top-color:#5b6b7c;}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--line);
+  font-size:12.5px;font-weight:600;color:#94a3b8;}
+.foot .ftxt{display:flex;align-items:center;gap:7px;min-width:0;}
+.foot .ftxt .tick{width:16px;height:16px;flex:0 0 16px;border-radius:50%;display:inline-flex;align-items:center;
+  justify-content:center;font-size:10px;font-style:normal;background:rgba(0,194,154,.16);}
+.cta-link{display:block;width:100%;margin-top:12px;border-radius:12px;padding:13px;font-size:15px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,#64748b,#94a3b8);box-shadow:0 10px 20px -13px rgba(71,85,105,.95);
   text-align:center;text-decoration:none;cursor:pointer;}
 .card{cursor:pointer;transition:box-shadow .2s ease,transform .15s ease;}
-.card:hover{box-shadow:0 14px 40px rgba(15,23,42,.12);transform:translateY(-1px);}
-.card.expanded{cursor:default;transform:none;box-shadow:0 10px 30px rgba(15,23,42,.07);}
-.card .detail{display:none;margin-top:14px;padding-top:14px;border-top:2px solid var(--line);}
-.card.expanded .detail{display:block;}
-.card .detail .dtab{display:flex;gap:14px;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--sub);}
-.card .detail .dtab span{cursor:pointer;padding:4px 2px;border-bottom:2px solid transparent;}
-.card .detail .dtab span.on{color:var(--c,#00C29A);border-color:var(--c,#00C29A);}
-.card .detail .dsec{display:none;}
-.card .detail .dsec.on{display:block;}
-.card .detail .drow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
-.card .detail .drow:last-child{border-bottom:0;}
-.card .detail .drow .dk{color:var(--sub);}
-.card .detail .drow .dv{font-weight:600;}
-.card .detail .dsec h4{margin:0 0 8px;font-size:13px;color:var(--c);opacity:.8;}
-.card .detail .dempty{text-align:center;padding:20px 0;color:var(--sub);font-size:12px;}
+.card:hover{box-shadow:0 2px 4px rgba(15,23,42,.04),0 22px 40px -26px rgba(15,23,42,.85);transform:translateY(-1px);}
+.card-err{margin-top:12px;padding:10px 12px;border-radius:11px;font-size:12.5px;line-height:1.55;
+  color:#912018;background:rgba(240,68,56,.07);border:1px solid rgba(240,68,56,.16);}
+.dtab{display:flex;gap:18px;margin-bottom:14px;font-size:13px;font-weight:700;color:var(--sub);}
+.dtab span{cursor:pointer;padding:4px 2px;border-bottom:2px solid transparent;}
+.dtab span.on{color:var(--mc,#00C29A);border-color:var(--mc,#00C29A);}
+.dsec{display:none;}
+.dsec.on{display:block;}
+.drow{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+.drow:last-child{border-bottom:0;}
+.drow .dk{color:var(--sub);}
+.drow .dv{font-weight:600;text-align:right;}
+.dsec h4{margin:0 0 8px;font-size:13px;color:var(--mc,var(--c,#00C29A));opacity:.85;}
+.dempty{text-align:center;padding:20px 0;color:var(--sub);font-size:12px;}
 .dloading{display:flex;align-items:center;justify-content:center;padding:24px 0;color:var(--sub);font-size:13px;}
 .dloading .spin{margin-right:8px;border-color:rgba(0,0,0,.15);border-top-color:var(--c,#00C29A);}
 .loading{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--sub);padding:40px 0;font-size:14px;width:100%;grid-column:1 / -1;}
@@ -1907,23 +2247,60 @@ button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
   border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:7px;}
 @keyframes sp{to{transform:rotate(360deg)}}
-@media (min-width:1024px){
-  .wrap{max-width:1200px;}
-  #cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px;}
-  .brand h1{font-size:22px;}
-  .brand p{font-size:14px;}
-  .summary .top{font-size:16px;}
+/* ===== 响应式栅格：手机 1 列 → 平板 2 → 小桌面 3 → 宽屏 4 ===== */
+@media (min-width:600px){
+  .wrap{max-width:680px;}
+  #cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
 }
-/* 成长中心 / 每日任务 入口（嵌在 WorkBuddy 卡片内，点击新开页） */
-.entries{margin-top:12px;border-top:1px solid var(--line);}
-.entry{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line);
-  text-decoration:none;color:inherit;}
-.entry:last-child{border-bottom:0;}
-.entry .eic{font-size:20px;width:26px;text-align:center;flex:0 0 26px;}
+@media (min-width:920px){
+  .wrap{max-width:1040px;}
+  #cards{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+}
+@media (min-width:1240px){
+  .wrap{max-width:1320px;}
+  #cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;}
+}
+@media (min-width:760px){
+  .brand h1{font-size:20px;}
+  .brand p{font-size:13px;}
+  .brand .logo{width:48px;height:48px;flex-basis:48px;border-radius:15px;}
+  .brand .logo svg{width:27px;height:27px;}
+  .summary .top{font-size:15px;}
+}
+/* ===== 详情模态浮层（替代原绝对定位弹窗，彻底杜绝卡片重叠）===== */
+#modal{position:fixed;inset:0;z-index:1000;display:none;align-items:flex-start;justify-content:center;
+  padding:max(24px,env(safe-area-inset-top)) 14px 40px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#modal.show{display:flex;}
+#modal .mbg{position:fixed;inset:0;background:rgba(15,23,42,.42);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#modal .mpanel{position:relative;z-index:1;width:100%;max-width:430px;margin:auto;background:#fff;
+  border-radius:22px;overflow:hidden;display:flex;flex-direction:column;
+  max-height:calc(100vh - 72px);
+  box-shadow:0 30px 70px -22px rgba(15,23,42,.55);border-top:4px solid var(--mc,#00C29A);
+  animation:mpop .22s cubic-bezier(.22,.8,.28,1);}
+@keyframes mpop{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:none;}}
+#modal .mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:15px 18px;border-bottom:1px solid var(--line);}
+#modal .mhead h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px;}
+#modal .mclose{width:32px;height:32px;flex:0 0 32px;border:0;border-radius:50%;background:#f1f5f4;
+  color:#64748b;font-size:19px;line-height:1;cursor:pointer;transition:background .15s;}
+#modal .mclose:hover{background:#e4ebea;}
+#modal .mbody{padding:16px 18px 20px;overflow-y:auto;}
+#modal .detail{margin-top:0;padding-top:0;border-top:0;}
+@media (prefers-reduced-motion: reduce){
+  #modal .mpanel{animation:none;}
+  .card,.entry,button.cta,.bar > i{transition:none;}
+}
+/* 成长中心 / 每日任务 入口（嵌在 WorkBuddy 卡片内，两个并排小胶囊，点击新开页） */
+.entries{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+.entry{flex:1;min-width:0;display:flex;align-items:center;gap:7px;padding:9px 11px;border-radius:11px;
+  background:#f7fbfa;border:1px solid var(--line);text-decoration:none;color:inherit;}
+.entry .eic{font-size:15px;line-height:1;flex:0 0 auto;}
 .entry .etx{flex:1;min-width:0;}
-.entry .etx b{font-size:14px;font-weight:700;display:block;}
-.entry .etx small{font-size:12px;color:var(--sub);}
-.entry .earrow{color:#cbd5d2;font-size:20px;font-weight:700;line-height:1;}
+.entry .etx b{font-size:12.5px;font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.entry .etx small{display:block;font-size:11px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.entry .earrow{color:#cbd5d2;font-size:15px;font-weight:700;line-height:1;flex:0 0 auto;}
+.entry:hover{background:#eef7f4;}
 .entry:active{opacity:.7;}
 /* 独立功能页（?view=growth / ?view=daily） */
 .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--sub);
@@ -1960,7 +2337,7 @@ button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
 <body>
 <div class="wrap">
   <div class="brand">
-    <div class="logo">📋</div>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4.6" y="5.2" width="14.8" height="15.6" rx="3.2" stroke="#fff" stroke-width="1.7"/><rect x="9.1" y="2.6" width="5.8" height="4.4" rx="1.6" fill="#fff"/><path d="m8.7 13.4 2.3 2.3 4.4-4.7" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <div>
       <h1>签到中心</h1>
       <p>多个签到一目了然 · 一键完成</p>
@@ -1975,13 +2352,21 @@ button.cta[disabled]{background:#cbd5d2;box-shadow:none;opacity:.9;}
   <div id="cards"><div class="loading">加载中…</div></div>
   <div id="focus" style="display:none"></div>
 
+  <div id="modal">
+    <div class="mbg" data-close="1"></div>
+    <div class="mpanel" id="modal-panel">
+      <div class="mhead"><h3 id="modal-title">签到详情</h3><button class="mclose" id="modal-close" type="button" aria-label="关闭">×</button></div>
+      <div class="mbody" id="modal-body"></div>
+    </div>
+  </div>
+
   <div id="msg" class="msg"></div>
   <div id="keybox" class="keybox">
     <input id="key" type="password" inputmode="numeric" placeholder="输入访问口令后回车">
   </div>
 
-  <div class="hint">所有签到均在服务端执行，数据来自各平台官方接口<br>新增签到只需在服务端加一个适配器，本页自动多出一张卡</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260916-1</div>
+  <div class="hint">卡片顺序：WorkBuddy → 全自动签到 → 需偶尔维护凭据<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260920-3</div>
 </div>
 
 <script>
@@ -1998,6 +2383,7 @@ var ICON_TRAE = `__TRAE_SVG__`;
 var ICON_LK = `__LK_SVG__`;
 var ICON_LX = `__LX_SVG__`;
 var ICON_HW = `__HW_SVG__`;
+var ICON_QD = `__QD_SVG__`;
 var ICON_GROWTH = `__GROWTH_SVG__`;
 var ICON_DAILY = `__DAILY_SVG__`;
 function iconFor(it){
@@ -2008,6 +2394,7 @@ function iconFor(it){
   if(it.icon==="lk") return ICON_LK;
   if(it.icon==="lx") return ICON_LX;
   if(it.icon==="huawei") return ICON_HW;
+  if(it.icon==="qd") return ICON_QD;
   if(it.icon==="growth") return ICON_GROWTH;
   if(it.icon==="daily") return ICON_DAILY;
   return '<div style="font-size:20px">🪙</div>';
@@ -2028,6 +2415,7 @@ function cardHTML(it){
   else badge = '<span class="badge todo">今天还没签</span>';
   var rows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
   var last = it.last_run ? fmtLast(it.last_run) : "暂无记录";
+  var lastTs = (it.last_run && it.last_run.ts) ? String(it.last_run.ts).slice(5,16) : "";
   var btn;
   if(needsAuth){
     // cookie 类平台：签到用「服务器自己那份 Cookie」，在本人浏览器登录并不会推给服务器，
@@ -2036,10 +2424,12 @@ function cardHTML(it){
     btn = it.hide_auth_link
       ? retry
       : ('<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>' + retry);
+  } else if(it.checked){
+    // 已签到：顶部徽标已说明状态，底部只留一行「上次签到 + 重新检查」，不再重复「今日已签到」
+    btn = '<div class="foot"><span class="ftxt">'+(lastTs?('上次签到 '+lastTs):'暂无签到记录')+'</span>'
+        + '<button class="cta ghost" data-name="'+esc(it.name)+'">重新检查</button></div>';
   } else {
-    btn = it.checked ? '<button class="cta" disabled>' : '<button class="cta" data-name="'+esc(it.name)+'">';
-    if(!it.checked) btn += '立即签到'; else btn += '今日已签到';
-    btn += '</button>';
+    btn = '<button class="cta" data-name="'+esc(it.name)+'">立即签到</button>';
   }
   var entries = entriesHTML(it);
   var extraLink = it.extra_link
@@ -2055,10 +2445,9 @@ function cardHTML(it){
         '</div>'+
         '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
         '<div class="rows">'+rows+'</div>'+
-        '<div class="last">上次签到：'+last+'</div>'+
-        btn + extraLink + entries + err +
+        (it.checked ? '' : '<div class="last">上次签到：'+last+'</div>')+
+        '<div class="card-acts">'+btn + extraLink + entries + err +'</div>'+
       '</div>'+
-      '<div class="detail" id="detail-'+esc(it.name)+'"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
     '</div>';
 }
 // WorkBuddy 卡片内的「成长中心 / 每日任务」入口（点击新标签页打开独立功能页）
@@ -2082,28 +2471,27 @@ function entriesHTML(it){
   }
   return '<div class="entries">'+e+'</div>';
 }
-function toggleDetail(name){
+function openDetail(name){
   var card = document.querySelector('.card[data-name="'+name+'"]');
-  if(!card) return;
-  var isExpanded = card.classList.contains('expanded');
-  Array.prototype.forEach.call(document.querySelectorAll('.card.expanded'), function(c){
-    if(c !== card){
-      c.classList.remove('expanded');
-      var dn = c.querySelector('.detail');
-      if(dn) dn.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
-    }
-  });
-  if(isExpanded){
-    card.classList.remove('expanded');
-    var dn = card.querySelector('.detail');
-    if(dn) dn.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
-  } else {
-    card.classList.add('expanded');
-    loadDetail(name);
+  var brand = card ? (card.style.getPropertyValue('--c')||'').trim() : '';
+  var panel = $('modal-panel');
+  if(panel) panel.style.setProperty('--mc', brand || '#00C29A');
+  var titleEl = $('modal-title');
+  if(titleEl){
+    var t = card && card.querySelector('.ctitle') ? card.querySelector('.ctitle').textContent : '签到详情';
+    titleEl.textContent = t || '签到详情';
   }
+  var m = $('modal');
+  if(m){ m.classList.add('show'); document.body.style.overflow = 'hidden'; }
+  loadDetail(name);
+}
+function closeModal(){
+  var m = $('modal');
+  if(m){ m.classList.remove('show'); document.body.style.overflow = ''; }
+  var b = $('modal-body'); if(b) b.innerHTML = '';
 }
 function renderDetail(d, name){
-  var detail = $('detail-'+name);
+  var detail = $('modal-body');
   if(!detail) return;
   if(!d.ok){
     detail.innerHTML = '<div class="card-err">⚠️ '+esc(d.error||'加载失败')+'</div>';
@@ -2143,6 +2531,11 @@ function renderDetail(d, name){
     if(consumption.total_claimed != null){
       signinHTML += '<div class="drow"><span class="dk">累计签到</span><span class="dv">'+esc(consumption.total_claimed)+' 次</span></div>';
     }
+  } else if(d.name === 'qoder'){
+    signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">'+(signin.checked_today?'✅ 已领':'❌ 未领')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">今日福利</span><span class="dv">'+esc(signin.benefit||'--')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">有效期限</span><span class="dv">'+esc(signin.validity||'--')+'</span></div>';
+    if(signin.window){ signinHTML += '<div class="drow"><span class="dk">领取窗口</span><span class="dv">'+esc(signin.window)+'</span></div>'; }
   }
   var history = signin.history || [];
   var historyHTML = '';
@@ -2170,7 +2563,7 @@ consumeHTML += pkgs.map(function(p){
     consumeHTML += '<div class="drow"><span class="dk">总积分</span><span class="dv">'+esc(consumption.total_points||'--')+'</span></div>';
     consumeHTML += '<div class="drow"><span class="dk">可用积分</span><span class="dv">'+esc(consumption.available||'--')+'</span></div>';
     consumeHTML += '<div class="drow"><span class="dk">已用积分</span><span class="dv">'+esc(consumption.used||'--')+'</span></div>';
-  } else if(d.name === 'minimax' || d.name === 'trae'){
+  } else if(d.name === 'minimax' || d.name === 'trae' || d.name === 'qoder'){
     consumeHTML += '<div class="dempty">'+esc(consumption.note||'暂无消耗数据')+'</div>';
   } else if(d.name === 'lingxi'){
     if(consumption.total_claimed != null){
@@ -2192,18 +2585,18 @@ function switchTab(el, name, tab){
   var tabs = el.parentElement.querySelectorAll('span');
   Array.prototype.forEach.call(tabs, function(t){ t.className = ''; });
   el.className = 'on';
-  var secs = document.querySelectorAll('#detail-'+name+' .dsec');
+  var secs = $('modal-body').querySelectorAll('.dsec');
   Array.prototype.forEach.call(secs, function(s){ s.className = 'dsec'; });
-  $('dsec-'+name+'-'+tab).className = 'dsec on';
+  var t = $('dsec-'+name+'-'+tab); if(t) t.className = 'dsec on';
 }
 function loadDetail(name){
-  var detail = $('detail-'+name);
-  if(!detail) return;
-  detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+  var body = $('modal-body');
+  if(!body) return;
+  body.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
   api('api/detail?name='+encodeURIComponent(name)).then(function(d){
     renderDetail(d, name);
   }).catch(function(e){
-    detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
+    body.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
   });
 }
 // ===== 成长中心独立页（?view=growth）=====
@@ -2399,15 +2792,18 @@ function renderCenter(d){
   $("summary").textContent = "已签 "+d.signed_count+" / "+d.total_count;
   var pct = d.total_count ? Math.round(d.signed_count/d.total_count*100) : 0;
   $("prog").style.width = pct+"%";
-  $("cards").innerHTML = d.items.map(cardHTML).join("");
-  // 卡片点击展开详情
+  // 顺序由后端的适配器顺序决定：WorkBuddy → 全自动 → 需偶尔维护凭据
+  var html = "";
+  d.items.forEach(function(it){ html += cardHTML(it); });
+  $("cards").innerHTML = html;
+  // 卡片点击打开详情模态
   Array.prototype.forEach.call(document.querySelectorAll('.card'), function(c){
     c.addEventListener('click', function(e){
       var name = c.getAttribute('data-name');
       if(!name) return;
-      // 避免按钮/链接（含成长/每日任务入口）/tab 点击触发卡片展开
-      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.dtab') || e.target.closest('a.entry')) return;
-      toggleDetail(name);
+      // 卡片内按钮/链接（签到、登录、成长/每日任务入口）不触发详情浮层
+      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('a.entry')) return;
+      openDetail(name);
     });
   });
   // 按钮签到（排除成长/每日任务等特殊按钮）
@@ -2459,6 +2855,14 @@ $("key").addEventListener("change", function(e){
   try { localStorage.setItem(KEY_STORE, e.target.value.trim()); } catch(err){}
   if(VIEW==="growth") focusGrowth(); else if(VIEW==="daily") focusDaily(); else load();
 });
+(function bindModal(){
+  var m = $('modal'); if(!m) return;
+  var close = $('modal-close'); if(close) close.addEventListener('click', closeModal);
+  var bg = m.querySelector('.mbg'); if(bg) bg.addEventListener('click', closeModal);
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && m.classList.contains('show')) closeModal();
+  });
+})();
 if(VIEW==="growth" || VIEW==="daily"){ showFocus(VIEW); } else { load(); }
 </script>
 </body>
@@ -2471,6 +2875,7 @@ PAGE = PAGE.replace("__TRAE_SVG__", TRAE_SVG)
 PAGE = PAGE.replace("__LK_SVG__", LK_SVG)
 PAGE = PAGE.replace("__LX_SVG__", LX_SVG)
 PAGE = PAGE.replace("__HW_SVG__", HW_SVG)
+PAGE = PAGE.replace("__QD_SVG__", QD_SVG)
 PAGE = PAGE.replace("__GROWTH_SVG__", GROWTH_SVG)
 PAGE = PAGE.replace("__DAILY_SVG__", DAILY_SVG)
 
@@ -2712,7 +3117,7 @@ def main():
 
 
 def run_daily_all():
-    """--daily：按固定顺序执行全部平台签到（WorkBuddy/千帆/MiniMax/Trae/灵犀）。
+    """--daily：按固定顺序执行全部平台签到（顺序与首页卡片一致，最省心的在前）。
     每个平台失败不中断后续平台；逐项输出结果，供 systemd journal 查看。"""
     banner = "=" * 56
     print(banner)
@@ -2722,9 +3127,10 @@ def run_daily_all():
         ("workbuddy", "WorkBuddy"),
         ("qianfan", "百度千帆"),
         ("minimax", "MiniMax Code"),
-        ("trae", "Trae Work"),
-        ("lingxi", "WPS 灵犀"),
+        ("qoder", "Qoder"),
         ("linkai", "Link AI"),
+        ("lingxi", "WPS 灵犀"),
+        ("trae", "Trae Work"),
         ("huawei", "华为码道"),
     ]
     summary = []
