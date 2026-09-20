@@ -415,6 +415,316 @@ def run_all(sess, only_claim=False):
     return results
 
 
+# ==================== 每日任务（每天刷新的成长中心动作） ====================
+# 官方成长中心里「每天重置 / 每天可领」的部分，与上面一次性成长任务分开：
+#   1) 每日签到（+100 积分，连签累计）
+#   2) 连登兑换（7 / 14 / 28 天三档，每月每档限兑 1 次；给积分+能量+补登卡+抽奖次数）
+#   3) 补登卡补断登（修当月断登，保连登天数）
+#   4) 每日任务轮盘（抽奖，次数每日刷新、由连登兑换获得）
+#   5) Buddy 盲盒（消耗能量开盒）
+# 接口与请求体均按官方网页版前端（growthSpace chunk）对齐。
+METER_BASE = "/v2/billing/meter"
+GROWTH_BASE = "/v2/activity/growth"
+
+TIER_META = {
+    "7d": {"name": "入门档", "days": 7},
+    "14d": {"name": "进阶档", "days": 14},
+    "28d": {"name": "巅峰档", "days": 28},
+}
+TIERS = [
+    {"tier": "7d", "days": 7, "credit": 0, "energy": 2, "cards": 1, "chances": 1},
+    {"tier": "14d", "days": 14, "credit": 50, "energy": 3, "cards": 1, "chances": 1},
+    {"tier": "28d", "days": 28, "credit": 150, "energy": 5, "cards": 1, "chances": 1},
+]
+
+
+def _uuid_token(prefix="u"):
+    """官方前端用 `${prefix}-${randomUUID()}` 作为幂等 client_token。"""
+    import uuid
+    return "%s-%s" % (prefix, uuid.uuid4())
+
+
+def _get(sess, path):
+    s, b = _req("GET", CHAT_BASE + path, sess["access_token"], sess["uid"], sess["domain"])
+    if s != 200:
+        raise RuntimeError("%s http=%s %s" % (path, s, _brief(b)))
+    return (b.get("data") or {}) if isinstance(b, dict) else {}
+
+
+def _post(sess, path, body):
+    return _req("POST", CHAT_BASE + path, sess["access_token"], sess["uid"], sess["domain"], body=body)
+
+
+def _brief(b, n=200):
+    if isinstance(b, dict):
+        d = b.get("data")
+        if isinstance(d, dict):
+            return json.dumps(d, ensure_ascii=False)[:n]
+        return json.dumps(b, ensure_ascii=False)[:n]
+    return str(b)[:n]
+
+
+def checkin_status(sess):
+    """加油站每日签到状态（today_checked_in / daily_credit / streak_days…）。"""
+    s, b = _post(sess, METER_BASE + "/checkin-activity-status", {})
+    if s != 200:
+        return {}
+    d = b.get("data") if isinstance(b, dict) else None
+    if isinstance(d, str):  # 服务端偶发双层编码，兜底再解一次
+        try:
+            d = json.loads(d)
+        except Exception:
+            return {}
+    return d or {}
+
+
+def do_daily_checkin(sess):
+    s, b = _post(sess, METER_BASE + "/daily-checkin", {})
+    return s, b
+
+
+def get_streak(sess):
+    """连登信息：streak{ days, month_total_days, next_tier, makeup_dates }、redemption_status.tiers。"""
+    return _get(sess, GROWTH_BASE + "/streak")
+
+
+def get_energy(sess):
+    return _get(sess, GROWTH_BASE + "/energy")
+
+
+def get_lottery(sess):
+    """{"chances": n, "module": {"enabled": true}}"""
+    return _get(sess, GROWTH_BASE + "/lottery/summary")
+
+
+def get_buddy_quota(sess):
+    """{"affordable": n, "balance": 能量, "cost_per_open": 10, "max_open_count": 5}"""
+    return _get(sess, GROWTH_BASE + "/buddy/quota")
+
+
+def redeem_tier(sess, tier):
+    """兑换连登档位（7d/14d/28d）。返回 (http, body)。"""
+    return _post(sess, GROWTH_BASE + "/redeem",
+                 {"tier": tier, "client_token": _uuid_token("redeem-%s" % tier)})
+
+
+def makeup_use(sess, target_date):
+    """用补登卡补某天（target_date: YYYY-MM-DD，仅当月断登日）。"""
+    return _post(sess, GROWTH_BASE + "/makeup-cards/use", {"target_date": target_date})
+
+
+def lottery_draw(sess):
+    """抽奖轮盘抽一次（每日任务轮盘）。返回 (http, body)，body.data 含 prize_name。"""
+    return _post(sess, GROWTH_BASE + "/lottery/draw", {"client_token": _uuid_token("draw")})
+
+
+def buddy_open(sess, count=1):
+    """开 Buddy 盲盒 count 次（消耗能量，每次 cost_per_open）。"""
+    return _post(sess, GROWTH_BASE + "/buddy/open", {"count": int(count)})
+
+
+def get_daily_card(sess):
+    """每日任务卡片：汇总当天可做/可领的刷新项。"""
+    try:
+        ci = checkin_status(sess)
+        st = get_streak(sess)
+        streak = st.get("streak") or {}
+        mk = st.get("makeup_cards") or {}
+        rs = st.get("redemption_status") or {}
+        en = get_energy(sess)
+        lo = get_lottery(sess)
+        bq = get_buddy_quota(sess)
+
+        days = streak.get("days") or ci.get("streak_days") or 0
+        rows = []
+        todo = 0
+
+        # 1) 每日签到
+        done = bool(ci.get("today_checked_in"))
+        rows.append({
+            "code": "checkin", "title": "每日签到",
+            "reward": "+%s 积分" % (ci.get("daily_credit") or 100),
+            "detail": "连续签到 %s 天" % days,
+            "status": "done" if done else "todo",
+            "note": "今日已签" if done else "可签到",
+        })
+        if not done:
+            todo += 1
+
+        # 2) 连登兑换（三档，每月各限 1 次）
+        for t in (rs.get("tiers") or TIERS):
+            tier = t.get("tier")
+            if not tier:
+                continue
+            meta = TIER_META.get(tier, {"name": tier, "days": t.get("days") or 0})
+            status = rs.get("tier_%s_status" % tier)
+            can = days >= (meta["days"] or 0) and status != "claimed"
+            rows.append({
+                "code": "redeem_%s" % tier,
+                "title": "连登兑换 · %s（%s 天）" % (meta["name"], meta["days"]),
+                "reward": "+%s 积分 / +%s 能量" % (t.get("credit") or 0, t.get("energy") or 0),
+                "detail": "补登卡 +%s · 抽奖次数 +%s" % (t.get("cards") or 0, t.get("chances") or 0),
+                "status": "done" if status == "claimed" else ("todo" if can else "locked"),
+                "note": {"claimed": "本月已兑", "locked": "连登差 %s 天" % max(0, (meta["days"] or 0) - days)}
+                        .get(status, "可兑换" if can else "未达成"),
+            })
+            if can:
+                todo += 1
+
+        # 3) 补登卡
+        md = streak.get("makeup_dates") or []
+        rows.append({
+            "code": "makeup", "title": "补登卡补断登",
+            "reward": "保住连登天数",
+            "detail": "持有 %s / %s 张" % (mk.get("balance") or 0, mk.get("max") or 4),
+            "status": "todo" if md else "done",
+            "note": ("待补 %s 天：%s" % (len(md), "、".join(str(x)[5:] for x in md[:5]))) if md else "本月无断登",
+        })
+        if md:
+            todo += 1
+
+        # 4) 抽奖轮盘
+        ch = int(lo.get("chances") or 0)
+        rows.append({
+            "code": "lottery", "title": "每日任务轮盘（抽奖）",
+            "reward": "10~100 积分 / 周边",
+            "detail": "次数每日刷新，由连登兑换获得",
+            "status": "todo" if ch > 0 else "done",
+            "note": ("剩 %s 次，可抽" % ch) if ch else "暂无次数",
+        })
+        if ch > 0:
+            todo += 1
+
+        # 5) Buddy 盲盒
+        aff = int(bq.get("affordable") or 0)
+        rows.append({
+            "code": "buddy", "title": "Buddy 盲盒",
+            "reward": "随机 Buddy",
+            "detail": "每次 %s 能量 · 当前能量 %s" % (bq.get("cost_per_open") or 10, bq.get("balance") or 0),
+            "status": "todo" if aff > 0 else "done",
+            "note": ("可开 %s 次" % aff) if aff else "能量不足",
+        })
+        if aff > 0:
+            todo += 1
+
+        return {
+            "name": "daily",
+            "title": "成长中心 · 每日任务",
+            "brand": "#F79009", "brand2": "#FDB022",
+            "icon": "daily", "daily": True,
+            "checked": todo == 0,
+            "metric_label": "今日可做",
+            "metric_value": ("%d 项" % todo) if todo else "已全部完成",
+            "claimable": todo,
+            "streak_days": days,
+            "energy": en.get("balance"),
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return {"name": "daily", "title": "成长中心 · 每日任务",
+                "brand": "#F79009", "brand2": "#FDB022",
+                "icon": "daily", "daily": True, "checked": False,
+                "metric_label": "今日可做", "metric_value": "--",
+                "claimable": 0, "rows": [], "error": str(e)}
+
+
+def run_daily(sess):
+    """一键做完当日所有动作：签到 → 连登兑换 → 补登断登 → 抽奖 → 开盒。"""
+    out = []
+
+    def add(code, ok, msg, skipped=False):
+        out.append({"code": code, "ok": bool(ok), "msg": msg, "skipped": skipped})
+
+    # 1) 每日签到
+    try:
+        ci = checkin_status(sess)
+        if ci.get("today_checked_in"):
+            add("checkin", True, "今日已签到", skipped=True)
+        else:
+            s, b = do_daily_checkin(sess)
+            add("checkin", s == 200, "签到成功" if s == 200 else "签到失败 http=%s %s" % (s, _brief(b)))
+    except Exception as e:
+        add("checkin", False, repr(e))
+
+    # 2) 连登兑换
+    try:
+        st = get_streak(sess)
+        streak = st.get("streak") or {}
+        rs = st.get("redemption_status") or {}
+        days = streak.get("days") or 0
+        for t in (rs.get("tiers") or TIERS):
+            tier = t.get("tier")
+            if not tier:
+                continue
+            status = rs.get("tier_%s_status" % tier)
+            need = t.get("days") or (TIER_META.get(tier) or {}).get("days") or 0
+            if status == "claimed":
+                add("redeem_%s" % tier, True, "本月已兑换过", skipped=True)
+                continue
+            if days < need:
+                add("redeem_%s" % tier, False, "连登 %s 天 < %s 天，未达标" % (days, need), skipped=True)
+                continue
+            s, b = redeem_tier(sess, tier)
+            add("redeem_%s" % tier, s == 200,
+                "兑换成功" if s == 200 else "兑换失败 http=%s %s" % (s, _brief(b)))
+            time.sleep(0.4)
+    except Exception as e:
+        add("redeem", False, repr(e))
+
+    # 3) 补登断登
+    try:
+        st2 = get_streak(sess)
+        md = (st2.get("streak") or {}).get("makeup_dates") or []
+        if not md:
+            add("makeup", True, "本月无断登，无需补", skipped=True)
+        else:
+            for d in md:
+                s, b = makeup_use(sess, d)
+                add("makeup_%s" % d, s == 200,
+                    ("补登 %s 成功" % d) if s == 200 else "补登 %s 失败 http=%s %s" % (d, s, _brief(b)))
+                time.sleep(0.4)
+    except Exception as e:
+        add("makeup", False, repr(e))
+
+    # 4) 抽奖（把当天次数抽完，上限 10 次防失控）
+    try:
+        drew = 0
+        for _ in range(10):
+            lo = get_lottery(sess)
+            if int(lo.get("chances") or 0) <= 0:
+                if drew == 0:
+                    add("lottery", True, "暂无抽奖次数（可靠连登兑换获得）", skipped=True)
+                break
+            s, b = lottery_draw(sess)
+            prize = ""
+            if isinstance(b, dict):
+                prize = (b.get("data") or {}).get("prize_name") or ""
+            add("lottery", s == 200,
+                ("抽中 %s" % prize) if (s == 200 and prize) else ("抽奖成功" if s == 200 else "抽奖失败 http=%s %s" % (s, _brief(b))))
+            if s != 200:
+                break
+            drew += 1
+            time.sleep(0.4)
+    except Exception as e:
+        add("lottery", False, repr(e))
+
+    # 5) 开盲盒（能量够几次开几次，上限 5）
+    try:
+        bq = get_buddy_quota(sess)
+        n = min(int(bq.get("affordable") or 0), 5)
+        if n <= 0:
+            add("buddy", True, "能量不足（需 %s，现有 %s）" % (bq.get("cost_per_open") or 10, bq.get("balance") or 0),
+                skipped=True)
+        else:
+            s, b = buddy_open(sess, n)
+            add("buddy", s == 200, ("开盒 %s 次成功" % n) if s == 200 else "开盒失败 http=%s %s" % (s, _brief(b)))
+    except Exception as e:
+        add("buddy", False, repr(e))
+
+    return out
+
+
 def get_growth_card(sess):
     """供 web_server 的成长中心卡片数据。"""
     try:
@@ -459,7 +769,7 @@ def get_growth_card(sess):
 
 
 if __name__ == "__main__":
-    # 本地调试：python wb_growth.py list|claim|run  （需 WB_TOKEN_FILE 指向明文 token.info）
+    # 本地调试：python wb_growth.py list|claim|run|daily|dailyrun  （需 WB_TOKEN_FILE 指向明文 token.info）
     mode = sys.argv[1] if len(sys.argv) > 1 else "list"
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import workbuddy_checkin as w
@@ -475,4 +785,15 @@ if __name__ == "__main__":
             print(r)
     elif mode == "run":
         for r in run_all(sess):
+            print(r)
+    elif mode == "daily":
+        c = get_daily_card(sess)
+        print("== %s | %s: %s | 连登 %s 天 | 能量 %s" % (
+            c["title"], c["metric_label"], c["metric_value"], c.get("streak_days"), c.get("energy")))
+        for r in c.get("rows") or []:
+            print("  [%-8s] %-26s %-22s %s" % (r.get("status"), r.get("title"), r.get("reward"), r.get("note")))
+        if c.get("error"):
+            print("  ERROR:", c["error"])
+    elif mode == "dailyrun":
+        for r in run_daily(sess):
             print(r)

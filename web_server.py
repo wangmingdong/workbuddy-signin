@@ -61,6 +61,8 @@ except Exception:
 
 # WorkBuddy 成长中心图标（紫色渐变火箭，对应成长中心品牌色 #7C5CFF）
 GROWTH_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="grGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#9D7BFF"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#grGrad)"/><path d="M32 10c6 5 7 14 4 23l-4 7h0l-4-7c-3-9-2-18 4-23z" fill="#fff"/><circle cx="32" cy="24" r="4.5" fill="#7C5CFF"/><path d="M24 33l-6 9 7-4z" fill="#fff"/><path d="M40 33l6 9-7-4z" fill="#fff"/><path d="M29 40l3 12 3-12z" fill="#FFE255"/><circle cx="47" cy="18" r="2.6" fill="#fff"/><circle cx="17" cy="21" r="1.8" fill="#fff"/><circle cx="44" cy="40" r="1.6" fill="#fff"/></svg>"""
+# 每日任务（每天刷新的成长中心动作）：橙金日历+对勾
+DAILY_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="dlGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F79009"/><stop offset="1" stop-color="#FDB022"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#dlGrad)"/><circle cx="24" cy="13" r="3.4" fill="#fff"/><circle cx="40" cy="13" r="3.4" fill="#fff"/><rect x="13" y="16" width="38" height="35" rx="7" fill="#fff"/><rect x="13" y="16" width="38" height="10" rx="6" fill="#FFE3B0"/><path d="M22 37l6 6 13-14" fill="none" stroke="#F79009" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>"""
 
 PORT = int(os.environ.get("WB_PORT", "8765"))
 HOST = os.environ.get("WB_HOST", "0.0.0.0")
@@ -1682,13 +1684,53 @@ def run_growth_background():
         _GROWTH_RUN["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# ================== 成长中心 · 每日任务（每天刷新的动作：签到/兑换/补登/抽奖/盲盒） ==================
+_DAILY_RUN = {"running": False, "results": None, "updated": None, "error": None}
+
+
+def get_daily_card():
+    """每日任务卡片。失败返回错误卡，绝不抛异常。"""
+    base = {"name": "daily", "title": "成长中心 · 每日任务", "brand": "#F79009",
+            "brand2": "#FDB022", "icon": "daily", "daily": True, "checked": False,
+            "metric_label": "今日可做", "metric_value": "--", "claimable": 0, "rows": []}
+    if wb_growth is None:
+        base["error"] = "成长中心模块未加载（wb_growth.py 缺失）"
+        return base
+    sess = _load_session_safe()
+    if not sess or not sess.get("access_token"):
+        base["error"] = "未找到本地会话 token（服务器需 WB_TOKEN_FILE 指向明文 token.info）"
+        return base
+    card = wb_growth.get_daily_card(sess)
+    card["daily"] = True
+    return card
+
+
+def run_daily_background():
+    """后台执行「一键做完每日任务」，避免长连接被 nginx 代理超时打断。"""
+    global _DAILY_RUN
+    _DAILY_RUN["running"] = True
+    _DAILY_RUN["error"] = None
+    try:
+        sess = _load_session_safe()
+        if not sess or not sess.get("access_token"):
+            _DAILY_RUN["error"] = "未找到本地会话 token（WB_TOKEN_FILE 需指向明文 token.info）"
+            return
+        _DAILY_RUN["results"] = wb_growth.run_daily(sess)
+    except Exception as e:
+        _DAILY_RUN["error"] = str(e)
+    finally:
+        _DAILY_RUN["running"] = False
+        _DAILY_RUN["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 def get_center():
     items = [fn() for fn in ADAPTERS.values()]
     signed = sum(1 for it in items if it.get("checked"))
-    try:
-        items.append(get_growth_card())
-    except Exception:
-        pass
+    for extra in (get_growth_card, get_daily_card):
+        try:
+            items.append(extra())
+        except Exception:
+            pass
     return {
         "ok": True,
         "server_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1873,6 +1915,7 @@ var ICON_LK = `__LK_SVG__`;
 var ICON_LX = `__LX_SVG__`;
 var ICON_HW = `__HW_SVG__`;
 var ICON_GROWTH = `__GROWTH_SVG__`;
+var ICON_DAILY = `__DAILY_SVG__`;
 function iconFor(it){
   if(it.icon==="wb") return ICON_WB;
   if(it.icon==="qf") return ICON_QF;
@@ -1882,6 +1925,7 @@ function iconFor(it){
   if(it.icon==="lx") return ICON_LX;
   if(it.icon==="huawei") return ICON_HW;
   if(it.icon==="growth") return ICON_GROWTH;
+  if(it.icon==="daily") return ICON_DAILY;
   return '<div style="font-size:20px">🪙</div>';
 }
 function fmtLast(lr){
@@ -1893,6 +1937,7 @@ function fmtLast(lr){
 }
 function cardHTML(it){
   if(it.growth) return growthCardHTML(it);
+  if(it.daily) return dailyCardHTML(it);
   var needsAuth = it.needs_auth;
   var badge;
   if(it.checked) badge = '<span class="badge done">今天已签到 ✅</span>';
@@ -1950,6 +1995,36 @@ function growthCardHTML(it){
         btn + err +
       '</div>'+
       '<div class="detail" id="detail-growth"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
+    '</div>';
+}
+function dailyCardHTML(it){
+  var todo = it.claimable||0;
+  var badge = it.error
+    ? '<span class="badge todo">读取失败</span>'
+    : (todo>0 ? '<span class="badge todo">可做 '+todo+' 项</span>' : '<span class="badge done">今日已清 ✅</span>');
+  var btn = it.error
+    ? '<button class="cta daily-run" data-name="daily" disabled style="background:#cbd5d2">无法读取（见详情）</button>'
+    : '<button class="cta daily-run" data-name="daily">🎯 一键做完每日任务</button>';
+  var extra = '';
+  if(!it.error && (it.streak_days || it.energy!=null)){
+    extra = '<div class="rows">'
+      + '<div class="row"><span class="k">连续登录</span><span class="v">'+(it.streak_days||0)+' 天</span></div>'
+      + '<div class="row"><span class="k">能量值</span><span class="v">'+(it.energy==null?'--':it.energy)+'</span></div>'
+      + '</div>';
+  }
+  var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
+  return ''+
+    '<div class="card daily-card" data-name="daily" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
+      '<div class="card-main">'+
+        '<div class="card-top">'+
+          '<div class="cicon">'+iconFor(it)+'</div>'+
+          '<div class="ctitle">'+esc(it.title)+'</div>'+ badge +
+        '</div>'+
+        '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
+        extra +
+        btn + err +
+      '</div>'+
+      '<div class="detail" id="detail-daily"><div class="dloading"><span class="spin"></span> 加载中…</div></div>'+
     '</div>';
 }
 function toggleDetail(name){
@@ -2076,6 +2151,13 @@ function loadDetail(name){
     });
     return;
   }
+  if(name==="daily"){
+    detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+    api("api/daily").then(function(d){ renderDaily(d, name); }).catch(function(e){
+      detail.innerHTML = '<div class="card-err">⚠️ '+(e&&e.message||'加载失败')+'</div>';
+    });
+    return;
+  }
   detail.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
   api('api/detail?name='+encodeURIComponent(name)).then(function(d){
     renderDetail(d, name);
@@ -2145,6 +2227,68 @@ function pollGrowth(){
     if(document.querySelector('.card.growth-card.expanded')){ loadDetail('growth'); }
   }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
 }
+function renderDaily(d, name){
+  var detail = $('detail-'+name);
+  if(!detail) return;
+  if(!d.ok){ detail.innerHTML='<div class="card-err">⚠️ '+esc(d.error||'加载失败')+'</div>'; return; }
+  var card = d.card||{};
+  var rows = card.rows||[];
+  var html = '';
+  if(d.running){
+    html += '<div class="dloading" style="padding:14px 0"><span class="spin"></span> 每日任务后台执行中…</div>';
+  }
+  html += '<div class="dsec on">';
+  if(!d.running){
+    html += '<button class="cta daily-run" data-name="daily" style="margin-bottom:10px">🎯 一键做完每日任务</button>';
+    html += '<div style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.5">每日签到 / 连登兑换 / 补登卡 / 抽奖 / Buddy 盲盒，一键自动跑完可做的部分；已完成的会自动跳过。</div>';
+  }
+  if(rows.length){
+    html += rows.map(function(t){
+      var st;
+      if(t.status==="done") st = '<span style="color:#00614D;font-weight:700">✅ 已完成</span>';
+      else if(t.status==="locked") st = '<span style="color:#7a7a7a;font-weight:700">🔒 未解锁</span>';
+      else st = '<span style="color:#b54708;font-weight:700">⏳ 待做</span>';
+      var rw = t.reward ? ('+'+t.reward) : '';
+      var nt = t.note ? (' · '+t.note) : '';
+      return '<div class="drow"><span class="dk">'+esc(t.title)+'</span><span class="dv">'+st+'<br><small style="color:#64748b">'+esc(rw+nt)+'</small></span></div>';
+    }).join('');
+  } else {
+    html += '<div class="dempty">暂无任务数据</div>';
+  }
+  if(d.results && d.results.length){
+    var ok=0; d.results.forEach(function(r){ if(r.ok) ok++; });
+    html += '<div class="drow" style="margin-top:6px"><span class="dk">上次执行</span><span class="dv">成功 '+ok+' / '+d.results.length+(d.updated?(' · '+esc(d.updated.slice(5))):'')+'</span></div>';
+  } else if(d.run_error){
+    html += '<div class="card-err" style="margin-top:8px">⚠️ '+esc(d.run_error)+'</div>';
+  }
+  html += '</div>';
+  detail.innerHTML = html;
+  var btns = detail.querySelectorAll('button.daily-run');
+  Array.prototype.forEach.call(btns, function(b){ b.addEventListener('click', function(){ runDaily(b); }); });
+}
+function runDaily(btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>任务进行中…'; }
+  showMsg("每日任务正在后台执行，请稍候…","ok");
+  api("api/daily/run",{method:"POST"}).then(function(d){
+    if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🎯 一键做完每日任务"; } return; }
+    pollDaily();
+  }).catch(function(e){
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    else showMsg("网络错误："+(e&&e.message),"err");
+    if(btn){ btn.disabled=false; btn.innerHTML="🎯 一键做完每日任务"; }
+  });
+}
+function pollDaily(){
+  api("api/daily").then(function(d){
+    if(d.running){ setTimeout(pollDaily, 2500); return; }
+    var ok=0, tot=(d.results||[]).length;
+    (d.results||[]).forEach(function(r){ if(r.ok) ok++; });
+    if(tot) showMsg("每日任务：成功 "+ok+" / "+tot+" 项 ✅","ok");
+    else if(d.run_error) showMsg("执行出错："+d.run_error,"err");
+    load();
+    if(document.querySelector('.card.daily-card.expanded')){ loadDetail('daily'); }
+  }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
+}
 function showMsg(t,kind){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok"); }
 function hideMsg(){ $("msg").className="msg"; }
 function api(path,opts){
@@ -2168,18 +2312,21 @@ function renderCenter(d){
       toggleDetail(name);
     });
   });
-  // 按钮签到（成长中心按钮单独走 runGrowth，不参与签到逻辑）
-  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.growth-run)"), function(b){
+  // 按钮签到（成长中心 / 每日任务 按钮单独走 runGrowth/runDaily，不参与签到逻辑）
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.growth-run):not(.daily-run)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
   });
   Array.prototype.forEach.call(document.querySelectorAll("button.growth-run"), function(b){
     b.addEventListener("click", function(){ runGrowth(b); });
   });
+  Array.prototype.forEach.call(document.querySelectorAll("button.daily-run"), function(b){
+    b.addEventListener("click", function(){ runDaily(b); });
+  });
 }
-function load(){
+function load(cb){
   hideMsg();
   $("cards").innerHTML = '<div class="loading"><span class="spin"></span><span class="ld">加载中…</span></div>';
-  api("api/center").then(renderCenter).catch(function(e){
+  api("api/center").then(function(d){ renderCenter(d); if(cb) cb(); }).catch(function(e){
     if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
     else { showMsg("连接失败："+(e&&e.message),"err"); }
   });
@@ -2213,6 +2360,7 @@ PAGE = PAGE.replace("__LK_SVG__", LK_SVG)
 PAGE = PAGE.replace("__LX_SVG__", LX_SVG)
 PAGE = PAGE.replace("__HW_SVG__", HW_SVG)
 PAGE = PAGE.replace("__GROWTH_SVG__", GROWTH_SVG)
+PAGE = PAGE.replace("__DAILY_SVG__", DAILY_SVG)
 
 
 # ============================ HTTP 服务 ============================
@@ -2288,6 +2436,22 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
+        if u.path == "/api/daily":
+            if not self._key_ok(parse_qs(u.query)):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                self._json(200, {
+                    "ok": True,
+                    "card": get_daily_card(),
+                    "running": _DAILY_RUN["running"],
+                    "results": _DAILY_RUN["results"],
+                    "updated": _DAILY_RUN["updated"],
+                    "run_error": _DAILY_RUN["error"],
+                })
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         if u.path == "/api/detail":
             q = parse_qs(u.query)
             if not self._key_ok(q):
@@ -2296,15 +2460,6 @@ class Handler(BaseHTTPRequestHandler):
             name = (q.get("name") or [""])[0]
             try:
                 self._json(200, get_detail(name))
-            except Exception as e:
-                self._json(200, {"ok": False, "error": str(e)})
-            return
-        if u.path == "/api/growth":
-            if not self._key_ok(parse_qs(u.query)):
-                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
-                return
-            try:
-                self._json(200, get_growth_card())
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
@@ -2355,6 +2510,24 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(200, {"ok": True, "started": True, "running": True})
                     return
                 t = threading.Thread(target=run_growth_background, daemon=True)
+                t.start()
+                self._json(200, {"ok": True, "started": True, "running": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/daily/run":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                if wb_growth is None:
+                    self._json(200, {"ok": False, "error": "成长中心模块未加载"})
+                    return
+                if _DAILY_RUN["running"]:
+                    self._json(200, {"ok": True, "started": True, "running": True})
+                    return
+                t = threading.Thread(target=run_daily_background, daemon=True)
                 t.start()
                 self._json(200, {"ok": True, "started": True, "running": True})
             except Exception as e:

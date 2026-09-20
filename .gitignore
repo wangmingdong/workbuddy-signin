@@ -16,6 +16,7 @@ _trash/
 
 # 含 ECS root 密码的部署脚本，禁止入库
 deploy*.py
+_sync_creds.py
 change_key.py
 explore*.py
 verify*.py
@@ -46,4 +47,6 @@ __pycache__/
 mm_web_token.json
 mm_token.json
 trae_jwt.txt
+trae_cookie.txt
+linkai_token.txt
 lx_cookie.txt
