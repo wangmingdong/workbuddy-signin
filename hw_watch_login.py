@@ -17,11 +17,16 @@ import paramiko
 from envconf import load_local_env
 load_local_env()
 
-HOST = os.environ.get("ECS_HOST", "SERVER_IP_112")
+# 服务器地址/路径均可通过环境变量覆盖（见 .env.example）：
+#   ECS_HOST / ECS_PORT / ECS_USER / ECS_PASS —— SSH 登录信息
+#   ECS_REMOTE                                —— 服务器上的部署目录
+#   WEB_PORT                                 —— 网页服务端口（健康检查用）
+HOST = os.environ.get("ECS_HOST", "your_server_ip")
 PORT = int(os.environ.get("ECS_PORT", "22"))
 USER = os.environ.get("ECS_USER", "root")
 PASS = os.environ.get("ECS_PASS", "")
-REMOTE = "/opt/wb-checkin"
+REMOTE = os.environ.get("ECS_REMOTE", "/opt/wb-checkin")
+WEB_PORT = os.environ.get("WEB_PORT", "8790")
 LOCAL = os.path.dirname(os.path.abspath(__file__))
 COOKIES = os.path.join(LOCAL, "hw_cookies.json")
 OUT = os.path.join(LOCAL, "hw_cookie.txt")
@@ -106,9 +111,9 @@ def push(cookie):
     _, out, _ = c.exec_command(
         "systemctl restart wb-checkin >/dev/null 2>&1; "
         "systemctl restart wb-hw-keepalive.service; sleep 3; "
-        "tail -3 /opt/wb-checkin/hw_keepalive.log 2>/dev/null")
+        "tail -3 %s/hw_keepalive.log 2>/dev/null" % REMOTE)
     log = out.read().decode("utf-8", "replace")
-    _, out2, _ = c.exec_command("curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8790/")
+    _, out2, _ = c.exec_command("curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:%s/" % WEB_PORT)
     code = out2.read().decode("utf-8", "replace")
     c.close()
     return log, code

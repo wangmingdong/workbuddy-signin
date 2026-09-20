@@ -31,7 +31,7 @@ WorkBuddy 登录后，会把登录凭证（accessToken）以明文存在你电�
 
 本项目**核心代码已配置化**：所有敏感信息（ECS 密码、网页访问口令、各平台 token/cookie）都从环境变量读取，不写死在代码里。
 
-- 服务端 `web_server.py` 等读取 `WB_ACCESS_KEY` / `QF_ACCESS_TOKEN` / `TRAE_COOKIE` / `HW_COOKIE` …（生产由 systemd 注入）。
+- 服务端 `web_server.py` 等读取 `WB_ACCESS_KEY` / `QF_BASE_URL` / `QF_ACCESS_TOKEN` / `TRAE_COOKIE` / `HW_COOKIE` …（生产由 systemd 注入；`QF_BASE_URL` 未设置时自动跳过千帆平台）。
 - 本地运维脚本（`check_112_hw.py` / `build_center_preview.py` / `hw_watch_login.py` / `hw_autopush.py` / `install_hw_keepalive.py` / `qoder_push.py` / `check_now.py`）统一从项目根目录的 `.env` 读取 `ECS_HOST` / `ECS_PORT` / `ECS_USER` / `ECS_PASS` / `ACCESS_KEY`，由 `envconf.py` 加载。
 
 **别人拿到仓库后怎么配：**
@@ -79,7 +79,7 @@ schtasks /run /tn WorkBuddyDailyCheckin
 ### 4. 服务器自动签到 + 手机网页查看（已部署到云服务器 ✅）
 
 **签到已经由服务器自动完成**：服务器上的 systemd 定时器 `wb-checkin-daily.timer` **每天 09:10 自动签到**（若那一刻服务器不可用，恢复后会补跑），你什么都不用做。
-网页 `http://SERVER_IP_112/checkin/` 只是**用来看记录**（今天各平台是否已签 / 上次签到时间）；页面上的按钮是**手动备用**——万一定时没跑成功，点一下即可补签。
+网页 `http://<你的服务器IP>/checkin/`（或你绑定的域名）只是**用来看记录**（今天各平台是否已签 / 上次签到时间）；页面上的按钮是**手动备用**——万一定时没跑成功，点一下即可补签。
 
 **八个平台**（下表顺序 = 手机页卡片顺序：WorkBuddy 固定第一，其后是「全自动」组，最后是「需偶尔维护凭据」组）：
 
@@ -95,7 +95,7 @@ schtasks /run /tn WorkBuddyDailyCheckin
 | 华为码道 | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt` | 会话失效后双击 `relogin_huawei.bat`（`hw_autopush.py` 会自动同步） |
 
 > 卡片这一顺序由 `web_server.py` 里 `ADAPTERS` 字典的插入顺序决定（WorkBuddy → 全自动 → 需偶尔维护凭据），`AUTO_PLATFORMS` 决定每张卡归到哪一组。
-> 桌面端（≥760px）是两列等高等宽网格：8 张卡正好 4×2 不留空位，每行两张卡底部的按钮对齐在同一水平线上；展开的详情是浮层，不会把同一行的另一张卡拉长。手机端仍是单列折叠列表。
+> 卡片为响应式 CSS Grid：**<600px 单列 / ≥600px 两列 / ≥920px 三列 / ≥1240px 四列**，移动端不再横向溢出；详情改为**真模态弹窗**（点 × / 点遮罩 / 按 Esc 三种方式关闭），不会覆盖其他卡片。手机端仍是单列折叠列表。
 
 > Trae / 灵犀的 Cookie 是长期登录态（HttpOnly），无法由代码生成，只能在**系统浏览器**登录对应网站后手动复制：
 > 1. 打开 Chrome/Edge，登录 `work.trae.cn` 和 `lingxi.kdocs.cn`；
@@ -112,20 +112,20 @@ systemctl edit wb-checkin-daily.timer   # 加 OnCalendar=*-*-* 10:05:00，再 sy
 **Qoder 登录态维护**：token 由服务器携带发起领取，**服务端不会自动刷新**（刷新会顶掉你本机 Qoder 客户端的登录态）。
 有效期约 1 个月；卡片显示「登录态过期」时，在**本机**双击 `push_qoder.bat` 即可：
 它从本机 Qoder 客户端（需处于已登录状态）读出最新 token、校验接口可用后推到服务器，约 1 分钟卡片自动变绿（无需重启服务，也无需重新部署）。
-token 以 `qoder_token.txt` 存于服务器 `/opt/wb-checkin/`，该文件已被 `.gitignore` 忽略，不会入库。
+token 以 `qoder_token.txt` 存于服务器部署目录（默认 `/opt/wb-checkin`，可改），该文件已被 `.gitignore` 忽略，不会入库。
 
 | 项目 | 值 |
 |------|----|
-| 查看地址 | **http://SERVER_IP_112/checkin/** |
+| 查看地址 | **http://<你的服务器IP>/checkin/**（或你的域名）|
 | 访问口令 | 由本地 `.env` 的 `ACCESS_KEY` 提供（或服务器 `WB_ACCESS_KEY` 环境变量注入），**不写在代码里**；`.env` 已被 .gitignore 忽略，分享仓库时只提交 `.env.example` 模板 |
 | 自动签到 | systemd `wb-checkin-daily.timer` → 每天 09:10 触发 `wb-checkin-daily.service`（执行 `web_server.py --daily`，一次跑完 8 个平台，任一失败不阻塞其余） |
-| 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790` |
+| 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790`（端口可改）|
 | nginx | `location /checkin/` 反代 |
-| 服务端文件 | `/opt/wb-checkin/`（web_server.py / wb_icon.py / workbuddy_checkin.py / wb_growth.py / token.info / last_run.json / mm_web_token.json / trae_cookie.txt / lx_cookie.txt / linkai_token.txt / hw_cookie.txt / qoder_token.txt / qf_token.txt）|
+| 服务端目录 | `<部署目录>`（默认 `/opt/wb-checkin`，可改；含 web_server.py / wb_icon.py / workbuddy_checkin.py / wb_growth.py / token.info / last_run.json / mm_web_token.json / trae_cookie.txt / lx_cookie.txt / linkai_token.txt / hw_cookie.txt / qoder_token.txt / qf_token.txt）|
 | 本地部署 | `python deploy_ui.py`（上传代码 + 凭据 + 切换定时任务 → 重启服务） |
 
 > 原理：签到由服务器自己读本地凭证、调官方接口完成，**完全不经过你的电脑**，所以电脑关机也无所谓。
-> 网页请求：浏览器 → `http://SERVER_IP_112/checkin/` → nginx 反代 → `web_server.py` → 返回签到状态。
+> 网页请求：浏览器 → `http://<你的服务器IP>/checkin/`（或域名）→ nginx 反代 → `web_server.py` → 返回签到状态。
 
 服务器运维（SSH 登录 ECS 后执行）：
 ```bash
@@ -134,14 +134,14 @@ systemctl status wb-checkin                     # 网页服务状态
 journalctl -u wb-checkin-daily.service -n 30    # 看自动签到日志
 systemctl start wb-checkin-daily.service        # 手动立刻跑一次（不影响定时）
 systemctl restart wb-checkin                    # 重启网页服务
-python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次 8 平台签到（前台看结果）
+python3 <部署目录>/web_server.py --daily   # 手动跑一次 8 平台签到（前台看结果）
 ```
 
 活动结束后想彻底移除：
 ```bash
 systemctl disable --now wb-checkin-daily.timer wb-checkin
 rm -f /etc/systemd/system/wb-checkin.service /etc/systemd/system/wb-checkin-daily.service /etc/systemd/system/wb-checkin-daily.timer
-rm -rf /opt/wb-checkin
+rm -rf <部署目录>
 systemctl daemon-reload
 # 再从 /etc/nginx/conf.d/payroll.conf 删掉 /buddy/ 两段，然后：
 nginx -t && systemctl reload nginx
@@ -157,7 +157,7 @@ nginx -t && systemctl reload nginx
 - 对未完成的任务，尽力上报对应行为事件（best-effort），并在详情里清楚标出哪些还需手动操作。
 
 **怎么用**
-1. 打开 `http://SERVER_IP_112/checkin/`，在 WorkBuddy 卡片底部点「成长中心」（或直接访问 `http://SERVER_IP_112/checkin/?view=growth`）；
+1. 打开 `http://<你的服务器IP>/checkin/`，在 WorkBuddy 卡片底部点「成长中心」（或直接访问 `http://<你的服务器IP>/checkin/?view=growth`）；
 2. 看每个任务状态（✅ 已完成 / ⏳ 待完成 / 🔒 需手动）；
 3. 点「🚀 一键完成全部任务」，后台自动跑（页面会轮询，跑完刷新状态）。
 

@@ -81,11 +81,10 @@ ACCESS_KEY = os.environ.get(
 STATE_FILE = os.environ.get("WB_STATE_FILE", os.path.join(BASE_DIR, "last_run.json"))
 
 # ============================ 千帆签到适配器配置 ============================
-# 千帆服务部署在另一台 ECS（SERVER_IP_121），nginx 已把 /checkin/ 反代出去，
-# 本服务在服务端直接调用它的 API（带 token，避开浏览器跨域），不搬动千帆代码。
-# 千帆服务在 SERVER_IP_121，其 /checkin/ 反代挂在「IP 默认 server」上（SERVICE_DOMAIN 域名 443 被中捷应用中心 SPA 占用），
-# 故必须用 IP 直连 http://SERVER_IP_121/checkin/ 才能打到千帆 8021。可用 QF_BASE_URL 环境变量覆盖。
-QIANFAN_BASE = os.environ.get("QF_BASE_URL", "http://SERVER_IP_121/checkin").rstrip("/")
+# 千帆签到接口基址。本服务在服务端直接调用它的 API（带 token，避开浏览器跨域），不搬动千帆代码。
+# 自部署时通过环境变量 QF_BASE_URL 指定你自己的千帆服务地址；留空（默认）则跳过千帆平台（卡片显示「未配置」），
+# 不影响其余 7 个平台。示例：http://<你的千帆服务IP>/checkin
+QIANFAN_BASE = os.environ.get("QF_BASE_URL", "").rstrip("/")
 # 千帆口令优先级：环境变量 QF_ACCESS_TOKEN > 同目录 qf_token.txt（部署时由 deploy_ui.py 写入，便于不改 systemd）
 QIANFAN_TOKEN = os.environ.get("QF_ACCESS_TOKEN", "")
 if not QIANFAN_TOKEN:
@@ -1706,8 +1705,8 @@ def get_wb_card():
 
 def get_qf_card():
     try:
-        if not QIANFAN_TOKEN:
-            raise RuntimeError("未配置千帆访问口令（QF_ACCESS_TOKEN）")
+        if not QIANFAN_TOKEN or not QIANFAN_BASE:
+            raise RuntimeError("未配置千帆（请设置 QF_BASE_URL 与 QF_ACCESS_TOKEN）")
         d = _http_json("%s/api/status?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN))
         if not d.get("ok"):
             raise RuntimeError(d.get("error") or "千帆状态获取失败")
@@ -1813,8 +1812,8 @@ def get_detail(name):
         }
 
     if name == "qianfan":
-        if not QIANFAN_TOKEN:
-            raise RuntimeError("未配置千帆访问口令")
+        if not QIANFAN_TOKEN or not QIANFAN_BASE:
+            raise RuntimeError("未配置千帆（请设置 QF_BASE_URL 与 QF_ACCESS_TOKEN）")
         # 拉取最近 7 天签到历史
         h = _http_json(
             "%s/api/history?days=30&token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN)
@@ -2103,8 +2102,8 @@ def run_checkin_for(name):
         do_checkin()  # 会写 last_run；失败抛异常
         return get_wb_card()
     if name == "qianfan":
-        if not QIANFAN_TOKEN:
-            raise RuntimeError("未配置千帆访问口令（QF_ACCESS_TOKEN）")
+        if not QIANFAN_TOKEN or not QIANFAN_BASE:
+            raise RuntimeError("未配置千帆（请设置 QF_BASE_URL 与 QF_ACCESS_TOKEN）")
         d = _http_json(
             "%s/api/checkin/run?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN), method="POST"
         )

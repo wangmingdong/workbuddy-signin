@@ -1,0 +1,58 @@
+{
+  "_说明": "本文件是凭据配置说明模板（不进仓库）。真实凭据请放在同名本地文件或 .env 环境变量中，二者均已被 .gitignore 忽略。优先级：环境变量 > 同目录本地文件。",
+  "网页访问口令": {
+    "环境变量": "WB_ACCESS_KEY（服务器 systemd 注入） / ACCESS_KEY（本地 .env）",
+    "如何获取": "自己设任意字符串；留空=不校验口令",
+    "对应文件": "无（仅环境变量）"
+  },
+  "platforms": {
+    "workbuddy": {
+      "凭据文件": "token.info",
+      "环境变量": "WB_TOKEN_FILE（默认 BASE_DIR/token.info）",
+      "类型": "本地文件",
+      "如何获取": "打开一次 WorkBuddy 客户端，token 自动写入 %LOCALAPPDATA%\\CodeBuddyExtension\\Data\\Public\\auth\\workbuddy-desktop.info"
+    },
+    "qianfan": {
+      "凭据文件": "qf_token.txt",
+      "环境变量": "QF_ACCESS_TOKEN / QF_BASE_URL",
+      "类型": "token",
+      "如何获取": "千帆官网登录后获取的 access token；QF_BASE_URL 指向你的千帆服务签到接口"
+    },
+    "minimax": {
+      "凭据文件": "mm_web_token.json",
+      "环境变量": "MM_WEB_TOKEN",
+      "类型": "JWT",
+      "如何获取": "agent.minimax.cn 网页端登录后从浏览器 localStorage._token 复制（约 40 天有效）"
+    },
+    "qoder": {
+      "凭据文件": "qoder_token.txt",
+      "环境变量": "QODER_TOKEN / QODER_BASE_URL",
+      "类型": "token",
+      "如何获取": "本机双击 push_qoder.bat 从已登录的 Qoder 客户端取出并推送"
+    },
+    "linkai": {
+      "凭据文件": "linkai_token.txt",
+      "环境变量": "LINKAI_TOKEN",
+      "类型": "token",
+      "如何获取": "Link AI 平台生成的 API token"
+    },
+    "lingxi": {
+      "凭据文件": "lx_cookie.txt",
+      "环境变量": "LX_COOKIE",
+      "类型": "Cookie 串（name=val; name=val）",
+      "如何获取": "浏览器登录 lingxi.wps.cn 后从 DevTools → Application → Cookies 复制全部 cookie"
+    },
+    "trae": {
+      "凭据文件": "trae_cookie.txt",
+      "环境变量": "TRAE_COOKIE / TRAE_JWT",
+      "类型": "Cookie 串（优先）/ 短期 JWT",
+      "如何获取": "浏览器登录 work.trae.cn 后复制全部 cookie（HttpOnly，无法代码生成）"
+    },
+    "huawei": {
+      "凭据文件": "hw_cookie.txt",
+      "环境变量": "HW_COOKIE",
+      "类型": "Cookie 串（name=val; name=val）",
+      "如何获取": "浏览器登录 devcloud 后复制 cookie；由 hw_autopush.py 自动同步到服务器"
+    }
+  }
+}
