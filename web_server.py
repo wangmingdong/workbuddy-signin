@@ -1322,6 +1322,77 @@ def _hw_read_last():
         return None
 
 
+# 华为会话 Cookie 寿命极短（静置 30~60 分钟即失效），而当日签到只需成功一次。
+# 因此本地记一条「今日已签」标记：当天签到成功后，卡片直接读标记返回，
+# 不再每次去 ping 华为接口（避免会话已失效 → 卡片反而报「登录态过期」）。
+# 标记按自然日（本地时区）判定，跨过 0 点自动视为过期（无需定时清理）。
+HW_DONE_FILE = os.path.join(BASE_DIR, "hw_today_done.json")
+
+
+def _hw_mark_today_done(message=""):
+    """记录「今天已签到成功」，供 get_hw_card 短路使用。"""
+    try:
+        with open(HW_DONE_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "date": datetime.date.today().isoformat(),
+                    "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "message": message or "今日签到成功",
+                },
+                f,
+                ensure_ascii=False,
+            )
+    except Exception:
+        pass
+
+
+def _hw_today_done():
+    """若今天已成功签到，返回标记 dict；否则 None（含跨 0 点自动失效）。"""
+    try:
+        with open(HW_DONE_FILE, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        if isinstance(d, dict) and d.get("date") == datetime.date.today().isoformat():
+            return d
+    except Exception:
+        pass
+    return None
+
+
+def _hw_clear_today_done():
+    """清除今日标记（凭据被重置/需要真实查询时调用）。"""
+    try:
+        os.remove(HW_DONE_FILE)
+    except Exception:
+        pass
+
+
+def _hw_done_card(mark):
+    """今日已签到的短路卡片：不依赖华为会话，直接展示本地成功记录。"""
+    ts = mark.get("ts") or ""
+    rows = [
+        {"k": "今日福利", "v": "1000 积分"},
+        {"k": "签到状态", "v": "✅ 今日已签（本地记录）"},
+        {"k": "签到时间", "v": ts[5:16] if len(ts) >= 16 else ts},
+        {"k": "说明", "v": "今日已成功签到，为避免华为短效会话反复失效，本卡当天不再实时查询；次日 0 点自动恢复查询。"},
+    ]
+    return {
+        "name": "huawei",
+        "title": "华为码道每日签到",
+        "brand": "#804FED",
+        "brand2": "#6A35D6",
+        "icon": "huawei",
+        "checked": True,
+        "badge": "今日已签",
+        "hide_auth_link": True,
+        "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
+        "metric_label": "今日积分",
+        "metric_value": "已领 1000",
+        "last_run": {"ts": ts, "ok": True, "message": mark.get("message") or "今日签到成功"},
+        "rows": rows,
+        "error": None,
+    }
+
+
 def _hw_find_daily(items):
     """从活动列表里挑出每日签到活动（campaignId=1 / USER_LOGIN）。"""
     if not isinstance(items, list):
@@ -1335,6 +1406,15 @@ def _hw_find_daily(items):
 
 
 def get_hw_card():
+    # 今日已签到成功 → 直接读本地标记，不再 ping 华为（短效会话易失效，避免误报过期）
+    _done = _hw_today_done()
+    if _done:
+        return _hw_done_card(_done)
+    return _hw_live_card()
+
+
+def _hw_live_card():
+    """真实查询华为签到状态（会 ping 华为接口，依赖会话 Cookie）。"""
     if not HW_COOKIE:
         return {
             "name": "huawei",
@@ -1448,6 +1528,7 @@ def run_hw_checkin():
     camp = _hw_find_daily(items)
     if camp and camp.get("status") in ("CLAIMED", "CONFIRMED", "CONSUMED"):
         _hw_record(True, "今日已签到（幂等跳过）")
+        _hw_mark_today_done("今日已签到（幂等跳过）")
         return get_hw_card()
     ts = int(time.time() * 1000)
     claim = _hw_api(
@@ -1461,6 +1542,7 @@ def run_hw_checkin():
     if conf.get("code") != 0:
         raise RuntimeError(conf.get("message") or "华为签到确认失败")
     _hw_record(True, "今日签到成功 +1000 积分")
+    _hw_mark_today_done("今日签到成功 +1000 积分")
     return get_hw_card()
 
 
@@ -1945,16 +2027,57 @@ def _auth_fail_card(name, title, brand, brand2, icon, err, steps):
     并用 steps 给出明确的恢复步骤（指向本地取凭据脚本或设置页粘贴新 token）。
     服务器侧的凭据无法直接经浏览器「跳转登录」刷新——它来自你本机浏览器登录态，
     所以需要本机脚本把新令牌推上来，或手动更新服务器上的凭据文件。
+
+    ⚠️ 判定顺序：先判「网络类瞬时故障」（超时/连接重置/DNS），这类**不是**凭据问题，
+    绝不能提示用户去重导 Cookie——实测「The read operation timed out」若落到
+    凭据分支，会误导用户白折腾。只有确属鉴权错误才走「登录态过期」。
     """
     s = str(err or "").strip()
     low = s.lower()
-    is_auth = any(
-        k in s
+    # 1) 网络类瞬时故障优先判定（不是凭据问题）
+    transient = any(
+        k in low
         for k in (
-            "401", "403", "unauthorized", "forbidden", "token", "expired",
-            "过期", "失效", "登录", "鉴权", "auth", "invalid", "未授权",
+            "timed out", "timeout", "connection reset", "connection aborted",
+            "connection refused", "connection error", "temporarily unavailable",
+            "max retries", "name or service not known", "getaddrinfo",
+            "temporary failure in name resolution", "remote end closed",
+            "ssl", "eof occurred", "network is unreachable", "remotedisconnected",
         )
+    ) or any(k in s for k in ("超时", "连接被重置", "网络不可达", "暂时不可用", "服务暂时不可用"))
+    # 2) 鉴权类错误
+    is_auth = any(
+        k in low
+        for k in (
+            "401", "403", "unauthorized", "forbidden", "expired", "invalid token",
+            "invalid_token", "token expired", "authentication", "not logged",
+        )
+    ) or any(
+        k in s
+        for k in ("过期", "失效", "登录", "鉴权", "未授权", "凭据", "凭证", "cookie")
     )
+    if transient and not is_auth:
+        # 网络抖动：等一会刷新即可，不提示重导凭据
+        return {
+            "name": name,
+            "title": title,
+            "brand": brand,
+            "brand2": brand2,
+            "icon": icon,
+            "checked": False,
+            "needs_auth": False,
+            "badge": "查询失败",
+            "hide_auth_link": True,
+            "metric_label": "状态",
+            "metric_value": "暂时查不到",
+            "last_run": None,
+            "rows": [
+                {"k": "原因", "v": (s[:140] + "…") if len(s) > 140 else (s or "未知错误")},
+                {"k": "说明", "v": "这是接口临时超时/网络抖动，不是登录态失效；"
+                                 "稍后点「重新检查签到状态」即可，无需重导凭据。"},
+            ],
+            "error": None,
+        }
     badge = "登录态过期" if is_auth else "查询失败"
     rows = [{"k": "原因", "v": (s[:140] + "…") if len(s) > 140 else (s or "未知错误")}]
     for k, v in steps:
@@ -2565,12 +2688,32 @@ def run_checkin_for(name):
     raise RuntimeError("未知签到平台：%s" % name)
 
 
-def get_card_for(name):
-    """只取某个平台的最新卡片（不执行签到），用于「重新检查签到状态」。"""
+def get_card_for(name, force_live=False):
+    """只取某个平台的最新卡片（不执行签到），用于「重新检查签到状态」。
+
+    force_live=True 时绕过「当日已签」本地短路（华为等短效会话平台），
+    供用户显式点「重新检查」时做一次真实查询；但若真实查询因会话失效而报错，
+    仍回落到本地已签标记（避免把「今天其实签成功了」误报成过期）。
+    """
     fn = ADAPTERS.get(name)
     if not fn:
         return {"name": name, "title": name, "checked": False, "error": "未知平台"}
     try:
+        if force_live and name == "huawei":
+            done = _hw_today_done()
+            try:
+                card = _hw_live_card()
+            except Exception:
+                card = None
+            if card is not None:
+                return card
+            if done:
+                return _hw_done_card(done)
+            return _auth_fail_card(
+                "huawei", "华为码道每日签到", "#804FED", "#6A35D6", "huawei",
+                RuntimeError("华为会话已失效（HTTP 401/403）"),
+                [("如何恢复", "在电脑上双击 relogin_huawei.bat，弹出的窗口里登录一次华为云（一次性）")],
+            )
         return fn()
     except Exception as e:
         return {"name": name, "title": name, "checked": False, "error": str(e)}
@@ -3689,7 +3832,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if mode == "refresh":
                     # 仅刷新状态，不执行签到（用于「重新检查签到状态」）
-                    card = get_card_for(name)
+                    # force_live：华为等短效会话平台做一次真实查询，而非读当日缓存
+                    card = get_card_for(name, force_live=True)
                 else:
                     card = run_checkin_for(name)
                 self._json(200, {"ok": True, "name": name, "card": card})
