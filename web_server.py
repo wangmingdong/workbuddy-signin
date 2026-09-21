@@ -1144,11 +1144,12 @@ def get_lx_card():
             "icon": "lx",
             "checked": False,
             "needs_auth": True,
+            "hide_auth_link": True,
             "auth_url": "https://lingxi.wps.cn/",
             "metric_label": "状态",
             "metric_value": "未配置",
             "last_run": None,
-            "rows": [{"k": "说明", "v": "请在浏览器登录后重新加载本页"}],
+            "rows": [{"k": "说明", "v": "服务器未读到灵犀 Cookie（lx_cookie.txt）：在浏览器登录 lingxi.wps.cn 后导出 Cookie 部署到服务器"}],
             "error": None,
         }
     try:
@@ -1196,7 +1197,12 @@ def get_lx_card():
             "error": None,
         }
     except Exception as e:
-        return _card_error("lingxi", "WPS 灵犀每日签到", "#10B981", "#059669", "lx", e)
+        return _auth_fail_card(
+            "lingxi", "WPS 灵犀每日签到", "#10B981", "#059669", "lx", e,
+            [("如何恢复",
+              "WPS 灵犀登录 Cookie 已失效：在浏览器登录 lingxi.wps.cn 后用抓 Cookie 脚本导出 "
+              "lx_cookie.txt 部署到服务器，或在设置页更新 LX_COOKIE，再点「重新检查」")],
+        )
 
 
 def run_lx_checkin():
@@ -2151,7 +2157,7 @@ ADAPTERS = {
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai")
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "lingxi")
 
 
 def _load_json_records(path, limit=30):
@@ -2620,10 +2626,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .tab .cnt{font-size:12px;font-weight:600;opacity:.85;font-variant-numeric:tabular-nums;padding:2px 9px;border-radius:999px;background:rgba(15,23,42,.05);}
 .tab.on{color:#00614D;border-color:#00C29A;background:rgba(0,194,154,.07);box-shadow:0 10px 20px -14px rgba(0,194,154,.9);}
 .tab.on .cnt{color:#00614D;background:rgba(0,194,154,.16);}
-.tab-actions{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.tab-actions{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;grid-column:1/-1;}
 .cta.ghost.slim{width:auto;margin-top:0;padding:11px 18px;}
 .tab-hint{font-size:12px;color:var(--sub);line-height:1.5;flex:1;min-width:160px;}
-.tab-hint.block{display:block;flex:none;width:100%;margin-bottom:14px;padding:11px 14px;border-radius:12px;
+.tab-hint.block{display:block;flex:none;width:100%;margin-bottom:14px;padding:11px 14px;border-radius:12px;grid-column:1/-1;}
   background:rgba(247,144,9,.08);color:#b54708;border:1px solid rgba(247,144,9,.18);}
 .badge.manual{color:#b54708;background:rgba(247,144,9,.13);}
 .card.manual-card{cursor:default;}
