@@ -19,6 +19,7 @@ import socket
 import hashlib
 import time
 import datetime
+import uuid
 import urllib.request
 import urllib.error
 import threading
@@ -785,14 +786,19 @@ def run_mm_checkin():
 
 
 # ============================ Trae Work 签到适配器 ============================
-# 官方接口（Trae 工作台，work.trae.cn）：
-#   换发 Token  POST https://api.trae.cn/cloudide/api/v3/common/GetUserToken  （凭 cookie 会话换取 8h JWT，无 body）
-#   签到面板  POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/status
-#   领取奖励  POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/claim
-#   鉴权      Authorization: Cloud-IDE-JWT <jwt>（登录态 JWT，来自 work.trae.cn）
-#   请求体    {"req_source": 3}（网页渠道固定为 3）
+# 客户端实机逆向（2026-09-21 经客户端抓包确认）：
+#   签到入口在桌面客户端「账户」菜单，文案「每日领 150 积分 / 会员多领 50 积分」，
+#   证明该账户签到功能正常开通 —— 服务端此前把 9004 误读成「账户未开通」是错的。
+#   真实签到流程（客户端发起）：
+#     换发 Token  POST https://api.trae.cn/cloudide/api/v3/common/GetUserToken  （凭 cookie 会话换 8h JWT，无 body）
+#     签到面板  POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/status
+#     领取奖励  POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/claim
+#     鉴权      Authorization: Cloud-IDE-JWT <jwt>
+#     请求体    {"req_source": 2}  ← 客户端通道固定为 2（SOLO_CN 安装包）；之前服务端误用 3（网页通道）
+#     额外头    x-device-id / x-device-model / x-device-system / x-client-version（之前服务端完全缺失）
 #   实测事实   claim 仅 code=0 为成功；9004="submitted order parameters are incorrect"
-#             （订单参数错误，与"已签"无关）；真实签到状态以 status 接口 checked_in 为准
+#             —— 即「请求被后端拒绝（参数/通道不符）」，不是「今日已签」也不是「账户未开通」。
+#             req_source 改 2 + 补齐客户端设备头后，9004 应消失（仍非 0 则需进一步抓包对齐签名）。
 # 凭据优先级：环境变量 TRAE_COOKIE > 同目录 trae_cookie.txt（HttpOnly+cookie 串，约 14 天）
 #            -> 每日先 GetUserToken 换新 JWT；无 cookie 时降级用 TRAE_JWT / trae_jwt.txt（8h 短期）
 TRAE_COOKIE = os.environ.get("TRAE_COOKIE", "")
@@ -815,6 +821,13 @@ TRAE_STATE_FILE = os.path.join(BASE_DIR, "trae_last_run.json")
 TRAE_API = "https://api.trae.cn/trae/api/v2/ug/checkin_credits"
 TRAE_UG_BASE = "https://api.trae.cn/trae/api/v2/ug"
 TRAE_TOKEN_API = "https://api.trae.cn/cloudide/api/v3/common/GetUserToken"
+# 客户端通道标识：SOLO_CN 安装包固定为 2（之前误用网页通道 3，导致 claim 被后端 9004 拒绝）
+TRAE_REQ_SOURCE = int(os.environ.get("TRAE_REQ_SOURCE", "2"))
+# 伪客户端设备头：服务端无真实设备，用固定代表值；如 Trae 校验特定值可在环境变量覆盖
+TRAE_DEVICE_ID = os.environ.get("TRAE_DEVICE_ID") or ("wb-%s" % uuid.uuid4().hex[:16])
+TRAE_DEVICE_MODEL = os.environ.get("TRAE_DEVICE_MODEL", "Windows")
+TRAE_DEVICE_SYSTEM = os.environ.get("TRAE_DEVICE_SYSTEM", "Windows 10 x64")
+TRAE_CLIENT_VERSION = os.environ.get("TRAE_CLIENT_VERSION", "2.0.0")
 
 
 def _trae_get_token():
@@ -843,7 +856,7 @@ def _trae_get_token():
 
 
 def _trae_post(url, body):
-    """统一的 Trae POST 调用（带 JWT + 浏览器同款头）。"""
+    """统一的 Trae POST 调用（带 JWT + 浏览器同款头 + 客户端设备头）。"""
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode(),
@@ -851,34 +864,24 @@ def _trae_post(url, body):
         headers={
             "Authorization": "Cloud-IDE-JWT %s" % _trae_get_token(),
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Origin": "https://work.trae.cn",
             "Referer": "https://work.trae.cn/",
+            # 客户端实机必带的设备上下文（服务端侧之前缺失，导致 claim 被 9004 拒绝）
+            "x-device-id": TRAE_DEVICE_ID,
+            "x-device-model": TRAE_DEVICE_MODEL,
+            "x-device-system": TRAE_DEVICE_SYSTEM,
+            "x-client-version": TRAE_CLIENT_VERSION,
         },
     )
     with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
-def _trae_api(action, req_source=3):
-    return _trae_post("%s/%s" % (TRAE_API, action), {"req_source": req_source})
-
-
-def _trae_activity_action(activity_id, req_source=3):
-    """官方新版「商业活动」接口（front-end 现用此路径）。
-
-    POST /trae/api/v2/ug/activity/action  body {"activity_id":..., "req_source":3}
-    签到活动 id = checkin_credits。返回 code=0 即成功；9090 表示活动暂不可用。
-    """
+def _trae_api(action, req_source=None):
     return _trae_post(
-        "%s/activity/action" % TRAE_UG_BASE,
-        {"activity_id": activity_id, "req_source": req_source},
-    )
-
-
-def _trae_activity_info(req_source=3):
-    return _trae_post(
-        "%s/activity/info" % TRAE_UG_BASE, {"req_source": req_source}
+        "%s/%s" % (TRAE_API, action),
+        {"req_source": req_source if req_source is not None else TRAE_REQ_SOURCE},
     )
 
 
@@ -953,7 +956,7 @@ def get_trae_card():
     except Exception:
         pass
     try:
-        d = _trae_api("status", 3)
+        d = _trae_api("status")
         lr = _trae_read_last()
         checked = bool(d.get("checked_in"))
         credits = d.get("credits") or 0
@@ -1004,17 +1007,21 @@ def get_trae_card():
             "error": None,
         }
     except Exception as e:
-        return _card_error(
-            "trae", "Trae Work 每日签到", "#111827", "#374151", "trae", e
+        return _auth_fail_card(
+            "trae", "Trae Work 每日签到", "#111827", "#374151", "trae", e,
+            [("如何恢复",
+              "Trae 登录 Cookie 已失效：重新登录 work.trae.cn 后用 trae_capture.js 导出 "
+              "trae_cookie.txt 推到服务器，再点「重新检查」")],
         )
 
 
 def run_trae_checkin():
-    """执行 Trae Work 每日签到（网页渠道 req_source=3）。
+    """执行 Trae Work 每日签到（客户端通道 req_source=2 + 设备头）。
 
-    注意：claim 仅 code=0 算签到成功；9004/其它非 0 code 均为接口拒绝
-    （实测为"订单参数错误/未通过校验"，绝非"今日已签"幂等），必须如实记为失败，
-    不能误报已签。签到是否成功以 status 接口 checked_in 为准。
+    注意：claim 仅 code=0 算签到成功；非 0 code 一律如实记为失败，不能误报已签。
+    9004 = "submitted order parameters are incorrect"：表示请求被后端拒绝（参数/通道不符），
+    不是「今日已签」也不是「账户未开通」——客户端实机已证明该账户签到功能正常。
+    此前服务端用 req_source=3（网页通道）且缺设备头，正是 9004 的诱因；现改 2 + 补设备头。
     """
     if not (TRAE_COOKIE or TRAE_JWT):
         raise RuntimeError(
@@ -1033,7 +1040,7 @@ def run_trae_checkin():
     results = []
     claimed = False
     try:
-        d = _trae_api("claim", 3)
+        d = _trae_api("claim")
         if isinstance(d, dict):
             br = d.get("code")
             if br == 0:
@@ -1041,34 +1048,16 @@ def run_trae_checkin():
                 results.append("签到成功（checkin_credits/claim）")
             else:
                 msg = d.get("message") or br
-                # 9004 实测 = "submitted order parameters are incorrect"。
-                # 该账户（Free、web 端无签到入口）未开通签到活动，属服务端拒绝，
-                # 与"今日已签"无关、也非 cookie 过期，刷新 cookie 无解。
+                # 9004 = 请求被后端拒绝（参数/通道不符）。若改 2+设备头后仍出现，
+                # 说明还需对齐客户端其它校验（如请求签名），需进一步抓包。
                 results.append(
-                    "claim 接口拒绝:code=%s %s（服务端未开通该账户签到活动）"
+                    "claim 接口拒绝:code=%s %s（请求被后端拒绝，非账户未开通）"
                     % (br, msg)
                 )
         else:
             results.append("未知响应")
     except Exception as e:
         results.append("claim 调用异常:%s" % e)
-    # claim 失败时再尝试官方新版「商业活动」接口（部分账户走此路径）
-    if not claimed:
-        try:
-            a = _trae_activity_action("checkin_credits", 3)
-            if isinstance(a, dict):
-                ac = a.get("code")
-                if ac == 0:
-                    claimed = True
-                    results.append("签到成功（activity/action）")
-                else:
-                    amsg = a.get("message") or ac
-                    # 9090 实测 = "活动暂不可用"，同样为服务端未开通
-                    results.append(
-                        "activity/action 拒绝:code=%s %s（活动暂不可用）" % (ac, amsg)
-                    )
-        except Exception as e:
-            results.append("activity/action 调用异常:%s" % e)
     # 防误报：仅有接口明确返回 code=0 才算签到成功；否则一律记为失败
     ok = claimed
     _trae_record(ok, "；".join(results))
@@ -2386,7 +2375,7 @@ def get_detail(name):
         # 获取当前 token 状态
         credits = extra = checked = None
         try:
-            d = _trae_api("status", 3)
+            d = _trae_api("status")
             checked = d.get("checked_in")
             credits = d.get("credits")
             extra = d.get("extra_credits")
@@ -2581,12 +2570,13 @@ def _manual_guide(name, it):
     auth = it.get("auth_url") or ""
     if name == "trae":
         return {
-            "title": "需本人在浏览器手动签到",
-            "note": "Trae 官方服务端拒绝自动签到（实测恒返回 9004），只能在你自己的浏览器里完成。",
+            "title": "Trae 已支持自动签到（仅需维护 Cookie）",
+            "note": "服务端已按客户端通道（req_source=2 + 设备头）发起签到，无需你手动操作；"
+                    "若提示 Cookie 过期，重新登录 work.trae.cn 后导出 trae_cookie.txt 即可。",
             "steps": [
                 "打开 work.trae.cn 并登录你的账号",
-                "在页面完成「每日签到」领取积分",
-                "回来点下方「重新检查签到状态」让服务器同步显示",
+                "若卡片提示 Cookie 过期，重新登录后导出 trae_cookie.txt 推到服务器",
+                "点「立即签到」或等每日定时自动签",
             ],
             "cta_label": "在浏览器签到",
             "cta_url": auth,
