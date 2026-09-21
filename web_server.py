@@ -2396,6 +2396,48 @@ def run_daily_background():
         _DAILY_RUN["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _manual_guide(name, it):
+    """为「手动签到」分组的平台生成友好的恢复指引（仅 needs_auth / 未就绪时前端展示）。"""
+    auth = it.get("auth_url") or ""
+    if name == "trae":
+        return {
+            "title": "需本人在浏览器手动签到",
+            "note": "Trae 官方服务端拒绝自动签到（实测恒返回 9004），只能在你自己的浏览器里完成。",
+            "steps": [
+                "打开 work.trae.cn 并登录你的账号",
+                "在页面完成「每日签到」领取积分",
+                "回来点下方「重新检查签到状态」让服务器同步显示",
+            ],
+            "cta_label": "在浏览器签到",
+            "cta_url": auth,
+        }
+    if name == "huawei":
+        return {
+            "title": "服务器登录态已过期",
+            "note": "签到用的是服务器自己那份 Cookie；你在本人浏览器登录华为云，服务器拿不到（HttpOnly）。需在本机重新登录一次。",
+            "steps": [
+                "在电脑上双击 relogin_huawei.bat",
+                "弹出的 Edge 窗口里登录华为云（一次性）",
+                "登录态会自动推送到服务器，点「重新检查签到状态」",
+            ],
+            "cta_label": None,
+            "cta_url": None,
+        }
+    if name == "lingxi":
+        return {
+            "title": "登录 Cookie 已失效",
+            "note": "WPS 灵犀用的是浏览器 Cookie，过期后需要重新导出。",
+            "steps": [
+                "在浏览器登录 lingxi.wps.cn",
+                "重新导出 lx_cookie.txt 并部署到服务器",
+                "回来点「重新检查签到状态」同步最新结果",
+            ],
+            "cta_label": None,
+            "cta_url": None,
+        }
+    return None
+
+
 def get_center():
     items = [fn() for fn in ADAPTERS.values()]
     for it in items:
@@ -2419,6 +2461,10 @@ def get_center():
         d_entry = {"ok": False, "error": str(e)}
     for it in items:
         it["group"] = "auto" if it.get("name") in AUTO_PLATFORMS else "manual"
+        if it.get("group") == "manual":
+            g = _manual_guide(it.get("name"), it)
+            if g:
+                it["manual_guide"] = g
         if it.get("name") == "workbuddy":
             it["growth_entry"] = g_entry
             it["daily_entry"] = d_entry
@@ -2462,6 +2508,17 @@ def run_checkin_for(name):
     raise RuntimeError("未知签到平台：%s" % name)
 
 
+def get_card_for(name):
+    """只取某个平台的最新卡片（不执行签到），用于「重新检查签到状态」。"""
+    fn = ADAPTERS.get(name)
+    if not fn:
+        return {"name": name, "title": name, "checked": False, "error": "未知平台"}
+    try:
+        return fn()
+    except Exception as e:
+        return {"name": name, "title": name, "checked": False, "error": str(e)}
+
+
 # ============================ 手机页面 ============================
 PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
@@ -2501,6 +2558,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   background:linear-gradient(90deg,var(--wb-grad-a),var(--wb-grad-b));
   transition:width .6s cubic-bezier(.22,.8,.28,1);}
 #cards{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;}
+/* ===== 自动/手动 双 Tab ===== */
+#tabs{display:flex;gap:10px;margin-bottom:12px;}
+.tabs-spacer{height:0;}
+.tab{flex:1;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:12px 14px;cursor:pointer;
+  display:flex;flex-direction:column;gap:2px;font-weight:800;font-size:14px;color:var(--sub);
+  transition:border-color .15s,background .15s,box-shadow .15s;text-align:left;min-width:0;}
+.tab:hover{border-color:rgba(0,194,154,.4);}
+.tab .tc{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.tab .cnt{font-size:12px;font-weight:600;opacity:.85;font-variant-numeric:tabular-nums;padding:2px 9px;border-radius:999px;background:rgba(15,23,42,.05);}
+.tab.on{color:#00614D;border-color:#00C29A;background:rgba(0,194,154,.07);box-shadow:0 10px 20px -14px rgba(0,194,154,.9);}
+.tab.on .cnt{color:#00614D;background:rgba(0,194,154,.16);}
+.tab-actions{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.cta.ghost.slim{width:auto;margin-top:0;padding:11px 18px;}
+.tab-hint{font-size:12px;color:var(--sub);line-height:1.5;flex:1;min-width:160px;}
+.tab-hint.block{display:block;flex:none;width:100%;margin-bottom:14px;padding:11px 14px;border-radius:12px;
+  background:rgba(247,144,9,.08);color:#b54708;border:1px solid rgba(247,144,9,.18);}
+.badge.manual{color:#b54708;background:rgba(247,144,9,.13);}
+.card.manual-card{cursor:default;}
+.mguide{background:rgba(247,144,9,.07);border:1px solid rgba(247,144,9,.18);border-radius:12px;padding:12px 14px;margin-top:2px;}
+.mguide .mg-title{font-size:14px;font-weight:800;color:#b54708;margin-bottom:4px;}
+.mguide .mg-note{font-size:12.5px;color:#9a6a2f;line-height:1.55;margin-bottom:9px;}
+.mguide .mg-steps{margin:0;padding-left:20px;font-size:13px;color:#7a5224;line-height:1.7;}
+.mguide .mg-steps li{margin-bottom:2px;min-width:0;overflow-wrap:anywhere;}
 .card{background:var(--card);border-radius:16px;padding:16px;
   box-shadow:0 1px 2px rgba(15,23,42,.03),0 18px 34px -26px rgba(15,23,42,.75);
   border:1px solid rgba(15,23,42,.045);
@@ -2704,6 +2784,8 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
     <div class="bar"><i id="prog"></i></div>
   </div>
 
+  <div id="tabs"></div>
+
   <div id="cards"><div class="loading">加载中…</div></div>
   <div id="focus" style="display:none"></div>
 
@@ -2720,8 +2802,8 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
     <input id="key" type="password" inputmode="numeric" placeholder="输入访问口令后回车">
   </div>
 
-  <div class="hint">卡片顺序：WorkBuddy → 全自动签到 → 需偶尔维护凭据<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260920-3</div>
+  <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-1</div>
 </div>
 
 <script>
@@ -2762,15 +2844,16 @@ function fmtLast(lr){
   return "暂无记录";
 }
 function cardHTML(it){
+  var manualTag = it.group==='manual' ? '<span class="badge manual">✋ 手动</span>' : '';
   if(it.disabled){
     var drows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
     var dentries = entriesHTML(it);
     return ''+
       '<div class="card disabled" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
         '<div class="card-main">'+
-          '<div class="card-top"><div class="cicon">'+iconFor(it)+'</div><div class="ctitle">'+esc(it.title)+'</div><span class="badge todo">已停用</span></div>'+
+          '<div class="card-top"><div class="cicon">'+iconFor(it)+'</div><div class="ctitle">'+esc(it.title)+'</div>'+manualTag+'<span class="badge todo">已停用</span></div>'+
           '<div class="rows">'+drows+'</div>'+
-          '<div class="card-acts"><button class="cta ghost" data-name="'+esc(it.name)+'">重新检查</button>'+dentries+'</div>'+
+          '<div class="card-acts"><button class="cta ghost recheck" data-name="'+esc(it.name)+'">重新检查</button>'+dentries+'</div>'+
         '</div>'+
       '</div>';
   }
@@ -2787,14 +2870,14 @@ function cardHTML(it){
   if(needsAuth){
     // cookie 类平台：签到用「服务器自己那份 Cookie」，在本人浏览器登录并不会推给服务器，
     // 所以这里不摆「去登录」死路（hide_auth_link），只留一个诚实的「重新检查」。
-    var retry = '<button class="cta" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
+    var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
     btn = it.hide_auth_link
       ? retry
       : ('<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>' + retry);
   } else if(it.checked){
     // 已签到：顶部徽标已说明状态，底部只留一行「上次签到 + 重新检查」，不再重复「今日已签到」
     btn = '<div class="foot"><span class="ftxt">'+(lastTs?('上次签到 '+lastTs):'暂无签到记录')+'</span>'
-        + '<button class="cta ghost" data-name="'+esc(it.name)+'">重新检查</button></div>';
+        + '<button class="cta ghost recheck" data-name="'+esc(it.name)+'">重新检查</button></div>';
   } else {
     btn = '<button class="cta" data-name="'+esc(it.name)+'">立即签到</button>';
   }
@@ -2808,7 +2891,7 @@ function cardHTML(it){
       '<div class="card-main">'+
         '<div class="card-top">'+
           '<div class="cicon">'+iconFor(it)+'</div>'+
-          '<div class="ctitle">'+esc(it.title)+'</div>'+ badge +
+          '<div class="ctitle">'+esc(it.title)+'</div>'+ manualTag + badge +
         '</div>'+
         '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
         '<div class="rows">'+rows+'</div>'+
@@ -3221,28 +3304,116 @@ function api(path,opts){
   var url=path+(k?(path.indexOf("?")>=0?"&":"?")+"k="+encodeURIComponent(k):"");
   return fetch(url,opts||{}).then(function(r){ if(r.status===401){var e=new Error("need key");e.needKey=true;throw e;} return r.json(); });
 }
+var LAST_CENTER = null;
+var TAB = (function(){ try { return localStorage.getItem('wb_tab') || 'auto'; } catch(e){ return 'auto'; } })();
+
+function manualCardHTML(it){
+  var g = it.manual_guide || {};
+  var steps = (g.steps||[]).map(function(s){ return '<li>'+esc(s)+'</li>'; }).join("");
+  var badge = it.badge ? '<span class="badge todo">'+esc(it.badge)+'</span>' : '<span class="badge todo">待处理</span>';
+  var rows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
+  var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'">🔄 重新检查签到状态</button>';
+  var browserLink = (g.cta_url) ? '<a class="cta-link" style="margin-top:8px;background:linear-gradient(135deg,#64748b,#94a3b8)" href="'+esc(g.cta_url)+'" target="_blank" rel="noopener">🔗 '+esc(g.cta_label||'在浏览器打开')+'</a>' : '';
+  var guide = (g.title||g.note||steps) ? '<div class="mguide">'
+      + (g.title?'<div class="mg-title">'+esc(g.title)+'</div>':'')
+      + (g.note?'<div class="mg-note">'+esc(g.note)+'</div>':'')
+      + (steps?'<ol class="mg-steps">'+steps+'</ol>':'')
+    + '</div>' : '';
+  return ''
+    + '<div class="card manual-card" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'
+    +   '<div class="card-main">'
+    +     '<div class="card-top"><div class="cicon">'+iconFor(it)+'</div><div class="ctitle">'+esc(it.title)+'</div>'+badge+'</div>'
+    +     guide
+    +     '<div class="rows">'+rows+'</div>'
+    +     '<div class="card-acts">'+retry + browserLink+'</div>'
+    +   '</div>'
+    + '</div>';
+}
+
+function renderTabs(aN, aD, mN, mT){
+  var el = $('tabs'); if(!el) return;
+  el.innerHTML =
+    '<button class="tab '+(TAB==='auto'?'on':'')+'" data-tab="auto"><span class="tc"><span>🤖 自动签到</span><span class="cnt">'+aD+'/'+aN+'</span></span></button>'
+    + '<button class="tab '+(TAB==='manual'?'on':'')+'" data-tab="manual"><span class="tc"><span>✋ 手动签到</span><span class="cnt">'+mT+' 待处理</span></span></button>';
+  Array.prototype.forEach.call(el.querySelectorAll('.tab'), function(t){
+    t.addEventListener('click', function(){
+      TAB = t.getAttribute('data-tab');
+      try { localStorage.setItem('wb_tab', TAB); } catch(e){}
+      renderCenter(LAST_CENTER);
+    });
+  });
+}
+
 function renderCenter(d){
   if(!d.ok){ $("summary").textContent="读取失败"; showMsg(d.error||"读取失败","err"); return; }
+  LAST_CENTER = d;
   $("summary").textContent = "已签 "+d.signed_count+" / "+d.total_count;
   var pct = d.total_count ? Math.round(d.signed_count/d.total_count*100) : 0;
   $("prog").style.width = pct+"%";
-  // 顺序由后端的适配器顺序决定：WorkBuddy → 全自动 → 需偶尔维护凭据
+  var auto = d.items.filter(function(it){ return it.group!=='manual'; });
+  var manual = d.items.filter(function(it){ return it.group==='manual'; });
+  var autoDone = auto.filter(function(it){ return it.checked && !it.disabled; }).length;
+  var manualTodo = manual.filter(function(it){ return !it.checked || it.needs_auth; }).length;
+  renderTabs(auto.length, autoDone, manual.length, manualTodo);
+  var items = (TAB==='manual') ? manual : auto;
   var html = "";
-  d.items.forEach(function(it){ html += cardHTML(it); });
+  if(TAB==='auto'){
+    html += '<div class="tab-actions"><button class="cta ghost slim" id="runAll">🔄 立即全部签到</button>'
+          + '<span class="tab-hint">全自动平台，到点（设置里的时间）也会自动签；此按钮可随时手动触发一次</span></div>';
+  } else {
+    html += '<div class="tab-hint block">以下平台的凭据短效或服务端拒绝自动签到，需你偶尔手动维护。按卡面提示操作即可，完成后点「重新检查签到状态」同步。</div>';
+  }
+  if(!items.length){ html += '<div class="dempty">该分组暂无平台</div>'; }
+  items.forEach(function(it){
+    if(TAB==='manual' && it.needs_auth && it.manual_guide){ html += manualCardHTML(it); }
+    else { html += cardHTML(it); }
+  });
   $("cards").innerHTML = html;
-  // 卡片点击打开详情模态
+  // 卡片点击打开详情模态（手动卡不弹详情，聚焦指引）
   Array.prototype.forEach.call(document.querySelectorAll('.card'), function(c){
+    if(c.classList.contains('manual-card')) return;
     c.addEventListener('click', function(e){
       var name = c.getAttribute('data-name');
       if(!name) return;
-      // 卡片内按钮/链接（签到、登录、成长/每日任务入口）不触发详情浮层
       if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('a.entry')) return;
       openDetail(name);
     });
   });
-  // 按钮签到（排除成长/每日任务等特殊按钮）
-  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.growth-run):not(.daily-run)"), function(b){
+  // 立即签到（排除成长/每日任务与重新检查）
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
+  });
+  // 重新检查签到状态（只刷新、不执行签到）
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta.recheck[data-name]"), function(b){
+    b.addEventListener("click", function(){ recheck(b.getAttribute("data-name"), b); });
+  });
+  // 自动 Tab 的「立即全部签到」
+  var ra = $('runAll'); if(ra) ra.addEventListener('click', runAllAuto);
+}
+
+function recheck(name, btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>检查中…'; }
+  api("api/center/checkin?name="+encodeURIComponent(name)+"&mode=refresh",{method:"POST"}).then(function(d){
+    load(function(){ showMsg((d.card&&d.card.title?d.card.title:"")+" 状态已刷新 ✅","ok"); });
+  }).catch(function(e){
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); if(btn){btn.disabled=false;btn.textContent="重试";} return; }
+    var msg="网络错误："+((e&&e.message)||e); load(function(){ showMsg(msg,"err"); });
+  });
+}
+
+function runAllAuto(){
+  var b=$('runAll'); if(b){ b.disabled=true; b.innerHTML='<span class="spin"></span>签到中…'; }
+  api("api/center/checkin/all?scope=auto",{method:"POST"}).then(function(d){
+    if(d.ok){
+      showMsg("已启动自动签到，稍后自动刷新…","ok");
+      setTimeout(function(){ load(); }, 6000);
+    } else {
+      showMsg(d.error||"启动失败","err");
+      if(b){ b.disabled=false; b.textContent="🔄 立即全部签到"; }
+    }
+  }).catch(function(e){
+    showMsg("网络错误："+((e&&e.message)||e),"err");
+    if(b){ b.disabled=false; b.textContent="🔄 立即全部签到"; }
   });
 }
 function load(cb){
@@ -3457,11 +3628,31 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
                 return
             name = (q.get("name") or [""])[0]
+            mode = (q.get("mode") or ["sign"])[0]
             try:
-                card = run_checkin_for(name)
+                if mode == "refresh":
+                    # 仅刷新状态，不执行签到（用于「重新检查签到状态」）
+                    card = get_card_for(name)
+                else:
+                    card = run_checkin_for(name)
                 self._json(200, {"ok": True, "name": name, "card": card})
             except Exception as e:
                 self._json(200, {"ok": False, "name": name, "error": str(e)})
+            return
+        if u.path == "/api/center/checkin/all":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            scope = (q.get("scope") or ["all"])[0]
+            try:
+                t = threading.Thread(
+                    target=run_daily_all, kwargs={"scope": scope}, daemon=True
+                )
+                t.start()
+                self._json(200, {"ok": True, "started": True, "scope": scope})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
             return
         if u.path == "/api/growth/run":
             q = parse_qs(u.query)
@@ -3599,8 +3790,9 @@ def main():
         httpd.server_close()
 
 
-def run_daily_all():
-    """--daily：按固定顺序执行全部平台签到（顺序与首页卡片一致，最省心的在前）。
+def run_daily_all(scope=None):
+    """--daily：按固定顺序执行签到（顺序与首页卡片一致，最省心的在前）。
+    scope="auto" 只跑全自动平台；scope=None/"all" 跑全部。
     每个平台失败不中断后续平台；逐项输出结果，供 systemd journal 查看。"""
     banner = "=" * 56
     print(banner)
@@ -3616,6 +3808,8 @@ def run_daily_all():
         ("trae", "Trae Work"),
         ("huawei", "华为码道"),
     ]
+    if scope == "auto":
+        order = [(k, l) for (k, l) in order if k in AUTO_PLATFORMS]
     results = []
     for key, label in order:
         if not platform_enabled(key):
