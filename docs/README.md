@@ -1,45 +1,152 @@
-# WorkBuddy 每日积分自动签到（纯代码层）
+# 多平台积分签到中心（WorkBuddy 每日签到）
 
-每天自动领取 WorkBuddy「开学季 · Buddy加油站」活动的 100 通用积分，**完全无需打开 WorkBuddy、无需任何点击**，后台定时运行即可。
+一个纯标准库 Python 单文件服务（`web_server.py`），把多个 AI 平台的「每日积分/活动分」签到聚合成一个手机网页：**后台定时自动签，手机随时看状态、可一键补签**。
 
-## 它是怎么做到的（一句话版）
-WorkBuddy 登录后，会把登录凭证（accessToken）以明文存在你电脑的一个本地文件里；
-这个脚本每次运行时读取该文件、拿 token 去调官方签到接口，相当于"替你点了一下签到按钮"，但全程在后台、无界面。
+> 设计铁律：**单文件 SPA**——改 UI 只动 `web_server.py` 内联的 `PAGE` 字符串，不引外部静态文件；部署就是 scp 一个文件到服务器。所有凭据/状态文件**平铺在项目根目录**，服务端按平铺路径读取（这是线上部署依赖的约定，勿擅自改成子目录）。
 
-## 文件说明
+---
+
+## 它能签到哪些平台
+
+卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 9 张卡**：8 张全自动 + 1 张手动（华为）。
+
+| 平台 | 官网 | 每日奖励 | 凭据文件（根目录） | 维护频率 |
+|------|------|---------|------------------|----------|
+| WorkBuddy | workbuddy.cn | 100 积分 | `token.info` | 打开一次客户端自动续期 |
+| 百度千帆 | qianfan.baidu.com | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
+| MiniMax Code | platform.minimax.io | 400 智点 | `mm_web_token.json` | 约 40 天，过期重新登录 |
+| Qoder | qoder.com | 100 Credits | `qoder_token.txt` | 约 1 个月，失效重新取出 |
+| Link AI | console.link-ai.tech | — | `linkai_token.txt` | 不定期 |
+| WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
+| Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
+| **Coze 扣子** | coze.cn | 1500 活动分（登录自动发） | `coze_cookie.txt` | 约 60 天，过期重新导出 Cookie |
+| 华为码道（手动卡） | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步） | 会话失效后双击 `huawei/relogin_huawei.bat` |
+
+> **派猫猫旅行**已并入 WorkBuddy：它共用 WorkBuddy 登录态，在 WorkBuddy 卡内作为弹窗入口，不单独成卡、也不在设置页单独配置（开关跟随 WorkBuddy）。
+>
+> **CodeBuddy / MiniMax Agent** 曾经加过，但实测与 WorkBuddy / MiniMax Code 是同一套登录态、同一笔积分，属重复项，已删除。
+>
+> 卡片为响应式 CSS Grid：`<600px 单列 / ≥600px 两列 / ≥920px 三列 / ≥1240px 四列`；详情是**真模态弹窗**（× / 点遮罩 / Esc 三种关闭），每卡右下角「🌐 前往官网登录」跳官方站点。
+
+---
+
+## 目录结构
+
+```
+workbuddy-signin/
+├─ web_server.py          ← 核心：HTTP 服务 + 签到中心单页（PAGE 内联全部 HTML/CSS/JS）
+├─ wb_icon.py             ← 各平台官方图标（SVG/PNG，运行时注入 PAGE）
+├─ wb_travel.py           ← 派猫猫旅行（WorkBuddy 卡内弹窗）逻辑
+├─ wb_growth.py           ← WorkBuddy 成长中心 / 每日任务 一键完成
+├─ workbuddy_checkin.py   ← 核心签到逻辑（找 token → 查状态 → 签到，CLI 供 timer）
+├─ deploy_ui.py           ← 最小化 UI 部署：传 web_server.py + 凭据、重启 wb-checkin（不碰口令）
+├─ envconf.py             ← 本地运维脚本统一从 .env 读 ECS/ACCESS_KEY
+├─ config.example.json    ← 各平台凭据文件/环境变量说明模板（不进仓库）
+├─ start_web.bat          ← 启动网页服务并打印手机访问地址
+├─ run_checkin.bat        ← 本机手动跑一次每日签到
+├─ setup_task.ps1         ← 注册 Windows 计划任务（本机每日自动跑）
+├─ install_autostart.bat  ← 网页服务开机后台自启（无需管理员）
+├─ trae_capture.js        ← Trae Cookie 抓取脚本（本机从浏览器导出）
+│
+├─ ★ 凭据 & 状态文件（平铺根目录，服务端平铺读取）★
+│   token.info  qf_token.txt  mm_token.json  mm_web_token.json  qoder_token.txt
+│   linkai_token.txt  lx_cookie.txt  trae_cookie.txt  coze_cookie.txt
+│   hw_cookie.txt（注：实际由 huawei/ 工具链产生并推送）
+│   settings.json  *_last_run.json（各平台签到历史） travel_state.json
+│
+├─ huawei/                ← 华为本机常驻工具链（王大少 PC 侧，非服务器）
+│   ├─ hw_keeper.js        ← 无头常驻，每 5 分刷新华为会话
+│   ├─ hw_capture.js       ← 抓华为登录态 Cookie
+│   ├─ hw_autopush.py      ← 把 Cookie 推到 112 服务器
+│   ├─ hw_watch_login.py / hw_keepalive.py / hw_index.js
+│   ├─ relogin_huawei.bat  ← 华为登录态一键恢复（双击）
+│   ├─ run_keeper.bat / run_autopush.bat / install_keeper.bat / install_hw_keepalive.py
+│   └─ hw_profile/ / hw_cookies.json / hw_cookie.txt / 各类日志（均 gitignored）
+│
+├─ docs/                  ← 文档
+│   ├─ README.md          ← 本文件
+│   └─ WORKBUDDY_CHECKIN_REVIEW.md
+│
+├─ node_modules/          ← 解包品牌资源用的 asar 依赖（保留，非垃圾）
+└─ .env.example           ← 环境变量模板（复制为 .env 填值，.env 已 gitignored）
+```
+
+---
+
+## 文件说明（核心）
+
 | 文件 | 作用 |
 |------|------|
+| `web_server.py` | 手机网页版服务：9 个平台签到适配器 + 单页 UI；`--daily` 模式供服务器定时跑全部平台 |
+| `wb_icon.py` | 各平台官方图标（64×64 圆角内联 SVG/PNG，含 Coze 官方 logo 已 base64 内联） |
+| `wb_travel.py` | 派猫猫旅行（WorkBuddy 卡内弹窗）逻辑，共用 WorkBuddy 登录态 |
+| `wb_growth.py` | WorkBuddy 成长中心 / 每日任务 一键完成（纯标准库） |
 | `workbuddy_checkin.py` | WorkBuddy 核心脚本：读 token → 查状态 → 未签则签到 |
-| `run_checkin.bat` | 启动器（自动找 Python，输出日志到 `checkin.log`） |
-| `setup_task.ps1` | 一键注册 Windows 计划任务（每天 09:10 自动跑） |
-| `web_server.py` | **手机网页版**服务（纯标准库；含 WorkBuddy/百度千帆/MiniMax Code/Trae Work/WPS 灵犀/Link AI/华为码道/Qoder 8 个签到适配器；`--daily` 模式供服务器定时跑全部平台） |
-| `wb_icon.py` | 各平台官方图标（64×64 圆角内联 SVG/PNG） |
-| `mm_web_token.json` | MiniMax Code 网页登录 JWT（约 40 天，已配置） |
-| `trae_cookie.txt` | Trae Work 登录 Cookie 串（约 14 天，**待提供**） |
-| `lx_cookie.txt` | WPS 灵犀登录 Cookie 串（**待提供**） |
-| `linkai_token.txt` | Link AI 登录 token |
-| `hw_cookie.txt` | 华为码道登录 Cookie 串（由 `hw_autopush.py` 自动同步） |
-| `qoder_token.txt` | Qoder 登录 token（约 1 个月，由 `push_qoder.bat` 从本机客户端取出并推送） |
-| `push_qoder.bat` | 一键把本机 Qoder 客户端的最新 token 推到服务器（登录态失效时双击） |
-| `start_web.bat` | 启动网页版服务，并打印手机访问地址 |
-| `install_autostart.bat` | 可选：让网页版开机自动后台运行（无需管理员） |
+| `deploy_ui.py` | 最小化 UI 部署：上传 `web_server.py`+凭据、重启 `wb-checkin`（不改口令、不触发签到） |
+| `envconf.py` | 本地运维脚本统一从项目根 `.env` 读取 `ECS_HOST/PORT/USER/PASS/ACCESS_KEY` |
+| `config.example.json` | 各平台凭据文件 / 环境变量 / 获取方式说明模板（不进仓库） |
+| `start_web.bat` | 启动网页版服务，打印手机访问地址 |
+| `install_autostart.bat` | 可选：网页版开机自动后台运行（无需管理员） |
 
-> 凭证只**读取**不修改；为避免影响你主程序登录态，脚本不会用 refreshToken 去刷新 token。
-> 只要你平时有打开过 WorkBuddy（它每天都会自动续期），token 一直有效。
+> 凭证只**读取**不修改；脚本不会用 refreshToken 刷新，避免影响主程序登录态。
+
+---
 
 ## 配置（分享 / 迁移给他人）
 
-本项目**核心代码已配置化**：所有敏感信息（ECS 密码、网页访问口令、各平台 token/cookie）都从环境变量读取，不写死在代码里。
+本项目**核心代码已配置化**：所有敏感信息（ECS 密码、网页访问口令、各平台 token/cookie）都从环境变量读取，不写死代码。
 
-- 服务端 `web_server.py` 等读取 `WB_ACCESS_KEY` / `QF_BASE_URL` / `QF_ACCESS_TOKEN` / `TRAE_COOKIE` / `HW_COOKIE` …（生产由 systemd 注入；`QF_BASE_URL` 未设置时自动跳过千帆平台）。
-- 本地运维脚本（`check_112_hw.py` / `build_center_preview.py` / `hw_watch_login.py` / `hw_autopush.py` / `install_hw_keepalive.py` / `qoder_push.py` / `check_now.py`）统一从项目根目录的 `.env` 读取 `ECS_HOST` / `ECS_PORT` / `ECS_USER` / `ECS_PASS` / `ACCESS_KEY`，由 `envconf.py` 加载。
+- 服务端 `web_server.py` 读取 `WB_ACCESS_KEY` / `QF_BASE_URL` / `QF_ACCESS_TOKEN` / `TRAE_COOKIE` / `HW_COOKIE` …（生产由 systemd 注入；`QF_BASE_URL` 未设置时自动跳过千帆）。
+- 本地运维脚本统一从项目根 `.env` 读 `ECS_HOST / ECS_PORT / ECS_USER / ECS_PASS / ACCESS_KEY`，由 `envconf.py` 加载。
 
 **别人拿到仓库后怎么配：**
 1. 复制 `.env.example` 为 `.env`：`cp .env.example .env`
 2. 在 `.env` 里填入自己的值（ECS 地址/密码、访问口令等）。
-3. 各平台 token/cookie 仍按上文"文件说明"各自放置（如 `trae_cookie.txt`、`lx_cookie.txt`），这些文件已在 `.gitignore` 忽略。
+3. 各平台 token/cookie 仍按上文「目录结构」各自放置（如 `trae_cookie.txt`、`lx_cookie.txt`、`coze_cookie.txt`），这些文件已在 `.gitignore` 忽略。
 
-> `.env` 含真实口令，**已被 .gitignore 忽略，绝不入库**；仓库里只有 `.env.example` 占位模板。
+> `.env` 含真实口令，**已被 .gitignore 忽略，绝不入库**；仓库里只有 `.env.example` 占位模板。所有凭据/状态文件（含 `hw/` 下华为登录态、`*_last_run.json`、`token.info`、`settings.json`）均已被 `.gitignore` 忽略。
+
+---
+
+## ⚙️ 设置页（手机网页内「⚙ 设置」入口）
+
+设置页 `?view=settings` 提供傻瓜式配置，**所有更改持久化到 `settings.json`**（已 gitignored，含口令，禁入库），无需改代码、无需重启服务（口令/通知立即生效，定时时间热更新）。后端接口：`GET /api/settings`（读）、`POST /api/settings`（保存）、`POST /api/settings/test`（测试 Webhook）。
+
+分为四个分组：
+
+### 1. ⏰ 定时签到
+| 字段 | 含义 | 默认 |
+|------|------|------|
+| 启用自动签到 `schedule_enabled` | 开关内置调度器 | `True` |
+| 每日签到时间 `schedule_time` | 进程内守护线程按此时间每日自动 `run_daily_all()` | `08:35` |
+
+> 改时间**热更新**（唤醒调度线程，无需重启）。若服务器另有 systemd 定时任务（`wb-checkin-daily.timer`）未关闭，会再跑一次——结果**幂等无副作用**。
+
+### 2. 🔑 中心访问口令
+| 字段 | 含义 |
+|------|------|
+| 当前状态 | 显示「页面已单独设置」或「沿用服务器环境变量」 |
+| 新口令 `access_key` | 留空=不变；填写则**覆盖**环境变量 `WB_ACCESS_KEY`，保存后立即生效 |
+
+> 设置后本机需用新口令访问（页面把口令存 `localStorage['wb_center_key']`，**不放在 URL**）。
+
+### 3. 🎚 平台开关
+按 `PLATFORM_TITLES` 列出每个平台一个开关（WorkBuddy / 百度千帆 / MiniMax Code / Qoder / Link AI / WPS 灵犀 / Trae Work / 华为码道）：
+- 关掉的平台在 `get_center` 标 `disabled`、灰显「已停用」，并在 `run_daily_all` 中跳过；
+- **派猫猫旅行**不在此列——它跟随 WorkBuddy（关 WorkBuddy 即关 travel）。
+
+### 4. 🔔 完成通知
+| 字段 | 含义 |
+|------|------|
+| 启用通知 `notify_on` | 总开关 |
+| Webhook 地址 `notify_webhook` | 每日跑完自动推送摘要 |
+
+支持的地址（填好点「测试推送」验证）：
+- **PushPlus**：`https://www.pushplus.plus/send/你的token`（需先在 pushplus.plus 绑定微信）
+- **Server酱**：`https://sctapi.ftqq.com/你的SendKey.send`（免费 5 条/天）
+- **企业微信群机器人**：`https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx`（进企业微信，非个人微信）
+
+---
 
 ## 用法
 
@@ -51,81 +158,38 @@ run_checkin.bat
 ```
 看 `checkin.log` 里的结果即可。
 
-### 2. 设置每天自动跑（一次设置，长期有效）
-以**管理员身份**打开 PowerShell，执行：
+### 2. 设置每天自动跑（本机，一次设置长期有效）
+以**管理员身份**打开 PowerShell：
 ```powershell
 cd E:\workspace\workbuddy-signin
 .\setup_task.ps1
 ```
-之后每天 09:10 会自动签到，结果记录在 `checkin.log`。
-
-想立刻验证计划任务是否生效：
+之后每天 09:10 自动签到，结果记录在 `checkin.log`。立即验证：
 ```powershell
 schtasks /run /tn WorkBuddyDailyCheckin
 ```
 
 ### 3. 手机打开网页签到（想手动签的时候用）
-双击 `start_web.bat` 启动服务，窗口里会打印一行**手机访问地址**，例如：
-```
-手机访问地址:  http://10.100.10.248:8765   (需连同一 WiFi)
-```
-手机连上**同一个 WiFi**，浏览器打开这个地址，就能看到积分和「立即签到」按钮，点一下即完成。
-
-- 电脑防火墙首次可能弹窗，选「允许访问」（专用网络）即可。
-- 手机必须和电脑在同一局域网（同一 WiFi）；跨网络/流量访问不适用。
-- 想让服务**开机自动后台运行**：双击 `install_autostart.bat` 即可（无需管理员）。取消就删掉启动文件夹里的 `WorkBuddyCheckinWeb.vbs`。
-- 想加访问口令（防止同网其他人乱点）：不要改代码，在 `.env` 里设 `ACCESS_KEY=你的口令`（或服务器 systemd 的 `WB_ACCESS_KEY` 环境变量），重启服务后手机首次访问需输入一次。本地 `check_now.py` 也读同一个 `ACCESS_KEY`。
+双击 `start_web.bat` 启动服务，窗口打印**手机访问地址**（需连同一 WiFi）。手机浏览器打开即可看积分和「立即签到」按钮。
+- 防火墙首次弹窗选「允许访问（专用网络）」。
+- 想开机自启：双击 `install_autostart.bat`（无需管理员）。取消就删启动文件夹里的 `WorkBuddyCheckinWeb.vbs`。
+- 加访问口令：在 `.env` 设 `ACCESS_KEY=你的口令`（或服务器 `WB_ACCESS_KEY`），重启服务后手机首次访问需输入一次。
 
 ### 4. 服务器自动签到 + 手机网页查看（已部署到云服务器 ✅）
 
-**签到已经由服务器自动完成**：服务器上的 systemd 定时器 `wb-checkin-daily.timer` **每天 09:10 自动签到**（若那一刻服务器不可用，恢复后会补跑），你什么都不用做。
-网页 `http://<你的服务器IP>/checkin/`（或你绑定的域名）只是**用来看记录**（今天各平台是否已签 / 上次签到时间）；页面上的按钮是**手动备用**——万一定时没跑成功，点一下即可补签。
-
-**八个平台**（下表顺序 = 手机页卡片顺序：WorkBuddy 固定第一，其后是「全自动」组，最后是「需偶尔维护凭据」组）：
-
-| 平台 | 地址 | 每日奖励 | 凭据（服务器端） | 维护 |
-|------|------|---------|------------------|------|
-| WorkBuddy | copilot.tencent.com | 100 积分 | `token.info` | 电脑上打开一次 WorkBuddy 自动续期 |
-| 百度千帆 | 千帆官网 | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
-| MiniMax Code | agent.minimax.cn | 400 智点 | `mm_web_token.json` | 约 40 天，快到期前在浏览器重新登录一次 |
-| Qoder | qoder.com | 100 Credits | `qoder_token.txt` | 约 1 个月；失效时双击 `push_qoder.bat` |
-| Link AI | — | — | `linkai_token.txt` | 不定期 |
-| WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | **不定期需重新导出 Cookie** |
-| Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | **约 14 天，需重新导出 Cookie** |
-| 华为码道 | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt` | 会话失效后双击 `relogin_huawei.bat`（`hw_autopush.py` 会自动同步） |
-
-> 卡片这一顺序由 `web_server.py` 里 `ADAPTERS` 字典的插入顺序决定（WorkBuddy → 全自动 → 需偶尔维护凭据），`AUTO_PLATFORMS` 决定每张卡归到哪一组。
-> 卡片为响应式 CSS Grid：**<600px 单列 / ≥600px 两列 / ≥920px 三列 / ≥1240px 四列**，移动端不再横向溢出；详情改为**真模态弹窗**（点 × / 点遮罩 / 按 Esc 三种方式关闭），不会覆盖其他卡片。手机端仍是单列折叠列表。
-
-> Trae / 灵犀的 Cookie 是长期登录态（HttpOnly），无法由代码生成，只能在**系统浏览器**登录对应网站后手动复制：
-> 1. 打开 Chrome/Edge，登录 `work.trae.cn` 和 `lingxi.kdocs.cn`；
-> 2. 按 F12 → Application（应用）→ Cookies，找到 `https://api.trae.cn`（或 `lingxi.wps.cn`）域下全部 cookie；
-> 3. 把每条复制成 `名字=值` 用 `; ` 连接成一行，分别存成 `trae_cookie.txt` / `lx_cookie.txt` 放到本地 `E:\workspace\workbuddy-signin`，再运行部署脚本即可。
-
-**Qoder 的领取时间窗（和其他平台不同，注意）**：
-Qoder 每日奖励**在 10:00（UTC+8）刷新**，窗口到**次日 09:59 截止，过期不能补领**。服务器定时器 09:10 跑的时候，窗口是「昨天 10:00 → 今天 09:59」，所以每天照常领一次没问题；
-万一定时那一刻失败（token 过期等），当天的窗口只能靠网页上手动点「立即签到」挽回（须赶在 09:59 前）。想更贴合刷新时间，可在服务器上把定时器改到 10:05：
-```bash
-systemctl edit wb-checkin-daily.timer   # 加 OnCalendar=*-*-* 10:05:00，再 systemctl daemon-reload
-```
-
-**Qoder 登录态维护**：token 由服务器携带发起领取，**服务端不会自动刷新**（刷新会顶掉你本机 Qoder 客户端的登录态）。
-有效期约 1 个月；卡片显示「登录态过期」时，在**本机**双击 `push_qoder.bat` 即可：
-它从本机 Qoder 客户端（需处于已登录状态）读出最新 token、校验接口可用后推到服务器，约 1 分钟卡片自动变绿（无需重启服务，也无需重新部署）。
-token 以 `qoder_token.txt` 存于服务器部署目录（默认 `/opt/wb-checkin`，可改），该文件已被 `.gitignore` 忽略，不会入库。
+**签到已由服务器自动完成**：systemd 定时器 `wb-checkin-daily.timer` 每天 08:35 自动签到（恢复后会补跑），你什么都不用做。网页 `http://<你的服务器IP>/checkin/`（或域名）只是**用来看记录**；按钮是**手动备用**——万一定时没跑成功，点一下即可补签。
 
 | 项目 | 值 |
 |------|----|
 | 查看地址 | **http://<你的服务器IP>/checkin/**（或你的域名）|
-| 访问口令 | 由本地 `.env` 的 `ACCESS_KEY` 提供（或服务器 `WB_ACCESS_KEY` 环境变量注入），**不写在代码里**；`.env` 已被 .gitignore 忽略，分享仓库时只提交 `.env.example` 模板 |
-| 自动签到 | systemd `wb-checkin-daily.timer` → 每天 09:10 触发 `wb-checkin-daily.service`（执行 `web_server.py --daily`，一次跑完 8 个平台，任一失败不阻塞其余） |
-| 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790`（端口可改）|
+| 访问口令 | 由 `.env` 的 `ACCESS_KEY`（或服务器 `WB_ACCESS_KEY` 注入），也可在「⚙ 设置」页改；不写代码、不入库 |
+| 自动签到 | systemd `wb-checkin-daily.timer` → 每天 08:35 触发 `wb-checkin-daily.service`（执行 `web_server.py --daily`，一次跑完平台，任一失败不阻塞其余）|
+| 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790` |
 | nginx | `location /checkin/` 反代 |
-| 服务端目录 | `<部署目录>`（默认 `/opt/wb-checkin`，可改；含 web_server.py / wb_icon.py / workbuddy_checkin.py / wb_growth.py / token.info / last_run.json / mm_web_token.json / trae_cookie.txt / lx_cookie.txt / linkai_token.txt / hw_cookie.txt / qoder_token.txt / qf_token.txt）|
-| 本地部署 | `python deploy_ui.py`（上传代码 + 凭据 + 切换定时任务 → 重启服务） |
+| 服务端目录 | `/opt/wb-checkin`（含 web_server.py / wb_icon.py / workbuddy_checkin.py / wb_growth.py / token.info / 各 *_last_run.json / 各平台凭据文件 / settings.json）|
+| 本地部署 | `python deploy_ui.py`（上传代码 + 凭据 + 重启服务，最小化不碰口令）|
 
-> 原理：签到由服务器自己读本地凭证、调官方接口完成，**完全不经过你的电脑**，所以电脑关机也无所谓。
-> 网页请求：浏览器 → `http://<你的服务器IP>/checkin/`（或域名）→ nginx 反代 → `web_server.py` → 返回签到状态。
+> 原理：签到由服务器自己读本地凭证、调官方接口完成，**完全不经过你的电脑**，电脑关机也无所谓。
 
 服务器运维（SSH 登录 ECS 后执行）：
 ```bash
@@ -134,64 +198,64 @@ systemctl status wb-checkin                     # 网页服务状态
 journalctl -u wb-checkin-daily.service -n 30    # 看自动签到日志
 systemctl start wb-checkin-daily.service        # 手动立刻跑一次（不影响定时）
 systemctl restart wb-checkin                    # 重启网页服务
-python3 <部署目录>/web_server.py --daily   # 手动跑一次 8 平台签到（前台看结果）
+python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台看结果）
 ```
 
-活动结束后想彻底移除：
-```bash
-systemctl disable --now wb-checkin-daily.timer wb-checkin
-rm -f /etc/systemd/system/wb-checkin.service /etc/systemd/system/wb-checkin-daily.service /etc/systemd/system/wb-checkin-daily.timer
-rm -rf <部署目录>
-systemctl daemon-reload
-# 再从 /etc/nginx/conf.d/payroll.conf 删掉 /buddy/ 两段，然后：
-nginx -t && systemctl reload nginx
-```
+---
 
 ## WorkBuddy 成长中心 · 一键完成任务
 
-签到中心网页的 WorkBuddy 卡片底部有两个入口胶囊：「成长中心」（打开 `?view=growth`）和「每日任务」（打开 `?view=daily`），都是新开页，可一键领取成长任务奖励、并显示每个任务的完成状态。
+签到中心网页的 WorkBuddy 卡片底部有两个入口胶囊：「成长中心」（`?view=growth`）和「每日任务」（`?view=daily`），都是新开页，可一键领取成长任务奖励、显示任务完成状态。
 
-**它能做什么**
 - 自动 `accept` 全部成长任务；
-- 对**你已经真实完成**的任务，一键 `claim` 领取积分/能量（幂等，重复点不会重复领）；
-- 对未完成的任务，尽力上报对应行为事件（best-effort），并在详情里清楚标出哪些还需手动操作。
+- 对**已真实完成**的任务，一键 `claim` 领取积分/能量（幂等，重复点不重复领）；
+- 对未完成任务，尽力上报对应行为事件（best-effort），并标出哪些还需手动操作。
 
-**怎么用**
-1. 打开 `http://<你的服务器IP>/checkin/`，在 WorkBuddy 卡片底部点「成长中心」（或直接访问 `http://<你的服务器IP>/checkin/?view=growth`）；
-2. 看每个任务状态（✅ 已完成 / ⏳ 待完成 / 🔒 需手动）；
-3. 点「🚀 一键完成全部任务」，后台自动跑（页面会轮询，跑完刷新状态）。
+**⚠️ 重要限制**：成长任务计分由服务端校验**真实产品交互**（真实召唤专家、打开 Buddy、用模板、夜间访问等）。仅靠 API 上报合成事件**不会**被计入进度，因此「一键完成」**无法凭空点亮需真实操作的任务**——只能领取已完成的奖励。两个纯人工任务（关注公众号、真实捐款）天然不可自动化。
 
-**⚠️ 重要限制（务必了解）**
-成长任务的计分由服务端校验**真实产品交互**（如真实召唤专家、打开 Buddy 应用、使用模板、夜间访问等）。实测表明：仅靠 API 上报合成事件**不会**被服务端计入进度，因此「一键完成」**无法凭空点亮需要真实操作的任务**——它只能：
-- 领取你已真实完成任务的奖励；
-- 对未完成任务做事件上报尝试（多数不记分），并在页面上明确提示「需先在 WorkBuddy 客户端完成对应操作」。
-两个纯人工任务（`wb_wechat_oa_subscribe_task` 关注公众号、`Expert_Philanthropy` 真实捐款）天然不可自动化。
+接口：`GET /api/growth` → 当前成长卡片；`POST /api/growth/run` → 后台启动一键完成（前端轮询）。实现模块：`wb_growth.py`。
 
-**接口 / 调试**
-- `GET  /api/growth` → 当前成长卡片 + 上次执行结果
-- `POST /api/growth/run` → 后台启动一键完成（立即返回，前端轮询）
-- 本地调试（需明文 token）：`WB_TOKEN_FILE=token.info python wb_growth.py list|run`
-- 实现模块：`wb_growth.py`（纯标准库，零依赖）
+---
 
 ## 常见问题
-- **提示 token 已过期**：说明你很久没开 WorkBuddy 了。随便打开一次 WorkBuddy 登录，它就会刷新凭证，再运行脚本即可。
-- **签到接口报网络错误**：公司网络下若命中代理失败，脚本会自动改走直连；若仍失败，确认能正常访问 `copilot.tencent.com`。
-- **今天已经签过**：脚本会识别并跳过（不会重复领），属正常现象。
-- **手机打不开网页**：① 确认手机和电脑连的是同一 WiFi；② 确认 `start_web.bat` 窗口还开着（关掉窗口=服务停止）；③ 首次运行请在电脑弹出的防火墙提示里点「允许」；④ 换个网络后电脑 IP 可能变化，回看 `start_web.bat` 窗口里最新打印的地址。
-- **网页版和计划任务冲突吗**：不冲突。两边都调用同一个签到接口，脚本是幂等的，谁先签都行，重复点也只会提示「今天已签到」。
-- **Qoder 卡片显示「登录态过期」**：本机双击 `push_qoder.bat` 重新推一次 token 即可（详见上文「Qoder 登录态维护」）。注意 Qoder 的窗口是 10:00 刷新、次日 09:59 截止且**不可补领**，过期后错过的那天无法找回。
-- **Qoder 早上 09:10 显示「今日 10:00 刷新后开放」**：说明昨天的窗口已经领过了，等 10:00 后让定时任务或手动点一次即可。
+
+- **提示 token 已过期**：很久没开 WorkBuddy 了。打开一次 WorkBuddy 登录即刷新凭证，再运行脚本。
+- **签到接口报网络错误**：公司网下若命中代理失败，脚本自动改走直连；仍失败则确认能访问对应官网。
+- **今天已经签过**：脚本会识别并跳过，属正常。
+- **手机打不开网页**：① 手机电脑同一 WiFi；② `start_web.bat` 窗口还开着；③ 防火墙点了「允许」；④ 换网后电脑 IP 可能变，回看窗口最新地址。
+- **网页版和计划任务冲突吗**：不冲突，两边调用同一接口，幂等，谁先签都行。
+- **Qoder 卡片显示「登录态过期」**：`qoder_token.txt` 失效，约 1 个月有效期。重新从本机已登录的 Qoder 客户端取出最新 token、经 `deploy_ui.py` 部署到服务器即可（服务端不会自动刷新，否则会顶掉你本机客户端登录态）。
+- **Coze 卡片显示「未配置」**：`coze_cookie.txt` 缺失或 Cookie 过期（约 60 天）。浏览器登录 coze.cn 后从 DevTools → Application → Cookies 复制全部 cookie 存为 `coze_cookie.txt`，再 `deploy_ui.py` 推 112。
+- **华为卡显示「登录态过期」**：本机双击 `huawei/relogin_huawei.bat` 重新登录一次；之后 `hw_keeper.js` + `hw_autopush.py` 会自动维持并推送（本机需常驻运行）。
+- **设置改了不生效**：口令/通知即时生效；定时时间在保存时已热更新。若仍不对，确认 `settings.json` 已写入（被 gitignored，不会进仓库）。
+
+---
 
 ## 技术细节（给想了解的人）
-- 签到接口：`POST https://copilot.tencent.com/v2/billing/meter/daily-checkin`（body `{}`）
-- 状态接口：`POST https://copilot.tencent.com/v2/billing/meter/checkin-activity-status`
-- 余额接口：`POST https://copilot.tencent.com/v2/billing/meter/get-user-resource`（**必须带浏览器 `User-Agent`，否则网关返回 403**；返回 `data.Response.Data.Accounts[].CapacityRemainPrecise` 求和即剩余积分）
-- 消耗明细接口：`POST https://copilot.tencent.com/billing/meter/get-user-request-usage`（**路径不带 `/v2`**；body `{startTime,endTime,pageNum,pageSize}`，返回 `data.data[]` 每条含 `credit` 消耗值、`requestTime`、`model`、`client`；「昨日用量」= 取昨天全部记录对 `credit` 求和）
-- 鉴权头：`Authorization: Bearer <accessToken>` + `X-User-Id` + `X-Domain: copilot.tencent.com`
+
+**WorkBuddy**（对应 `get_wb_card` / `run_wb_checkin`）：
+- 签到：`POST https://copilot.tencent.com/v2/billing/meter/daily-checkin`
+- 状态：`POST https://copilot.tencent.com/v2/billing/meter/checkin-activity-status`
+- 余额：`POST https://copilot.tencent.com/v2/billing/meter/get-user-resource`（**必须带浏览器 `User-Agent`，否则 403**；`data.Response.Data.Accounts[].CapacityRemainPrecise` 求和即剩余积分）
+- 鉴权：`Authorization: Bearer <accessToken>` + `X-User-Id` + `X-Domain: copilot.tencent.com`
 - token 来源：`%LOCALAPPDATA%\CodeBuddyExtension\Data\Public\auth\workbuddy-desktop.info`
 
-Qoder（对应 `web_server.py` 的 `get_qd_card` / `run_qd_checkin`）：
-- 活动接口：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`（返回 `campaigns[]`，取 `actionType=="CLAIM_BENEFIT"` 那条）
-- 领取接口：`POST https://openapi.qoder.sh/sash/api/v1/me/campaigns/{campaignId}/claim`（body `{}`，幂等；`claimStatus` 变 `CLAIMED` 即成功）
-- 最小鉴权头：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
-- token 来源（本机）：`%APPDATA%\com.qoder.app.stable\auth.v1.dat`（Chromium `v10` 加密；密钥在 `Local State` 的 `os_crypt.encrypted_key`，经 DPAPI 解出后 AES-GCM 解密），由 `qoder_push.py` 读取
+**MiniMax Code**（对应 `get_mm_card` / `run_mm_checkin`）：
+- 接口：`POST https://platform.minimax.io/api/v1/credits/...`（每日 00:00 自动刷新 400 智点，积分跨 Agent/Code/API 通用——即 MiniMax Agent 与 MiniMax Code 是同一积分池，故不单独成卡）
+- 凭据：`mm_web_token.json`（JWT，约 40 天）
+
+**Qoder**（对应 `get_qd_card` / `run_qd_checkin`）：
+- 活动：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`
+- 领取：`POST https://openapi.qoder.sh/sash/api/v1/me/campaigns/{campaignId}/claim`
+- 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
+- 领取窗口：每日 **10:00（UTC+8）刷新，次日 09:59 截止，过期不可补领**——服务器定时器 08:35 跑的是「昨天 10:00 → 今天 09:59」窗口，正常每天领一次；若失败须赶在 09:59 前手动点补。
+
+**Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`）：
+- 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。
+- 凭据：`coze_cookie.txt`（Cookie 串，含 `sessionid`/`sid_guard`，约 60 天）
+
+**华为码道 DevCloud**（对应 `get_hw_card` / `run_hw_checkin`，手动卡）：
+- 端点前缀 `https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService/v1/ops/`，每日签到需带浏览器同款头（`cftk` CSRF）否则回 SPA HTML。
+- 会话寿命短（静置 30~60 分失效）→ 每天 08:35 自动签必失败；真解：本机 `hw_keeper.js` 无头常驻每 5 分刷新 + `hw_autopush.py` 推 112。本机没开机/守护停了 → 华为卡转「登录态过期」→ 双击 `huawei/relogin_huawei.bat` 恢复。
+
+**千帆 / Link AI / WPS 灵犀 / Trae**：均为标准 token 或 Cookie 串鉴权，凭据见 `config.example.json`，过期后重新导出并经 `deploy_ui.py` 部署。
