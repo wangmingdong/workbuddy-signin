@@ -1007,10 +1007,6 @@ def get_trae_card():
             "metric_value": "已签到" if checked else "待签到",
             "last_run": lr,
             "rows": rows,
-            # 说明：在本机浏览器登录 trae 并不会把登录态同步给服务器（Cookie 在服务器侧），
-            # 这个链接只用来核对账号状态，别让人误以为「点一下就能签到」。
-            "extra_link": {"text": "🔗 打开 work.trae.cn（登录态不会同步到服务器）",
-                           "url": "https://work.trae.cn/?mode=mtc"},
             "error": None,
         }
     except Exception as e:
@@ -2713,10 +2709,27 @@ def _manual_guide(name, it):
     return None
 
 
+# 各平台官网 / 登录入口（详情弹窗里统一提供「前往官网登录」链接，风格与其他卡片一致）
+OFFICIAL_SITES = {
+    "workbuddy": ("https://www.workbuddy.cn/", "WorkBuddy 官网"),
+    "qianfan":   ("https://qianfan.baidu.com/", "百度智能云千帆"),
+    "minimax":   ("https://platform.minimax.io/", "MiniMax 开放平台"),
+    "qoder":     ("https://qoder.com/", "Qoder 官网"),
+    "linkai":    ("https://console.link-ai.tech/", "Link AI 控制台"),
+    "lingxi":    ("https://lingxi.wps.cn/", "WPS 灵犀"),
+    "huawei":    ("https://devcloud.cn-north-4.huaweicloud.com/", "华为云 DevCloud"),
+    "trae":      ("https://work.trae.cn/", "Trae 官网"),
+}
+
+
 def get_center():
     items = [fn() for fn in ADAPTERS.values()]
     for it in items:
         it["disabled"] = not platform_enabled(it.get("name"))
+        # 统一挂载官网入口（详情弹窗用），覆盖成长/每日任务等无官网的子卡
+        _oname = it.get("name")
+        if _oname in OFFICIAL_SITES:
+            it["official_url"], it["official_label"] = OFFICIAL_SITES[_oname]
     signed = sum(1 for it in items if it.get("checked") and not it.get("disabled"))
     # 成长中心 / 每日任务 都属于 WorkBuddy：作为 WorkBuddy 卡片内的入口，不单独成卡
     g_entry = d_entry = None
@@ -2961,6 +2974,11 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
 .drow .dk{color:var(--sub);}
 .drow .dv{font-weight:600;text-align:right;}
 .dsec h4{margin:0 0 8px;font-size:13px;color:var(--mc,var(--c,#00C29A));opacity:.85;}
+.dfoot{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);text-align:center;}
+.olink{display:inline-block;width:100%;box-sizing:border-box;padding:11px 14px;border-radius:11px;font-size:13.5px;font-weight:600;
+  color:var(--sub);background:rgba(120,130,150,.08);border:1px solid var(--line);text-decoration:none;
+  transition:background .15s,color .15s;}
+.olink:hover{background:rgba(120,130,150,.16);color:var(--mc,var(--c,#00C29A));}
 .dempty{text-align:center;padding:20px 0;color:var(--sub);font-size:12px;}
 .dloading{display:flex;align-items:center;justify-content:center;padding:24px 0;color:var(--sub);font-size:13px;}
 .dloading .spin{margin-right:8px;border-color:rgba(0,0,0,.15);border-top-color:var(--c,#00C29A);}
@@ -3134,7 +3152,7 @@ button.entry:hover{background:#eef7f4;}
   </div>
 
   <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-4</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-5</div>
 </div>
 
 <script>
@@ -3215,9 +3233,6 @@ function cardHTML(it){
   }
   // 注：派猫猫旅行已不再是独立卡片，改为 WorkBuddy 卡内的入口 + 弹窗（见 entriesHTML/openTravel）
   var entries = entriesHTML(it);
-  var extraLink = it.extra_link
-    ? '<a class="cta-link" style="margin-top:8px;background:linear-gradient(135deg,#64748b,#94a3b8)" href="'+esc(it.extra_link.url)+'" target="_blank" rel="noopener">'+esc(it.extra_link.text)+'</a>'
-    : '';
   var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
   return ''+
     '<div class="card" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
@@ -3229,7 +3244,7 @@ function cardHTML(it){
         '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
         '<div class="rows">'+rows+'</div>'+
         (it.checked ? '' : '<div class="last">上次签到：'+last+'</div>')+
-        '<div class="card-acts">'+btn + extraLink + entries + err +'</div>'+
+        '<div class="card-acts">'+btn + entries + err +'</div>'+
       '</div>'+
     '</div>';
 }
@@ -3466,10 +3481,21 @@ consumeHTML += pkgs.map(function(p){
       consumeHTML += '<div class="dempty">暂无消耗数据</div>';
     }
   }
-detail.innerHTML = ''+
+  // 统一官网登录入口：从已加载的 center 数据里取该卡的 official_url
+  var off = null;
+  if(LAST_CENTER && LAST_CENTER.items){
+    for(var oi=0; oi<LAST_CENTER.items.length; oi++){
+      if(LAST_CENTER.items[oi].name===name){ off = LAST_CENTER.items[oi].official_url; break; }
+    }
+  }
+  var offFoot = off
+    ? '<div class="dfoot"><a class="olink" href="'+esc(off)+'" target="_blank" rel="noopener">🌐 前往官网登录 / 账号管理</a></div>'
+    : '';
+  detail.innerHTML = ''+
     '<div class="dtab"><span class="on" data-tab="signin">签到详情</span><span data-tab="consume">消耗详情</span></div>'+
     '<div class="dsec on" id="dsec-'+name+'-signin">'+signinHTML+historyHTML+'</div>'+
-    '<div class="dsec" id="dsec-'+name+'-consume">'+consumeHTML+'</div>';
+    '<div class="dsec" id="dsec-'+name+'-consume">'+consumeHTML+'</div>'+
+    offFoot;
   var tabs = detail.querySelectorAll('.dtab span');
   Array.prototype.forEach.call(tabs, function(t){
     t.addEventListener('click', function(){ switchTab(t, name, t.getAttribute('data-tab')); });
@@ -3758,6 +3784,7 @@ function manualCardHTML(it){
   var rows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
   var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'">🔄 重新检查签到状态</button>';
   var browserLink = (g.cta_url) ? '<a class="cta-link" style="margin-top:8px;background:linear-gradient(135deg,#64748b,#94a3b8)" href="'+esc(g.cta_url)+'" target="_blank" rel="noopener">🔗 '+esc(g.cta_label||'在浏览器打开')+'</a>' : '';
+  var offLink = it.official_url ? '<a class="olink" style="margin-top:8px" href="'+esc(it.official_url)+'" target="_blank" rel="noopener">🌐 前往官网登录 / 账号管理</a>' : '';
   var guide = (g.title||g.note||steps) ? '<div class="mguide">'
       + (g.title?'<div class="mg-title">'+esc(g.title)+'</div>':'')
       + (g.note?'<div class="mg-note">'+esc(g.note)+'</div>':'')
@@ -3769,7 +3796,7 @@ function manualCardHTML(it){
     +     '<div class="card-top"><div class="cicon">'+iconFor(it)+'</div><div class="ctitle">'+esc(it.title)+'</div>'+badge+'</div>'
     +     guide
     +     '<div class="rows">'+rows+'</div>'
-    +     '<div class="card-acts">'+retry + browserLink+'</div>'
+    +     '<div class="card-acts">'+retry + browserLink + offLink+'</div>'
     +   '</div>'
     + '</div>';
 }
