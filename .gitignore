@@ -77,6 +77,9 @@ _qd_campaigns_dump.json
 *_last_run.json
 # 华为「当日已签」本地标记（短效会话优化用，运行态）
 hw_today_done.json
+# 派猫猫旅行：浏览器 Cookie（HttpOnly，等同账号密码）与运行时状态，禁止入库
+wb_travel_cookie.txt
+travel_state.json
 
 # Windows 批处理在仓库里必须保持 CRLF（见 .gitattributes），
 # 但本地转换/测试产生的临时文件不必入库

@@ -45,6 +45,11 @@ except Exception:
     wb_growth = None
 
 try:
+    import wb_travel
+except Exception:
+    wb_travel = None
+
+try:
     from wb_icon import (
         CENTER_SVG,
         WB_SVG,
@@ -109,6 +114,7 @@ PLATFORM_TITLES = {
     "minimax": "MiniMax Code",
     "qoder": "Qoder",
     "linkai": "Link AI",
+    "travel": "派猫猫旅行",
     "lingxi": "WPS 灵犀",
     "trae": "Trae Work",
     "huawei": "华为码道",
@@ -158,6 +164,7 @@ def save_settings(d):
 
 SETTINGS = load_settings()
 _sched_wake = threading.Event()
+_sched_wake_travel = threading.Event()
 
 
 def current_key():
@@ -2256,12 +2263,94 @@ def get_qf_card():
 
 # 本字典的插入顺序 = 手机页卡片顺序：WorkBuddy 固定第一，
 # 其余「服务器自持长效凭据、无需人工干预」的排前面，凭据短效/依赖本机的沉底。
+# ================== 派猫猫旅行（状态机 + 轮询） ==================
+_TRAVEL_COOKIE = None  # 模块级缓存：本地 cookie 文件路径（首次探测后填充）
+_TRAVEL_RUN = {"running": False, "results": None, "updated": None, "error": None}
+
+
+def _travel_cookie():
+    """返回 cookie 文本（若有），否则 None（走 Bearer）。"""
+    global _TRAVEL_COOKIE
+    if _TRAVEL_COOKIE is not None:
+        return _TRAVEL_COOKIE
+    try:
+        p = os.environ.get("WB_TRAVEL_COOKIE") or os.path.join(BASE_DIR, "wb_travel_cookie.txt")
+        if os.path.isfile(p):
+            with open(p, "r", encoding="utf-8") as f:
+                raw = f.read().strip()
+                _TRAVEL_COOKIE = raw or None
+        else:
+            _TRAVEL_COOKIE = None
+    except Exception:
+        _TRAVEL_COOKIE = None
+    return _TRAVEL_COOKIE
+
+
+def get_travel_card():
+    """派猫猫旅行卡片（供签到中心网格展示）。失败返回错误卡，绝不抛异常。"""
+    base = {
+        "name": "travel", "title": "派猫猫旅行",
+        "brand": "#F59E0B", "brand2": "#FBBF24", "icon": "travel",
+        "checked": False, "metric_label": "今日奖励", "metric_value": "--",
+        "rows": [], "error": None,
+    }
+    if wb_travel is None:
+        base["error"] = "旅行模块未加载（wb_travel.py 缺失）"
+        return base
+    sess = _load_session_safe()
+    if not sess or not sess.get("access_token"):
+        base["needs_auth"] = True
+        base["error"] = "未找到本地会话 token（服务器需 WB_TOKEN_FILE 指向明文 token.info）"
+        return base
+    cookie = _travel_cookie()
+    return wb_travel.get_travel_card(sess, cookie=cookie)
+
+
+def run_travel_background(prefer_loc=None):
+    """后台执行一轮旅行巡检（depart/claim 状态机），避免长连接被 nginx 超时打断。"""
+    global _TRAVEL_RUN
+    _TRAVEL_RUN["running"] = True
+    _TRAVEL_RUN["error"] = None
+    try:
+        sess = _load_session_safe()
+        if not sess or not sess.get("access_token"):
+            _TRAVEL_RUN["error"] = "未找到本地会话 token（WB_TOKEN_FILE 需指向明文 token.info）"
+            return
+        cookie = _travel_cookie()
+        _TRAVEL_RUN["results"] = wb_travel.run_poll(sess, cookie=cookie, prefer_loc=prefer_loc)
+    except Exception as e:
+        _TRAVEL_RUN["error"] = str(e)
+    finally:
+        _TRAVEL_RUN["running"] = False
+        _TRAVEL_RUN["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _travel_poll_loop():
+    """旅行轮询守护线程：每 ~30 分钟巡检一次状态机。
+
+    旅行耗时 1~4 小时，单次每日签到（08:35）只能「派出」，到点在本次轮询里自动「领取」，
+    与每日一次性 run_daily_all 解耦。脚本无状态，服务端 data.state 是权威，天然幂等。"""
+    interval = 30 * 60
+    while True:
+        try:
+            _sched_wake_travel.wait(interval)
+            _sched_wake_travel.clear()
+        except Exception:
+            time.sleep(interval)
+        try:
+            if platform_enabled("travel"):
+                print("[travel] 轮询巡检（状态机 depart/claim）")
+                run_travel_background()
+        except Exception as e:
+            print("[travel] 轮询异常: %s" % e)
+
 ADAPTERS = {
     "workbuddy": get_wb_card,
     "qianfan": get_qf_card,
     "minimax": get_mm_card,
     "qoder": get_qd_card,
     "linkai": get_lk_card,
+    "travel": get_travel_card,
     # ↓ 凭据短效或依赖本机，失效后需人工处理
     "lingxi": get_lx_card,
     "trae": get_trae_card,
@@ -2269,7 +2358,7 @@ ADAPTERS = {
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "lingxi")
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "travel", "lingxi")
 
 
 def _load_json_records(path, limit=30):
@@ -2565,6 +2654,9 @@ def run_daily_background():
         _DAILY_RUN["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+
+
+
 def _manual_guide(name, it):
     """为「手动签到」分组的平台生成友好的恢复指引（仅 needs_auth / 未就绪时前端展示）。"""
     auth = it.get("auth_url") or ""
@@ -2675,6 +2767,9 @@ def run_checkin_for(name):
         return run_hw_checkin()
     if name == "qoder":
         return run_qd_checkin()
+    if name == "travel":
+        run_travel_background()
+        return get_travel_card()
     raise RuntimeError("未知签到平台：%s" % name)
 
 
@@ -2993,7 +3088,7 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
   </div>
 
   <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-1</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-2</div>
 </div>
 
 <script>
@@ -3024,6 +3119,7 @@ function iconFor(it){
   if(it.icon==="qd") return ICON_QD;
   if(it.icon==="growth") return ICON_GROWTH;
   if(it.icon==="daily") return ICON_DAILY;
+  if(it.icon==="travel") return '<div style="font-size:20px">🧳</div>';
   return '<div style="font-size:20px">🪙</div>';
 }
 function fmtLast(lr){
@@ -3071,6 +3167,10 @@ function cardHTML(it){
   } else {
     btn = '<button class="cta" data-name="'+esc(it.name)+'">立即签到</button>';
   }
+  if(it.name === "travel"){
+    // 派猫猫旅行专属操作：状态驱动（派出仅 idle 时、领取仅 arrived 时）
+    btn = travelActionsHTML(it);
+  }
   var entries = entriesHTML(it);
   var extraLink = it.extra_link
     ? '<a class="cta-link" style="margin-top:8px;background:linear-gradient(135deg,#64748b,#94a3b8)" href="'+esc(it.extra_link.url)+'" target="_blank" rel="noopener">'+esc(it.extra_link.text)+'</a>'
@@ -3110,6 +3210,21 @@ function entriesHTML(it){
        + '<span class="eic">🎯</span><span class="etx"><b>每日任务</b><small>'+esc(d)+'</small></span><span class="earrow">›</span></a>';
   }
   return '<div class="entries">'+e+'</div>';
+}
+// 派猫猫旅行专属操作按钮（状态驱动：可派/可领/巡检）
+function travelActionsHTML(it){
+  if(it.needs_auth){
+    return '<button class="cta recheck travel-act" data-name="travel">🔄 重新检查</button>';
+  }
+  var b = '';
+  if(it.can_depart){
+    b += '<button class="cta travel-act" data-act="depart" data-name="travel">🚀 派出旅行</button>';
+  }
+  if(it.can_claim){
+    b += '<button class="cta travel-act" data-act="claim" data-name="travel">🎁 领取积分</button>';
+  }
+  b += '<button class="cta ghost travel-act" data-act="poll" data-name="travel">🔄 巡检</button>';
+  return b;
 }
 function openDetail(name){
   var card = document.querySelector('.card[data-name="'+name+'"]');
@@ -3422,7 +3537,7 @@ function showFocus(view){
   else if(view==='settings') focusSettings();
   else focusDaily();
 }
-var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道"};
+var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",travel:"派猫猫旅行",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道"};
 function focusSettings(){
   var el=$('focus');
   el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
@@ -3569,9 +3684,17 @@ function renderCenter(d){
       openDetail(name);
     });
   });
-  // 立即签到（排除成长/每日任务与重新检查）
-  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run)"), function(b){
+  // 立即签到（排除成长/每日任务、重新检查、旅行专属按钮）
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run):not(.travel-act)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
+  });
+  // 旅行专属动作（派出/领取/巡检）
+  Array.prototype.forEach.call(document.querySelectorAll("button.travel-act[data-act]"), function(b){
+    b.addEventListener("click", function(){
+      var act = b.getAttribute("data-act");
+      var name = b.getAttribute("data-name") || "travel";
+      travelAction(act, name, b);
+    });
   });
   // 重新检查签到状态（只刷新、不执行签到）
   Array.prototype.forEach.call(document.querySelectorAll("button.cta.recheck[data-name]"), function(b){
@@ -3642,6 +3765,28 @@ function doCheckin(name,btn){
     }
     var msg = "网络错误："+((e&&e.message)||e);
     load(function(){ showMsg(msg,"err"); markCardErr(name,msg); });
+  });
+}
+// 派猫猫旅行动作：depart（派出）/ claim（领取）/ poll（巡检一轮）
+function travelAction(act, name, btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>处理中…'; }
+  var url;
+  if(act==="depart") url = "api/travel/depart";
+  else if(act==="claim") url = "api/travel/claim";
+  else url = "api/travel/poll";
+  api(url,{method:"POST"}).then(function(d){
+    var ok = !!d.ok;
+    var msg = ok ? ("派猫猫旅行 · "+(d.msg||"操作成功")+" ✅") : ("派猫猫旅行失败："+(d.error||d.msg||"未知错误"));
+    load(function(){ showMsg(msg, ok?"ok":"err"); });
+  }).catch(function(e){
+    if(e&&e.needKey){
+      $("keybox").className="keybox show";
+      showMsg("请输入访问口令后回车","err");
+      if(btn){ btn.disabled=false; btn.textContent="重试"; }
+      return;
+    }
+    var msg = "网络错误："+((e&&e.message)||e);
+    load(function(){ showMsg(msg,"err"); });
   });
 }
 var VIEW = null;
@@ -3772,6 +3917,22 @@ class Handler(BaseHTTPRequestHandler):
             name = (q.get("name") or [""])[0]
             try:
                 self._json(200, get_detail(name))
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/travel":
+            if not self._key_ok(parse_qs(u.query)):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                self._json(200, {
+                    "ok": True,
+                    "card": get_travel_card(),
+                    "running": _TRAVEL_RUN["running"],
+                    "results": _TRAVEL_RUN["results"],
+                    "updated": _TRAVEL_RUN["updated"],
+                    "run_error": _TRAVEL_RUN["error"],
+                })
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
@@ -3936,6 +4097,55 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
+        if u.path == "/api/travel/poll":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                if wb_travel is None:
+                    self._json(200, {"ok": False, "error": "旅行模块未加载"})
+                    return
+                if _TRAVEL_RUN["running"]:
+                    self._json(200, {"ok": True, "started": True, "running": True})
+                    return
+                t = threading.Thread(target=run_travel_background, daemon=True)
+                t.start()
+                self._json(200, {"ok": True, "started": True, "running": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path in ("/api/travel/depart", "/api/travel/claim"):
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                if wb_travel is None:
+                    self._json(200, {"ok": False, "error": "旅行模块未加载"})
+                    return
+                sess = _load_session_safe()
+                if not sess or not sess.get("access_token"):
+                    self._json(200, {"ok": False,
+                                     "error": "未找到本地会话 token（WB_TOKEN_FILE 需指向明文 token.info）"})
+                    return
+                cookie = _travel_cookie()
+                if u.path == "/api/travel/depart":
+                    loc = (q.get("loc") or [""])[0]
+                    loc_id = int(loc) if loc.isdigit() else None
+                    ok, res, used = wb_travel.depart(sess, cookie=cookie, loc_id=loc_id)
+                    self._json(200, {"ok": ok, "data": res,
+                                     "msg": ("派出成功" if ok else "派出失败")})
+                else:
+                    # 领取前先读一次状态拿到 record_id（若服务端需要）
+                    st = wb_travel.get_status(sess, cookie=cookie)
+                    rec = st.get("record_id") if isinstance(st, dict) else None
+                    ok, res, used = wb_travel.claim(sess, cookie=cookie, record_id=rec)
+                    self._json(200, {"ok": ok, "data": res,
+                                     "msg": ("领取成功" if ok else "领取失败")})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         self._send(404, "not found", "text/plain; charset=utf-8")
 
     def log_message(self, fmt, *args):
@@ -3959,6 +4169,7 @@ def main():
         run_daily_all()
         return
     threading.Thread(target=_scheduler_loop, daemon=True).start()
+    threading.Thread(target=_travel_poll_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
@@ -3995,6 +4206,7 @@ def run_daily_all(scope=None):
         ("minimax", "MiniMax Code"),
         ("qoder", "Qoder"),
         ("linkai", "Link AI"),
+        ("travel", "派猫猫旅行"),
         ("lingxi", "WPS 灵犀"),
         ("trae", "Trae Work"),
         ("huawei", "华为码道"),
