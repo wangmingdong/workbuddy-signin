@@ -2265,7 +2265,8 @@ def get_qf_card():
 # 其余「服务器自持长效凭据、无需人工干预」的排前面，凭据短效/依赖本机的沉底。
 # ================== 派猫猫旅行（状态机 + 轮询） ==================
 _TRAVEL_COOKIE = None  # 模块级缓存：本地 cookie 文件路径（首次探测后填充）
-_TRAVEL_RUN = {"running": False, "results": None, "updated": None, "error": None}
+_TRAVEL_RUN = {"running": False, "results": None, "updated": None, "error": None,
+               "state": "", "arrive_at": 0}
 
 
 def _travel_cookie():
@@ -2318,6 +2319,9 @@ def run_travel_background(prefer_loc=None):
             return
         cookie = _travel_cookie()
         _TRAVEL_RUN["results"] = wb_travel.run_poll(sess, cookie=cookie, prefer_loc=prefer_loc)
+        ls = getattr(wb_travel, "LAST_STATUS", {}) or {}
+        _TRAVEL_RUN["state"] = (ls.get("state") or "").lower()
+        _TRAVEL_RUN["arrive_at"] = ls.get("arrive_at") or 0
     except Exception as e:
         _TRAVEL_RUN["error"] = str(e)
     finally:
@@ -2326,23 +2330,30 @@ def run_travel_background(prefer_loc=None):
 
 
 def _travel_poll_loop():
-    """旅行轮询守护线程：每 ~30 分钟巡检一次状态机。
+    """旅行轮询守护线程：负责「到点自动领奖」。
 
-    旅行耗时 1~4 小时，单次每日签到（08:35）只能「派出」，到点在本次轮询里自动「领取」，
-    与每日一次性 run_daily_all 解耦。脚本无状态，服务端 data.state 是权威，天然幂等。"""
-    interval = 30 * 60
+    旅行耗时 1~4 小时，每日 08:35 那次自动签到只能把猫「派出」，回来领奖要靠本线程。
+    策略：起来先巡检一轮；若读到 state=traveling 且知道 arrive_at，就精确睡到
+    「到达后 1 分钟」再巡检（而不是死等固定 30 分钟），其余情况最多等 30 分钟。
+    服务端 data.state 是权威状态机，巡检天然幂等。"""
+    default_wait = 30 * 60
     while True:
-        try:
-            _sched_wake_travel.wait(interval)
-            _sched_wake_travel.clear()
-        except Exception:
-            time.sleep(interval)
+        wait = default_wait
         try:
             if platform_enabled("travel"):
                 print("[travel] 轮询巡检（状态机 depart/claim）")
                 run_travel_background()
+                if (_TRAVEL_RUN.get("state") or "") == "traveling" and _TRAVEL_RUN.get("arrive_at"):
+                    left = int(_TRAVEL_RUN["arrive_at"]) - int(time.time()) + 60
+                    wait = max(60, min(left, default_wait))
+                    print("[travel] 旅行中，%d 秒后再巡检" % wait)
         except Exception as e:
             print("[travel] 轮询异常: %s" % e)
+        try:
+            _sched_wake_travel.wait(wait)
+            _sched_wake_travel.clear()
+        except Exception:
+            time.sleep(wait)
 
 ADAPTERS = {
     "workbuddy": get_wb_card,
@@ -2350,7 +2361,6 @@ ADAPTERS = {
     "minimax": get_mm_card,
     "qoder": get_qd_card,
     "linkai": get_lk_card,
-    "travel": get_travel_card,
     # ↓ 凭据短效或依赖本机，失效后需人工处理
     "lingxi": get_lx_card,
     "trae": get_trae_card,
@@ -2358,7 +2368,10 @@ ADAPTERS = {
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "travel", "lingxi")
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "lingxi")
+# 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
+# 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
+AUTO_RUN = AUTO_PLATFORMS + ("travel",)
 
 
 def _load_json_records(path, limit=30):
@@ -2721,6 +2734,22 @@ def get_center():
                          "energy": dy.get("energy")})
     except Exception as e:
         d_entry = {"ok": False, "error": str(e)}
+    # 「派猫猫旅行」也属于 WorkBuddy：作为 WorkBuddy 卡内的入口（弹窗），不单独成卡
+    t_entry = None
+    try:
+        tc = get_travel_card()
+        if tc.get("needs_auth") or tc.get("error"):
+            t_entry = {"ok": False, "error": tc.get("error") or "需要处理"}
+        else:
+            t_entry = {
+                "ok": True,
+                "state": tc.get("travel_state"), "state_cn": tc.get("state_cn"),
+                "metric": tc.get("metric_value"), "checked": bool(tc.get("checked")),
+                "can_depart": bool(tc.get("can_depart")), "can_claim": bool(tc.get("can_claim")),
+                "remain": tc.get("remain"), "location": tc.get("location"),
+            }
+    except Exception as e:
+        t_entry = {"ok": False, "error": str(e)}
     for it in items:
         it["group"] = "auto" if it.get("name") in AUTO_PLATFORMS else "manual"
         if it.get("group") == "manual":
@@ -2730,6 +2759,7 @@ def get_center():
         if it.get("name") == "workbuddy":
             it["growth_entry"] = g_entry
             it["daily_entry"] = d_entry
+            it["travel_entry"] = t_entry
     return {
         "ok": True,
         "server_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -3003,6 +3033,22 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
 .entry .earrow{color:#cbd5d2;font-size:15px;font-weight:700;line-height:1;flex:0 0 auto;}
 .entry:hover{background:#eef7f4;}
 .entry:active{opacity:.7;}
+/* 旅行入口是 <button>（弹窗），需抹掉浏览器默认按钮样式，视觉与两个 <a> 入口一致 */
+button.entry{font:inherit;cursor:pointer;text-align:left;color:inherit;background:#f7fbfa;}
+button.entry:hover{background:#eef7f4;}
+/* 派猫猫旅行弹窗（WorkBuddy 卡内入口） */
+.tmeta{display:flex;align-items:baseline;gap:10px;padding:2px 0 10px;border-bottom:1px solid var(--line);margin-bottom:4px;}
+.tmeta .tmetric{font-size:22px;font-weight:800;background:linear-gradient(135deg,#F59E0B,#FBBF24);
+  -webkit-background-clip:text;background-clip:text;color:transparent;}
+.tmeta .tstate{font-size:12px;font-weight:700;color:#b45309;background:rgba(245,158,11,.16);
+  border-radius:999px;padding:3px 10px;white-space:nowrap;}
+.tletter{font-size:12.5px;line-height:1.7;color:#6b5f43;background:#fffbeb;border:1px dashed #f2d98a;
+  border-radius:14px;padding:12px 14px;margin:12px 0;white-space:pre-wrap;word-break:break-word;}
+.tacts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.tacts .cta{flex:1 1 46%;width:auto;min-width:110px;margin-top:0;}
+.tres{margin-top:10px;font-size:12.5px;line-height:1.6;border-radius:12px;padding:9px 12px;display:none;}
+.tres.ok{display:block;color:#00614D;background:rgba(0,194,154,.12);}
+.tres.err{display:block;color:#912018;background:rgba(217,45,32,.10);}
 /* 设置页 */
 .gear{margin-left:auto;flex:0 0 auto;width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.4);
   background:rgba(255,255,255,.15);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;
@@ -3088,7 +3134,7 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
   </div>
 
   <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-2</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-3</div>
 </div>
 
 <script>
@@ -3167,10 +3213,7 @@ function cardHTML(it){
   } else {
     btn = '<button class="cta" data-name="'+esc(it.name)+'">立即签到</button>';
   }
-  if(it.name === "travel"){
-    // 派猫猫旅行专属操作：状态驱动（派出仅 idle 时、领取仅 arrived 时）
-    btn = travelActionsHTML(it);
-  }
+  // 注：派猫猫旅行已不再是独立卡片，改为 WorkBuddy 卡内的入口 + 弹窗（见 entriesHTML/openTravel）
   var entries = entriesHTML(it);
   var extraLink = it.extra_link
     ? '<a class="cta-link" style="margin-top:8px;background:linear-gradient(135deg,#64748b,#94a3b8)" href="'+esc(it.extra_link.url)+'" target="_blank" rel="noopener">'+esc(it.extra_link.text)+'</a>'
@@ -3190,10 +3233,10 @@ function cardHTML(it){
       '</div>'+
     '</div>';
 }
-// WorkBuddy 卡片内的「成长中心 / 每日任务」入口（点击新标签页打开独立功能页）
+// WorkBuddy 卡片内的入口：成长中心 / 每日任务（新标签页）+ 派猫猫旅行（弹窗）
 function entriesHTML(it){
-  var ge = it.growth_entry, de = it.daily_entry;
-  if(!ge && !de) return '';
+  var ge = it.growth_entry, de = it.daily_entry, te = it.travel_entry;
+  if(!ge && !de && !te) return '';
   var e = '';
   if(ge){
     var g = ge.ok
@@ -3209,22 +3252,118 @@ function entriesHTML(it){
     e += '<a class="entry" href="?view=daily" target="_blank" rel="noopener">'
        + '<span class="eic">🎯</span><span class="etx"><b>每日任务</b><small>'+esc(d)+'</small></span><span class="earrow">›</span></a>';
   }
-  return '<div class="entries">'+e+'</div>';
+  var html = e ? ('<div class="entries">'+e+'</div>') : '';
+  // 派猫猫旅行：同样属于 WorkBuddy，但改成弹窗（数据量大、含明信片与操作按钮），独占一行
+  if(te){
+    var tt;
+    if(!te.ok) tt = '暂不可用';
+    else if(te.can_claim) tt = '可领 '+(te.metric||'奖励')+'，点开领取';
+    else if(te.can_depart) tt = '今日还没派出，点开派出';
+    else if(te.checked) tt = te.metric || '今日已完成';
+    else if(te.remain) tt = te.remain;
+    else tt = te.state_cn || '--';
+    html += '<div class="entries">'
+          + '<button class="entry" type="button" id="travelEntry" data-travel="1">'
+          + '<span class="eic">🧳</span><span class="etx"><b>派猫猫旅行</b><small>'+esc(tt)+'</small></span>'
+          + '<span class="earrow">›</span></button></div>';
+  }
+  return html;
 }
-// 派猫猫旅行专属操作按钮（状态驱动：可派/可领/巡检）
-function travelActionsHTML(it){
-  if(it.needs_auth){
-    return '<button class="cta recheck travel-act" data-name="travel">🔄 重新检查</button>';
+// 派猫猫旅行操作按钮（状态驱动：可派/可领/巡检）—— 只在弹窗里用
+function travelActionsHTML(c){
+  if(c && c.needs_auth){
+    return '<button class="cta recheck travel-act" type="button" data-act="poll">🔄 重新检查</button>';
   }
   var b = '';
-  if(it.can_depart){
-    b += '<button class="cta travel-act" data-act="depart" data-name="travel">🚀 派出旅行</button>';
+  if(c && c.can_depart){
+    b += '<button class="cta travel-act" type="button" data-act="depart">🚀 派出旅行</button>';
   }
-  if(it.can_claim){
-    b += '<button class="cta travel-act" data-act="claim" data-name="travel">🎁 领取积分</button>';
+  if(c && c.can_claim){
+    b += '<button class="cta travel-act" type="button" data-act="claim">🎁 领取积分</button>';
   }
-  b += '<button class="cta ghost travel-act" data-act="poll" data-name="travel">🔄 巡检</button>';
+  b += '<button class="cta ghost travel-act" type="button" data-act="poll">🔄 巡检状态</button>';
   return b;
+}
+// ===== 派猫猫旅行弹窗（从 WorkBuddy 卡片内的入口打开，不再单独成卡）=====
+var TRAVEL_MSG = null;   // 弹窗内的一次性结果条 {msg, ok}（跨刷新保留，重新打开时清空）
+function openTravel(){
+  TRAVEL_MSG = null;
+  var panel = $('modal-panel'); if(panel) panel.style.setProperty('--mc','#F59E0B');
+  var t = $('modal-title'); if(t) t.textContent = '🧳 派猫猫旅行';
+  var m = $('modal'); if(m){ m.classList.add('show'); document.body.style.overflow = 'hidden'; }
+  var b = $('modal-body'); if(b) b.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+  loadTravelModal();
+}
+function loadTravelModal(){
+  api('api/travel').then(function(d){ renderTravelModal(d); }).catch(function(e){
+    var b = $('modal-body');
+    if(b) b.innerHTML = '<div class="card-err">⚠️ '+esc((e&&e.message)||e||'加载失败')+'</div>';
+  });
+}
+function renderTravelModal(d){
+  var b = $('modal-body'); if(!b) return;
+  if(!d || !d.ok){ b.innerHTML = '<div class="card-err">⚠️ '+esc((d&&d.error)||'加载失败')+'</div>'; return; }
+  var c = d.card || {};
+  if(c.error && !c.travel_state){ b.innerHTML = '<div class="card-err">⚠️ '+esc(c.error)+'</div>'; return; }
+  var rows = (c.rows||[]).map(function(r){
+    return '<div class="drow"><span class="dk">'+esc(r.k)+'</span><span class="dv">'+esc(r.v)+'</span></div>';
+  }).join('');
+  var res = TRAVEL_MSG ? ('<div class="tres '+(TRAVEL_MSG.ok?'ok':'err')+'">'+esc(TRAVEL_MSG.msg)+'</div>') : '';
+  var letter = c.letter_text ? '<div class="tletter">'+esc(c.letter_text)+'</div>' : '';
+  var runnote = d.running ? '<div class="fnote" style="text-align:center">⏳ 正在巡检，稍后自动刷新…</div>' : '';
+  var results = '';
+  if(!d.running && d.results && d.results.length){
+    // 过滤掉纯技术态（status 那条），只留人话，并标上成功/失败符号
+    var rs = d.results.filter(function(r){ return r.code !== 'status'; })
+      .map(function(r){ return (r.ok ? '✅ ' : '⚠️ ') + (r.msg || r.code || ''); });
+    if(rs.length) results = '<div class="fnote">上次巡检：'+esc(rs.join('　'))+'</div>';
+  } else if(d.run_error){
+    results = '<div class="fnote" style="color:#912018">⚠️ '+esc(d.run_error)+'</div>';
+  }
+  b.innerHTML = ''
+    + '<div class="tmeta"><span class="tmetric">'+esc(c.metric_value||'--')+'</span>'
+    +   '<span class="tstate">'+esc(c.state_cn||'—')+'</span></div>'
+    + '<div class="drows">'+rows+'</div>'
+    + res
+    + letter
+    + '<div class="tacts">'+travelActionsHTML(c)+'</div>'
+    + runnote + results
+    + '<div class="fnote">每天可把小猫派去 4 个地点之一，旅行 1~4 小时后回来领 5~10 积分。'
+    + '「派出」只在今天还没派时出现；「领取」只在猫咪已回来、奖还没领时出现。'
+    + '<b>自动流程</b>：每天定时签到自动派出，之后系统定时巡查、到点自动领奖，你什么都不用点。</div>';
+  bindTravelModal(b);
+  if(d.running) setTimeout(loadTravelModal, 3000);
+}
+function bindTravelModal(el){
+  Array.prototype.forEach.call(el.querySelectorAll('button.travel-act[data-act]'), function(btn){
+    btn.addEventListener('click', function(){ travelModalAction(btn.getAttribute('data-act'), btn); });
+  });
+}
+function travelModalAction(act, btn){
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>处理中…'; }
+  var url = (act==='depart') ? 'api/travel/depart' : (act==='claim' ? 'api/travel/claim' : 'api/travel/poll');
+  if(act === 'poll'){
+    TRAVEL_MSG = {msg:'已发起巡检，稍后自动刷新结果…', ok:true};
+    api(url,{method:'POST'}).then(function(){ loadTravelModal(); }).catch(function(e){
+      TRAVEL_MSG = {msg:'巡检失败：'+((e&&e.message)||e), ok:false};
+      loadTravelModal();
+    });
+    return;
+  }
+  api(url,{method:'POST'}).then(function(d){
+    var ok = !!d.ok;
+    TRAVEL_MSG = {msg: ok ? ('✅ '+(d.msg||'操作成功')) : ('⚠️ '+(d.error||d.msg||'操作失败')), ok: ok};
+    load();                 // 顺便刷新卡片上旅行入口的小字（不弹提示、不关弹窗）
+    loadTravelModal();
+  }).catch(function(e){
+    if(e && e.needKey){
+      $('keybox').className = 'keybox show';
+      TRAVEL_MSG = {msg:'需要访问口令，请在下方输入后回车重试', ok:false};
+    } else {
+      TRAVEL_MSG = {msg:'网络错误：'+((e&&e.message)||e), ok:false};
+    }
+    loadTravelModal();
+  });
 }
 function openDetail(name){
   var card = document.querySelector('.card[data-name="'+name+'"]');
@@ -3680,7 +3819,7 @@ function renderCenter(d){
     c.addEventListener('click', function(e){
       var name = c.getAttribute('data-name');
       if(!name) return;
-      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('a.entry')) return;
+      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.entry')) return;
       openDetail(name);
     });
   });
@@ -3688,13 +3827,10 @@ function renderCenter(d){
   Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run):not(.travel-act)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
   });
-  // 旅行专属动作（派出/领取/巡检）
-  Array.prototype.forEach.call(document.querySelectorAll("button.travel-act[data-act]"), function(b){
-    b.addEventListener("click", function(){
-      var act = b.getAttribute("data-act");
-      var name = b.getAttribute("data-name") || "travel";
-      travelAction(act, name, b);
-    });
+  // WorkBuddy 卡内的「派猫猫旅行」入口 → 打开弹窗
+  // 注意：弹窗里的按钮由 bindTravelModal() 单独绑定；这里只绑卡片内的入口，避免重复触发。
+  Array.prototype.forEach.call(document.querySelectorAll('button.entry[data-travel]'), function(b){
+    b.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openTravel(); });
   });
   // 重新检查签到状态（只刷新、不执行签到）
   Array.prototype.forEach.call(document.querySelectorAll("button.cta.recheck[data-name]"), function(b){
@@ -3767,28 +3903,7 @@ function doCheckin(name,btn){
     load(function(){ showMsg(msg,"err"); markCardErr(name,msg); });
   });
 }
-// 派猫猫旅行动作：depart（派出）/ claim（领取）/ poll（巡检一轮）
-function travelAction(act, name, btn){
-  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>处理中…'; }
-  var url;
-  if(act==="depart") url = "api/travel/depart";
-  else if(act==="claim") url = "api/travel/claim";
-  else url = "api/travel/poll";
-  api(url,{method:"POST"}).then(function(d){
-    var ok = !!d.ok;
-    var msg = ok ? ("派猫猫旅行 · "+(d.msg||"操作成功")+" ✅") : ("派猫猫旅行失败："+(d.error||d.msg||"未知错误"));
-    load(function(){ showMsg(msg, ok?"ok":"err"); });
-  }).catch(function(e){
-    if(e&&e.needKey){
-      $("keybox").className="keybox show";
-      showMsg("请输入访问口令后回车","err");
-      if(btn){ btn.disabled=false; btn.textContent="重试"; }
-      return;
-    }
-    var msg = "网络错误："+((e&&e.message)||e);
-    load(function(){ showMsg(msg,"err"); });
-  });
-}
+// （原 travelAction 已废弃：旅行动作改在弹窗内由 travelModalAction 处理）
 var VIEW = null;
 try { VIEW = new URLSearchParams(location.search).get("view"); } catch(e){}
 $("key").addEventListener("change", function(e){
@@ -4202,17 +4317,17 @@ def run_daily_all(scope=None):
     print(banner)
     order = [
         ("workbuddy", "WorkBuddy"),
+        ("travel", "派猫猫旅行"),
         ("qianfan", "百度千帆"),
         ("minimax", "MiniMax Code"),
         ("qoder", "Qoder"),
         ("linkai", "Link AI"),
-        ("travel", "派猫猫旅行"),
         ("lingxi", "WPS 灵犀"),
         ("trae", "Trae Work"),
         ("huawei", "华为码道"),
     ]
     if scope == "auto":
-        order = [(k, l) for (k, l) in order if k in AUTO_PLATFORMS]
+        order = [(k, l) for (k, l) in order if k in AUTO_RUN]
     results = []
     for key, label in order:
         if not platform_enabled(key):

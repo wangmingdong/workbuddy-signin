@@ -8,8 +8,8 @@
            若 Bearer 返回 401/403，则回退到浏览器 HttpOnly Cookie
            （session / session_2 / tgw_l7_route），Cookie 放 wb_travel_cookie.txt
            或环境变量 WB_TRAVEL_COOKIE 指向的文件。
-  状态     data.state: idle / traveling / arrived
-           data.daily_limit_reached: 今日是否已领满（布尔）
+  状态     data.state: idle / traveling / arrived（⭐ 唯一权威状态机）
+           data.daily_limit_reached: 今日是否已「派出」过（= 不能再派，≠ 已领奖！）
            data.record_id: 本次旅行记录 id（claim 时可能需要）
            data.arrive_at: 预计到达（领取）时间戳（秒）
            data.reward_credit: 本次奖励积分数
@@ -46,6 +46,10 @@ LOC_CODES = {1: "coffee", 2: "mall", 3: "gym", 4: "inn"}
 
 STATE_FILE_ENV = "WB_TRAVEL_STATE"
 COOKIE_FILE_ENV = "WB_TRAVEL_COOKIE"
+
+# 最近一次巡检读到的原始 status（供调用方决定「下次多久再来」）：
+# 若 traveling 且知道 arrive_at，调用方可精确睡到到达后再巡检，无需死等固定间隔。
+LAST_STATUS = {}
 
 
 def _state_path():
@@ -174,12 +178,15 @@ def depart(sess, cookie=None, loc_id=None):
 
 
 def claim(sess, cookie=None, record_id=None):
-    """领取旅行积分。record_id 可选。返回 (ok, data, used_payload)。"""
-    attempts = []
+    """领取旅行积分。返回 (ok, data, used_payload)。
+
+    ⚠️ 实测（2026-09-21）：官方客户端就是发**空 body** `{"code":0,"msg":"OK"}` 即成功，
+    服务端靠权威 state 判断该领哪一次的奖，**不需要 record_id**。
+    先试空 body（与官方一致、最稳），失败再退 record_id 变体。"""
+    attempts = [{}]
     if record_id:
         attempts.append({"record_id": record_id})
         attempts.append({"recordId": record_id})
-    attempts.append({})
     last = None
     for pl in attempts:
         s, b = _req(sess, "/claim", method="POST", payload=pl, cookie=cookie)
@@ -214,13 +221,23 @@ def run_poll(sess, cookie=None, prefer_loc=None):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     state_rec = _load_state()
 
-    out.append({"code": "status", "ok": True,
-                "msg": "状态=%s 地点=%s 今日上限=%s" % (state, loc, limit)})
+    global LAST_STATUS
+    LAST_STATUS = dict(st)
 
-    # 今日已达领取上限：无论当前处于什么状态都跳过（幂等保护，避免对已领的再 claim）
-    if limit:
-        out.append({"code": "limit", "ok": True, "msg": "今日已达领取上限"})
-    elif state == "arrived":
+    # 服务端在 idle（今日结束）后会清掉 location，所以路上/到达时见到就记下来，
+    # 供「今日已完成」状态下回显「今天去了哪儿」。
+    if state in ("traveling", "arrived") and loc and loc != "-":
+        state_rec["last_depart_loc"] = loc
+
+    out.append({"code": "status", "ok": True,
+                "msg": "状态=%s 地点=%s 今日已派=%s" % (state, loc, limit)})
+
+    # ⚠️ 语义更正（2026-09-21 实测）：daily_limit_reached 是「今天已经派过一次、不能再派」，
+    # 与「奖励是否已领」无关！绝不能拿它当"已领"来短路，否则 arrived（有奖待领）会被跳过，
+    # 奖励永远领不到 —— 这正是「卡片说已领 +6 分、官方页面说旅行完毕但没领奖」的根因。
+    # 权威判断只看 state：arrived=待领 → 领；traveling=路上 → 等；idle+未派 → 派；
+    # idle+已派 = 今日完成（服务端没有待领奖励）。
+    if state == "arrived":
         ok, res, used = claim(sess, cookie=cookie, record_id=rec)
         if ok:
             got = res.get("reward_credit", reward)
@@ -233,7 +250,7 @@ def run_poll(sess, cookie=None, prefer_loc=None):
                         "msg": "领取失败：%s" % _brief(res or {})})
     elif state == "traveling":
         out.append({"code": "traveling", "ok": True, "msg": "旅行中，暂不重复派出（到点自动领）"})
-    else:
+    elif state == "idle" and not limit:
         ok, res, used = depart(sess, cookie=cookie, loc_id=prefer_loc)
         if ok:
             state_rec["last_depart_loc"] = LOCATIONS.get(prefer_loc or 0, loc)
@@ -243,6 +260,8 @@ def run_poll(sess, cookie=None, prefer_loc=None):
         else:
             out.append({"code": "depart", "ok": False,
                         "msg": "派出失败：%s" % _brief(res or {})})
+    else:
+        out.append({"code": "done", "ok": True, "msg": "今日已完成（已派出且无待领奖励）"})
 
     state_rec["last_poll"] = now
     _save_state(state_rec)
@@ -269,51 +288,59 @@ def get_travel_card(sess, cookie=None):
             return base
 
         state = (st.get("state") or "").lower()
-        limit = bool(st.get("daily_limit_reached"))
+        limit = bool(st.get("daily_limit_reached"))   # = 今天已派过一次（≠ 已领奖！）
         loc = (st.get("location") or {}).get("name") or "-"
         arrive = st.get("arrive_at")
         reward = st.get("reward_credit")
         server_now = st.get("server_now") or int(time.time())
+        letter = st.get("letter") or {}
+        letter_text = letter.get("text") or ""
+        letter_guide = letter.get("guide_text") or ""
 
         remain = ""
+        remain_secs = 0
         if state == "traveling" and arrive:
             secs = max(0, int(arrive) - int(server_now))
+            remain_secs = secs
             h = secs // 3600
             m = (secs % 3600) // 60
             remain = ("%d 小时 %d 分后到达" % (h, m)) if h else ("%d 分后到达" % m)
 
         state_rec = _load_state()
         today = datetime.date.today().isoformat()
-        claimed_today = bool(state_rec.get("last_claim_date") == today) or limit
-        checked = bool(limit) or claimed_today
+        claimed_today = bool(state_rec.get("last_claim_date") == today)
+        last_reward = state_rec.get("last_reward")
+        # 服务端 idle 后不再给 location，用巡检时记下的地点回显
+        loc_show = loc if (loc and loc != "-") else (state_rec.get("last_depart_loc") or "-")
 
-        # 状态文案
-        if limit or claimed_today:
-            state_cn = "今日已领"
-        elif state == "arrived":
-            state_cn = "已到达 · 可领取"
+        # ⚠️ 只有「猫咪已回 + 奖已领」（服务端 state=idle 且今天派过）才算今日完成。
+        # arrived = 猫咪回来了但奖励还挂在门口 → 绝不能算「已签」！这是本卡此前的谎报根因。
+        if state == "arrived":
+            state_cn = "已到达 · 待领取"
+            checked = False
+            metric = ("可领 +%s 分" % reward) if reward else "可领取"
         elif state == "traveling":
             state_cn = "旅行中"
+            checked = False
+            metric = "旅行中"
+        elif state == "idle" and limit:
+            state_cn = "今日已完成"
+            checked = True
+            metric = ("今日已领 +%s 分" % last_reward) if (claimed_today and last_reward) else "今日已完成"
         else:
             state_cn = "待派出"
-
-        # 指标
-        if checked:
-            if state_rec.get("last_reward"):
-                metric = "今日已领 +%s 分" % state_rec["last_reward"]
-            elif reward:
-                metric = "今日已领 +%s 分" % reward
-            else:
-                metric = "今日已领"
-        elif state == "arrived" and reward:
-            metric = "可领 +%s 分" % reward
-        elif state == "traveling":
-            metric = "旅行中"
-        else:
+            checked = False
             metric = "待派出"
 
         can_depart = (state == "idle" and not limit)
-        can_claim = (state == "arrived" and not limit)
+        can_claim = (state == "arrived")   # 权威只看 state：arrived 就有奖可领，与 limit 无关
+
+        if state == "arrived" and reward:
+            reward_text = "+%s 分" % reward
+        elif claimed_today and last_reward:
+            reward_text = "+%s 分" % last_reward
+        else:
+            reward_text = "--"
 
         last_run = None
         if state_rec.get("last_poll"):
@@ -325,10 +352,10 @@ def get_travel_card(sess, cookie=None):
             }
 
         rows = [
-            {"k": "当前状态", "v": state_cn},
-            {"k": "旅行地点", "v": loc},
+            {"k": "签到状态", "v": state_cn},
+            {"k": "旅行地点", "v": loc_show},
             {"k": "到达倒计时", "v": remain or "--"},
-            {"k": "本次奖励", "v": ("+%s 分" % reward) if reward else "--"},
+            {"k": "本次奖励", "v": reward_text},
         ]
 
         base.update({
@@ -338,12 +365,17 @@ def get_travel_card(sess, cookie=None):
             "rows": rows,
             "last_run": last_run,
             "travel_state": state,
+            "state_cn": state_cn,
             "can_depart": can_depart,
             "can_claim": can_claim,
-            "location": loc,
+            "location": loc_show,
             "remain": remain,
+            "remain_secs": remain_secs,
             "reward": reward,
             "daily_limit": limit,
+            "letter_text": letter_text,
+            "letter_guide": letter_guide,
+            "done_today": bool(state == "idle" and limit),
         })
         return base
     except Exception as e:
