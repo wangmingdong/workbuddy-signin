@@ -114,7 +114,6 @@ PLATFORM_TITLES = {
     "minimax": "MiniMax Code",
     "qoder": "Qoder",
     "linkai": "Link AI",
-    "travel": "派猫猫旅行",
     "lingxi": "WPS 灵犀",
     "trae": "Trae Work",
     "huawei": "华为码道",
@@ -172,6 +171,10 @@ def current_key():
 
 
 def platform_enabled(name):
+    # 派猫猫旅行已并入 WorkBuddy（共用登录态 + 卡片内弹窗入口），不再独立配置，
+    # 其开关随 WorkBuddy 走：关 WorkBuddy 即关 travel。
+    if name == "travel":
+        name = "workbuddy"
     return bool(SETTINGS.get("platforms", {}).get(name, True))
 
 
@@ -3273,7 +3276,7 @@ button.entry:hover{background:#eef7f4;}
   </div>
 
   <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-8</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-9</div>
 </div>
 
 <script>
@@ -3828,7 +3831,7 @@ function showFocus(view){
   else if(view==='settings') focusSettings();
   else focusDaily();
 }
-var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",travel:"派猫猫旅行",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",};
+var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",};
 function focusSettings(){
   var el=$('focus');
   el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
