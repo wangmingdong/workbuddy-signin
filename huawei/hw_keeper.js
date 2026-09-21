@@ -6,7 +6,7 @@
 const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
 const fs = require('fs');
 
-const BASE = 'E:/workspace/workbuddy-signin';
+const BASE = __dirname;
 const PROFILE = BASE + '/hw_profile';
 const COOKIES = BASE + '/hw_cookies.json';
 const LOG = BASE + '/hw_keeper.log';

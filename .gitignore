@@ -75,6 +75,8 @@ coze_logo.png
 qoder_token.txt
 _qd_auth.json
 _qd_campaigns_dump.json
+# 千帆登录态（明文 token，禁止入库）
+qf_token.txt
 
 # 各平台签到运行时状态（非交付物）
 *_last_run.json

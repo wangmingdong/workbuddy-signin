@@ -1,9 +1,10 @@
 const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
 const fs = require('fs');
 
-const PROFILE = 'E:/workspace/workbuddy-signin/hw_profile';
-const NETLOG = 'E:/workspace/workbuddy-signin/hw_netlog.jsonl';
-const COOKIES = 'E:/workspace/workbuddy-signin/hw_cookies.json';
+const BASE = __dirname;
+const PROFILE = BASE + '/hw_profile';
+const NETLOG = BASE + '/hw_netlog.jsonl';
+const COOKIES = BASE + '/hw_cookies.json';
 const TARGET = 'https://devcloud.cn-north-4.huaweicloud.com/chat/home';
 
 const isHw = (u) => /huaweicloud|hwcloud|huawei/i.test(u);
@@ -52,7 +53,7 @@ function append(rec) {
     if (closed) return;
     closed = true;
     console.log('[exit] browser closed:', why);
-    try { fs.appendFileSync('E:/workspace/workbuddy-signin/hw_capture.log',
+    try { fs.appendFileSync(BASE + '/hw_capture.log',
       '\n[exit] ' + new Date().toLocaleString() + ' ' + why + '\n'); } catch (e) {}
     process.exit(0);
   };
@@ -68,12 +69,12 @@ function append(rec) {
   // screenshot + DOM-text trigger: touch hw_shot.trigger to capture current page
   setInterval(async () => {
     try {
-      if (!fs.existsSync('E:/workspace/workbuddy-signin/hw_shot.trigger')) return;
-      try { fs.rmSync('E:/workspace/workbuddy-signin/hw_shot.trigger', { force: true }); } catch (e) {}
-      await page.screenshot({ path: 'E:/workspace/workbuddy-signin/hw_shot.png', fullPage: false });
+      if (!fs.existsSync(BASE + '/hw_shot.trigger')) return;
+      try { fs.rmSync(BASE + '/hw_shot.trigger', { force: true }); } catch (e) {}
+      await page.screenshot({ path: BASE + '/hw_shot.png', fullPage: false });
       const txt = await page.evaluate(() => document.body ? document.body.innerText : '');
       const hit = (txt || '').split('\n').filter(l => /签到|积分|任务|活动|奖励|每日/i.test(l)).slice(0, 40);
-      fs.writeFileSync('E:/workspace/workbuddy-signin/hw_shot.txt', (txt || '') + '\n\n=== 命中关键词行 ===\n' + hit.join('\n'));
+      fs.writeFileSync(BASE + '/hw_shot.txt', (txt || '') + '\n\n=== 命中关键词行 ===\n' + hit.join('\n'));
       console.log('[shot] captured hw_shot.png + hw_shot.txt');
     } catch (e) { console.log('[shot] err', e.message); }
   }, 1500);
