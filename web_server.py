@@ -753,8 +753,11 @@ def get_mm_card():
             "error": None,
         }
     except Exception as e:
-        return _card_error(
-            "minimax", "MiniMax Code 每日签到", "#7C3AED", "#A855F7", "mm", e
+        return _auth_fail_card(
+            "minimax", "MiniMax Code 每日签到", "#7C3AED", "#A855F7", "mm", e,
+            [("如何恢复",
+              "MiniMax 网页登录态已失效：重新登录 code.minimax.io 后在浏览器开发者工具复制 access_token，"
+              "更新服务器上的 mm_web_token.json；或运行本机取 token 脚本推送到服务器，再点「重新检查」")],
         )
 
 
@@ -1848,7 +1851,12 @@ def get_lk_card():
             "error": None,
         }
     except Exception as e:
-        return _card_error("linkai", "Link AI 每日签到", "#3B82F6", "#2563EB", "lk", e)
+        return _auth_fail_card(
+            "linkai", "Link AI 每日签到", "#3B82F6", "#2563EB", "lk", e,
+            [("如何恢复",
+              "Link AI 令牌已失效：登录 link-ai.tech/console/account 复制新的 API Token，"
+              "更新服务器上的 linkai_token.txt；或在设置页更新 LINKAI_TOKEN，再点「重新检查」")],
+        )
 
 
 def run_lk_checkin():
@@ -1923,6 +1931,46 @@ def _card_error(name, title, brand, brand2, icon, err):
     }
 
 
+def _auth_fail_card(name, title, brand, brand2, icon, err, steps):
+    """登录态/令牌失效或查询异常时的友好卡片（替代裸 _card_error）。
+
+    自动签到平台一旦 token/cookie 过期，裸 _card_error 只会丢一句英文红条，
+    用户完全不知道该怎么办。这里统一转成「needs_auth」卡片：角标说明状态，
+    并用 steps 给出明确的恢复步骤（指向本地取凭据脚本或设置页粘贴新 token）。
+    服务器侧的凭据无法直接经浏览器「跳转登录」刷新——它来自你本机浏览器登录态，
+    所以需要本机脚本把新令牌推上来，或手动更新服务器上的凭据文件。
+    """
+    s = str(err or "").strip()
+    low = s.lower()
+    is_auth = any(
+        k in s
+        for k in (
+            "401", "403", "unauthorized", "forbidden", "token", "expired",
+            "过期", "失效", "登录", "鉴权", "auth", "invalid", "未授权",
+        )
+    )
+    badge = "登录态过期" if is_auth else "查询失败"
+    rows = [{"k": "原因", "v": (s[:140] + "…") if len(s) > 140 else (s or "未知错误")}]
+    for k, v in steps:
+        rows.append({"k": k, "v": v})
+    return {
+        "name": name,
+        "title": title,
+        "brand": brand,
+        "brand2": brand2,
+        "icon": icon,
+        "checked": False,
+        "needs_auth": True,
+        "badge": badge,
+        "hide_auth_link": True,
+        "metric_label": "状态",
+        "metric_value": "需更新凭据",
+        "last_run": None,
+        "rows": rows,
+        "error": None,
+    }
+
+
 def get_wb_card():
     try:
         st = get_status()
@@ -1958,8 +2006,11 @@ def get_wb_card():
             "error": None,
         }
     except Exception as e:
-        return _card_error(
-            "workbuddy", "WorkBuddy加油站", "#00C29A", "#00C885", "wb", e
+        return _auth_fail_card(
+            "workbuddy", "WorkBuddy加油站", "#00C29A", "#00C885", "wb", e,
+            [("如何恢复",
+              "服务器上的 WorkBuddy 会话令牌已失效：更新 WB_TOKEN_FILE 指向的 token.info"
+              "（SSH 覆盖或本机取令牌脚本推送），再点「重新检查」")],
         )
 
 
