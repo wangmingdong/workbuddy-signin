@@ -171,21 +171,123 @@ def reschedule():
     _sched_wake.set()
 
 
-def notify_summary(text):
+def _fmt_push(host, payload):
+    """把推送内容按平台渲染成最终文本。
+    payload 为字符串（测试/通用）→ 原样返回；为 dict{title,results,ts} → 结构化渲染。
+    返回 (style, text)。style 仅用于自检，实际格式已在文本内体现。"""
+    if isinstance(payload, str):
+        return "plain", payload
+    title = payload.get("title", "签到中心")
+    results = payload.get("results", [])
+    ts = payload.get("ts", "")
+    sym = {"ok": "✅", "warn": "⚠️", "fail": "❌", "skip": "⏭️"}
+    n_ok = sum(1 for r in results if r.get("s") == "ok")
+    n_warn = sum(1 for r in results if r.get("s") == "warn")
+    n_fail = sum(1 for r in results if r.get("s") == "fail")
+    total = len(results)
+
+    def footer():
+        bits = []
+        if n_warn:
+            bits.append("未签 %d" % n_warn)
+        if n_fail:
+            bits.append("失败 %d" % n_fail)
+        return " · ".join(bits)
+
+    # 企业微信 / 钉钉：纯文本
+    if "qyapi.weixin.qq.com" in host or "oapi.dingtalk.com" in host:
+        lines = [title]
+        for r in results:
+            lines.append("%s %s%s" % (r["label"], sym.get(r["s"], ""),
+                                      (" " + r["note"]) if r.get("note") else ""))
+        f = footer()
+        if f:
+            lines.append("")
+            lines.append(f)
+        if ts:
+            lines += ["", ts]
+        return "plain", "\n".join(lines)
+    # PushPlus：HTML（默认 html 模板）
+    if "pushplus.plus" in host or "pushplus.one" in host:
+        parts = ["<b>%s</b>" % title]
+        for r in results:
+            parts.append("%s <b>%s</b>%s" % (sym.get(r["s"], ""), r["label"],
+                                             (" " + r["note"]) if r.get("note") else ""))
+        f = footer()
+        if f:
+            parts.append("<br><b>%s</b>" % f)
+        if ts:
+            parts.append("<br><br><span style='color:#999'>%s</span>" % ts)
+        return "html", "<br>".join(parts)
+    # Server 酱：Markdown（微信内加粗/换行更清晰）
+    if "ftqq.com" in host:
+        lines = ["**%s**" % title, ""]
+        for r in results:
+            lines.append("%s **%s**%s" % (sym.get(r["s"], ""), r["label"],
+                                          (" " + r["note"]) if r.get("note") else ""))
+        f = footer()
+        if f:
+            lines += ["", f]
+        if ts:
+            lines += ["", ts]
+        return "markdown", "\n".join(lines)
+    # 通用：纯文本
+    lines = [title]
+    for r in results:
+        lines.append("%s %s%s" % (r["label"], sym.get(r["s"], ""),
+                                  (" " + r["note"]) if r.get("note") else ""))
+    return "plain", "\n".join(lines)
+
+
+def _send_webhook(url, payload):
+    """向 webhook 推送，按平台自动适配请求格式。
+    支持：企业微信群机器人 / 钉钉机器人 / PushPlus(推个人微信) / Server酱(推个人微信) / 通用 JSON。
+    payload 可为字符串或结构化 dict。失败抛出异常。"""
+    host = (urlparse(url).hostname or "").lower()
+    style, text = _fmt_push(host, payload)
+    headers = {"Content-Type": "application/json"}
+    data = None
+    # 企业微信群机器人 / 钉钉机器人：标准 text 类型
+    if "qyapi.weixin.qq.com" in host or "oapi.dingtalk.com" in host:
+        data = json.dumps({"msgtype": "text", "text": {"content": text}}).encode("utf-8")
+    # PushPlus（默认渠道 wechat，推送到个人微信，免费）
+    elif "pushplus.plus" in host or "pushplus.one" in host:
+        parts = urlparse(url)
+        token = ""
+        seg = [p for p in parts.path.split("/") if p]
+        if len(seg) >= 2 and seg[0] in ("send", "batchSend"):
+            token = seg[1]
+        if not token:
+            token = parse_qs(parts.query).get("token", [""])[0]
+        body = {"token": token, "title": "签到中心",
+                "content": text, "template": "html"}
+        data = json.dumps(body).encode("utf-8")
+    # Server 酱（推送到个人微信，免费 5 条/天）：表单 title + desp
+    elif "ftqq.com" in host:
+        title = payload.get("title", "签到中心") if isinstance(payload, dict) else "签到中心"
+        data = urlencode({"title": title, "desp": text}).encode("utf-8")
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    # 通用：原样 JSON（兼容自搭端点）
+    else:
+        data = json.dumps({"text": text,
+                           "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    urllib.request.urlopen(req, timeout=8, context=_SSL_CTX)
+    return True, ""
+
+
+def notify_summary(results):
+    """每日签到完成后推送摘要。results: list of {label, s(ok/warn/fail), note}。"""
     url = SETTINGS.get("notify_webhook", "")
     if not url or not SETTINGS.get("notify_on"):
         return
     try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps({
-                "text": text,
-                "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        urllib.request.urlopen(req, timeout=8, context=_SSL_CTX)
+        n_ok = sum(1 for r in results if r.get("s") == "ok")
+        total = len(results)
+        title = "每日签到完成 · 已签 %d/%d" % (n_ok, total)
+        payload = {"title": title, "results": results,
+                   "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        _send_webhook(url, payload)
     except Exception as e:
         print("[notify] 推送失败: %s" % e)
 
@@ -225,13 +327,45 @@ def _scheduler_loop():
             time.sleep(60)
 
 
-def _http_json(url, method="GET", timeout=20, headers=None):
-    """服务端发起 JSON 请求（用于调用千帆等外部签到 API）。"""
-    req = urllib.request.Request(
-        url, method=method, headers=headers or {"User-Agent": "WBCheckinCenter/1.0"}
-    )
-    with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
-        return json.loads(r.read().decode("utf-8", "replace"))
+def _http_json(url, method="GET", timeout=20, headers=None, retries=0):
+    """服务端发起 JSON 请求（用于调用千帆等外部签到 API）。
+
+    retries>0 时对「网络异常 / 5xx」做退避重试——外部签到上游偶发抖动很常见。
+    若对方返回 5xx 但 body 是合法 JSON（自建服务通常会把错误原因放在 body 里），
+    直接返回该 body 并附加 _http_status，交给上层按业务判断，避免把一个
+    「上游业务错误」误报成网关故障（例如千帆的 502 其实是登录态校验失败）。
+    """
+    last = None
+    for attempt in range(retries + 1):
+        try:
+            req = urllib.request.Request(
+                url, method=method, headers=headers or {"User-Agent": "WBCheckinCenter/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
+                return json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            body = None
+            try:
+                body = json.loads(e.read().decode("utf-8", "replace"))
+            except Exception:
+                body = None
+            # body 里带 ok 字段 = 对方主动给出的业务错误说明，原样返回
+            if isinstance(body, dict) and "ok" in body:
+                body.setdefault("_http_status", e.code)
+                return body
+            last = e
+            if attempt < retries and e.code in (500, 502, 503, 504):
+                time.sleep(1.2 * (attempt + 1))
+                continue
+            raise
+        except Exception as e:
+            last = e
+            if attempt < retries:
+                time.sleep(1.2 * (attempt + 1))
+                continue
+            raise
+    if last:
+        raise last
 
 
 # ============================ 业务逻辑 ============================
@@ -1829,11 +1963,81 @@ def get_wb_card():
         )
 
 
+def _qf_friendly_error(raw):
+    """把千帆上游的原始报错翻译成人话。
+
+    区分「上游偶发抖动」（等一会就好）与「凭据真的要换」——千帆 cookie 实测
+    有效期约一个月，且服务端会偶发返回「登录已经过期」但十几分钟后自愈，
+    直接展示原始英文/中文报错会让人误以为需要立刻重新导出 cookie。
+    """
+    s = str(raw or "").strip()
+    low = s.lower()
+    if ("登录" in s and ("过期" in s or "失效" in s)) or "unauthorized" in low or "401" in s:
+        return ("千帆提示登录态校验未通过（上游偶发判定，通常十几分钟后自愈，"
+                "签到记录不受影响）。若持续超过一天，需重新导出千帆 cookie。")
+    if any(k in s for k in ("502", "503", "504")) or "timed out" in low or "timeout" in low:
+        return "千帆服务暂时不可用（网络或上游抖动），稍后刷新即可，签到记录不受影响。"
+    return "千帆状态查询失败：%s" % (s or "未知原因")
+
+
+def _qf_degraded_card(err):
+    """千帆状态查询失败时的降级卡片：保留历史签到信息 + 人话提示，不整卡变红。
+
+    千帆的 /api/status 依赖上游两个接口（签到信息 + 积分余量），任一抖动都会
+    让整张卡变成报错。这里改为：状态查不到时用 /api/history（独立接口，通常
+    仍可用）回显最近签到，只把「实时积分/今日状态」标为待刷新。
+    """
+    friendly = _qf_friendly_error(err)
+    last_run = None
+    rows = []
+    checked = False
+    try:
+        h = _http_json(
+            "%s/api/history?days=7&token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN), retries=1
+        )
+        hs = h.get("data") or []
+        if hs:
+            rec = hs[0]
+            ok = rec.get("status") == "success"
+            last_run = {
+                "ts": rec.get("date"),
+                "ok": ok,
+                "message": rec.get("message"),
+                "source": "qianfan",
+            }
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
+            checked = bool(ok and rec.get("date") == today)
+            rows.append({
+                "k": "最近签到",
+                "v": "%s %s" % (rec.get("date") or "--", "已签到" if ok else "未成功"),
+            })
+    except Exception:
+        pass
+    rows.append({"k": "实时积分", "v": "暂时查不到"})
+    rows.append({"k": "今日状态", "v": "暂时查不到"})
+    return {
+        "name": "qianfan",
+        "title": "百度千帆每日签到",
+        "brand": "#4E6EF2",
+        "brand2": "#2932E1",
+        "icon": "qf",
+        "checked": checked,
+        "metric_label": "可用积分",
+        "metric_value": "--",
+        "last_run": last_run,
+        "rows": rows,
+        "badge": "状态待刷新",
+        "error": friendly,
+    }
+
+
 def get_qf_card():
     try:
         if not QIANFAN_TOKEN or not QIANFAN_BASE:
             raise RuntimeError("未配置千帆（请设置 QF_BASE_URL 与 QF_ACCESS_TOKEN）")
-        d = _http_json("%s/api/status?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN))
+        d = _http_json(
+            "%s/api/status?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN), retries=1
+        )
         if not d.get("ok"):
             raise RuntimeError(d.get("error") or "千帆状态获取失败")
         data = d.get("data") or {}
@@ -1861,6 +2065,9 @@ def get_qf_card():
             {"k": "已签天数", "v": signin.get("totalTimes", "--")},
             {"k": "已用积分", "v": points.get("usedPoints", "--")},
         ]
+        if data.get("pointsStale"):
+            # 千帆服务端已降级：积分来自最近一次快照而非实时查询，如实标注
+            rows.append({"k": "积分数据", "v": "上次快照（实时查询暂时失败）"})
         return {
             "name": "qianfan",
             "title": "百度千帆每日签到",
@@ -1875,7 +2082,7 @@ def get_qf_card():
             "error": None,
         }
     except Exception as e:
-        return _card_error("qianfan", "百度千帆每日签到", "#4E6EF2", "#2932E1", "qf", e)
+        return _qf_degraded_card(e)
 
 
 # 本字典的插入顺序 = 手机页卡片顺序：WorkBuddy 固定第一，
@@ -2233,10 +2440,12 @@ def run_checkin_for(name):
         if not QIANFAN_TOKEN or not QIANFAN_BASE:
             raise RuntimeError("未配置千帆（请设置 QF_BASE_URL 与 QF_ACCESS_TOKEN）")
         d = _http_json(
-            "%s/api/checkin/run?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN), method="POST"
+            "%s/api/checkin/run?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN),
+            method="POST",
+            retries=1,
         )
         if not d.get("ok"):
-            raise RuntimeError(d.get("error") or "千帆签到失败")
+            raise RuntimeError(_qf_friendly_error(d.get("error") or "千帆签到失败"))
         return get_qf_card()
     if name == "minimax":
         return run_mm_checkin()
@@ -2971,6 +3180,7 @@ function renderSettings(){
       +'<label class="fld"><span>启用通知</span><input type="checkbox" id="notifyOn" '+(s.notify_on?'checked':'')+'></label>'
       +'<label class="fld col"><span>Webhook 地址</span><input type="text" id="webhook" value="'+esc(s.notify_webhook||"")+'" placeholder="https://.../webhook"></label>'
       +'<button class="btn-mini" id="testWebhook" type="button">测试推送</button>'
+      +'<p class="ftip">支持「推送到个人微信」的地址：<br>· PushPlus：<code>https://www.pushplus.plus/send/你的token</code>（需先在 pushplus.plus 绑定微信）<br>· Server酱：<code>https://sctapi.ftqq.com/你的SendKey.send</code>（免费 5 条/天）<br>· 企业微信群机器人：<code>https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx</code>（消息进企业微信，非个人微信）<br>填好点「测试推送」验证，每天签到跑完自动发摘要。</p>'
       +'</div>'
       +'<div style="text-align:center;padding:6px 0 18px"><button class="cta" id="saveSettings" type="button">💾 保存设置</button></div>';
     $('fbody').innerHTML=html;
@@ -3339,13 +3549,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not url:
                     self._json(200, {"ok": False, "error": "缺少 webhook 地址"})
                     return
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps({"text": "【签到中心】Webhook 测试推送成功 ✅"}).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                urllib.request.urlopen(req, timeout=8, context=_SSL_CTX)
+                _send_webhook(url, "【签到中心】Webhook 测试推送成功 ✅")
                 self._json(200, {"ok": True})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
@@ -3412,7 +3616,7 @@ def run_daily_all():
         ("trae", "Trae Work"),
         ("huawei", "华为码道"),
     ]
-    summary = []
+    results = []
     for key, label in order:
         if not platform_enabled(key):
             print("[%s] 已在设置中停用，跳过" % label)
@@ -3424,18 +3628,18 @@ def run_daily_all():
                 (r for r in (card.get("rows") or []) if r.get("k") == "签到状态"), None
             )
             note = row.get("v", "") if row else ""
-            msg = "✅ 已签到" if checked else "⚠️ 未签到"
-            summary.append("%s %s%s" % (label, msg, ("（%s）" % note) if note else ""))
-            print("[%s] %s %s" % (label, msg, note))
+            s = "ok" if checked else "warn"
+            results.append({"label": label, "s": s, "note": note})
+            print("[%s] %s %s" % (label, "✅ 已签到" if checked else "⚠️ 未签到", note))
         except Exception as e:
-            summary.append("%s ❌ %s" % (label, e))
+            results.append({"label": label, "s": "fail", "note": str(e)})
             print("[%s] 失败: %s" % (label, e))
     print(banner)
-    for s in summary:
-        print(s)
+    for r in results:
+        print("%s [%s] %s" % (r["label"], r["s"], r.get("note", "")))
     print(banner)
     try:
-        notify_summary("【每日签到完成】\n" + "\n".join(summary))
+        notify_summary(results)
     except Exception:
         pass
     sys.stdout.flush()
