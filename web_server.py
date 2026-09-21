@@ -2385,100 +2385,6 @@ def _generic_record(path, ok, msg):
     return rec
 
 
-# ============================ CodeBuddy（腾讯）每日签到适配器 ============================
-# 与 WorkBuddy 同属腾讯、积分池通用，且共用同一份登录态 token.info（auth.accessToken + account.uid）。
-# 因此本适配器**零新凭据**，直接复用 WB_TOKEN_FILE 指向的 token.info（已线上实测可用）。
-# 接口（2026-09-21 实测 www.codebuddy.cn 可用）：
-#   查询  POST /v2/billing/meter/checkin-activity-status
-#   领取  POST /v2/billing/meter/daily-checkin
-#   鉴权  Authorization: Bearer {accessToken}  +  X-User-Id: {uid}
-#   领取成功 code=0；已签 code=10001 "今天已签到，请明天再来"（幂等，视作已签）
-CODEBUDDY_BASE = os.environ.get("CODEBUDDY_BASE", "https://www.codebuddy.cn")
-CB_STATE_FILE = os.path.join(BASE_DIR, "cb_last_run.json")
-
-
-def _cb_session():
-    p = os.path.join(BASE_DIR, "token.info")
-    try:
-        with open(p, encoding="utf-8") as f:
-            d = json.load(f)
-        auth = d.get("auth", {})
-        tok = auth.get("accessToken") or d.get("accessToken") or ""
-        uid = (d.get("account") or {}).get("uid") or ""
-        return tok, uid
-    except Exception:
-        return "", ""
-
-
-def _cb_http(path, tok, uid, data=b"{}"):
-    url = CODEBUDDY_BASE + path
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Authorization", "Bearer " + tok)
-    if uid:
-        req.add_header("X-User-Id", uid)
-    req.add_header("Origin", CODEBUDDY_BASE)
-    req.add_header("Referer", CODEBUDDY_BASE + "/")
-    with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
-        return json.loads(r.read().decode("utf-8", "replace"))
-
-
-def get_codebuddy_card():
-    tok, uid = _cb_session()
-    if not tok:
-        return {"name": "codebuddy", "title": "CodeBuddy 每日签到", "brand": "#0052D9",
-                "brand2": "#006EFF", "icon": "codebuddy", "checked": False, "needs_auth": True,
-                "auth_url": "https://www.codebuddy.cn/", "metric_label": "状态",
-                "metric_value": "未配置",
-                "last_run": None,
-                "rows": [{"k": "说明", "v": "复用 WorkBuddy 登录态（token.info），无需单独配置凭据"}],
-                "error": None}
-    try:
-        d = _cb_http("/v2/billing/meter/checkin-activity-status", tok, uid)
-        if d.get("code") != 0:
-            raise RuntimeError(d.get("msg") or "查询失败")
-        data = d.get("data") or {}
-        checked = bool(data.get("today_checked_in"))
-        streak = data.get("streak_days") or 0
-        daily = data.get("daily_credit") or 0
-        lr = _read_json_last(CB_STATE_FILE)
-        rows = [
-            {"k": "今日状态", "v": "✅ 今日已签" if checked else "⏳ 待签到"},
-            {"k": "连续签到", "v": "%d 天" % streak},
-            {"k": "每日积分", "v": "+%d 分" % daily},
-        ]
-        if lr:
-            rows.append({"k": "上次执行",
-                         "v": "%s %s" % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️")})
-        return {"name": "codebuddy", "title": "CodeBuddy 每日签到", "brand": "#0052D9",
-                "brand2": "#006EFF", "icon": "codebuddy", "checked": checked,
-                "metric_label": "连续签到", "metric_value": "%d 天" % streak,
-                "last_run": lr, "rows": rows, "error": None}
-    except Exception as e:
-        return _auth_fail_card(
-            "codebuddy", "CodeBuddy 每日签到", "#0052D9", "#006EFF", "codebuddy", e,
-            [("如何恢复",
-              "CodeBuddy 与 WorkBuddy 共用登录态：只要 WorkBuddy 卡片能正常签到，本卡凭据即有效；"
-              "若失效，刷新服务器 token.info 即可")],
-        )
-
-
-def run_codebuddy_checkin():
-    tok, uid = _cb_session()
-    if not tok:
-        raise RuntimeError("未找到 WorkBuddy 登录态 token.info（CodeBuddy 复用同一份）")
-    d = _cb_http("/v2/billing/meter/daily-checkin", tok, uid)
-    code = d.get("code")
-    if code == 0:
-        _generic_record(CB_STATE_FILE, True,
-                        "今日签到 +%s 分" % ((d.get("data") or {}).get("today_credit") or ""))
-        return get_codebuddy_card()
-    if code == 10001:
-        _generic_record(CB_STATE_FILE, True, "今天已签到")
-        return get_codebuddy_card()
-    raise RuntimeError(d.get("msg") or "CodeBuddy 签到失败 (code=%s)" % code)
-
-
 # ============================ Coze 扣子（字节）每日登录适配器 ============================
 # 扣子活动积分「每日登录自动发放 1500」（无需手动领取），与 Trae 同属字节体系。
 # 本适配器为**状态卡**：展示每日福利 + 会话 Cookie 是否有效；不假报「领取」（无显式领取接口）。
@@ -2525,53 +2431,6 @@ def run_coze_checkin():
     return get_coze_card()
 
 
-# ============================ MiniMax Agent 每日积分适配器 ============================
-# MiniMax Agent「每日 200 积分」为登录后自动刷新（非手动领取），与 MiniMax Code 同账号体系。
-# 本适配器为**状态卡**：展示每日福利 + JWT 是否有效；不假报「领取」（无显式领取接口）。
-MM_AGENT_TOKEN = os.environ.get("MM_AGENT_TOKEN", "")
-if not MM_AGENT_TOKEN:
-    try:
-        with open(os.path.join(BASE_DIR, "mm_agent_token.txt"), "r", encoding="utf-8") as _f:
-            MM_AGENT_TOKEN = _f.read().strip()
-    except Exception:
-        MM_AGENT_TOKEN = ""
-MM_AGENT_UID = os.environ.get("MM_AGENT_UID", "")
-MMA_STATE_FILE = os.path.join(BASE_DIR, "mma_last_run.json")
-
-
-def get_mmagent_card():
-    if not MM_AGENT_TOKEN:
-        return {"name": "mmagent", "title": "MiniMax Agent 每日积分", "brand": "#0B8C8C",
-                "brand2": "#14B8A6", "icon": "mmagent", "checked": False, "needs_auth": True,
-                "auth_url": "https://agent.minimax.io/", "metric_label": "每日福利",
-                "metric_value": "200 积分",
-                "last_run": None,
-                "rows": [{"k": "说明",
-                          "v": "每日 200 积分登录后自动刷新（无需手动领取）；配置 JWT 后显示状态"}],
-                "error": None}
-    lr = _read_json_last(MMA_STATE_FILE)
-    rows = [
-        {"k": "每日福利", "v": "登录后自动刷新 200 积分"},
-        {"k": "领取方式", "v": "每日 0 点自动到账，无需手动领取"},
-        {"k": "会话状态", "v": "✅ JWT 已配置"},
-    ]
-    if lr:
-        rows.append({"k": "上次检查",
-                     "v": "%s %s" % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️")})
-    return {"name": "mmagent", "title": "MiniMax Agent 每日积分", "brand": "#0B8C8C",
-            "brand2": "#14B8A6", "icon": "mmagent", "checked": True,
-            "metric_label": "每日福利", "metric_value": "200 积分",
-            "last_run": lr, "rows": rows, "error": None,
-            "auto_note": "每日 0 点自动刷新，无需手动领取"}
-
-
-def run_mmagent_checkin():
-    if not MM_AGENT_TOKEN:
-        raise RuntimeError("未配置 MiniMax Agent JWT（mm_agent_token.txt 或 MM_AGENT_TOKEN）")
-    _generic_record(MMA_STATE_FILE, True, "JWT 有效，每日自动刷新 200 积分")
-    return get_mmagent_card()
-
-
 ADAPTERS = {
     "workbuddy": get_wb_card,
     "qianfan": get_qf_card,
@@ -2582,14 +2441,11 @@ ADAPTERS = {
     "lingxi": get_lx_card,
     "trae": get_trae_card,
     "huawei": get_hw_card,
-    "codebuddy": get_codebuddy_card,
     "coze": get_coze_card,
-    "mmagent": get_mmagent_card,
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "lingxi", "trae",
-                   "codebuddy", "coze", "mmagent")
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "lingxi", "trae", "coze")
 # 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
 # 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
 AUTO_RUN = AUTO_PLATFORMS + ("travel",)
@@ -2753,30 +2609,12 @@ def get_detail(name):
     if name == "linkai":
         return get_lk_detail()
 
-    if name == "codebuddy":
-        history = _load_json_records(CB_STATE_FILE, 30)
-        tok, _ = _cb_session()
+    if name == "coze":
+        history = _load_json_records(COZE_STATE_FILE, 30)
         return {
-            "ok": True, "name": name, "title": "CodeBuddy 每日签到",
-            "signin": {
-                "history": history,
-                "checked": bool(tok),
-                "note": "与 WorkBuddy 共用登录态，每日签到 100 积分；连续签到有奖励",
-            },
-            "consumption": {"note": "积分与 WorkBuddy 通用"},
-        }
-
-    if name in ("coze", "mmagent"):
-        state = COZE_STATE_FILE if name == "coze" else MMA_STATE_FILE
-        cookie = COZE_COOKIE if name == "coze" else MM_AGENT_TOKEN
-        title = "Coze 扣子 每日登录" if name == "coze" else "MiniMax Agent 每日积分"
-        note = ("每日登录自动发放 1500 活动分（无需手动领取）；配置会话后显示真实状态"
-                if name == "coze" else
-                "每日 200 积分登录后自动刷新（无需手动领取）；配置 JWT 后显示真实状态")
-        history = _load_json_records(state, 30)
-        return {
-            "ok": True, "name": name, "title": title,
-            "signin": {"history": history, "checked": bool(cookie), "note": note},
+            "ok": True, "name": name, "title": "Coze 扣子 每日登录",
+            "signin": {"history": history, "checked": bool(COZE_COOKIE),
+                       "note": "每日登录自动发放 1500 活动分（无需手动领取）；配置会话后显示真实状态"},
             "consumption": {"note": "活动积分当日有效，过期清零"},
         }
 
@@ -2971,9 +2809,7 @@ OFFICIAL_SITES = {
     "lingxi":    ("https://lingxi.wps.cn/", "WPS 灵犀"),
     "huawei":    ("https://devcloud.cn-north-4.huaweicloud.com/", "华为云 DevCloud"),
     "trae":      ("https://work.trae.cn/", "Trae 官网"),
-    "codebuddy": ("https://www.codebuddy.cn/", "CodeBuddy 官网"),
     "coze":      ("https://www.coze.cn/", "扣子 Coze 官网"),
-    "mmagent":   ("https://agent.minimax.io/", "MiniMax Agent 官网"),
 }
 
 
@@ -3057,12 +2893,8 @@ def run_checkin_for(name):
         return run_mm_checkin()
     if name == "trae":
         return run_trae_checkin()
-    if name == "codebuddy":
-        return run_codebuddy_checkin()
     if name == "coze":
         return run_coze_checkin()
-    if name == "mmagent":
-        return run_mmagent_checkin()
     if name == "lingxi":
         return run_lx_checkin()
     if name == "linkai":
@@ -3413,7 +3245,7 @@ button.entry:hover{background:#eef7f4;}
   </div>
 
   <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-6</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-7</div>
 </div>
 
 <script>
@@ -3442,9 +3274,7 @@ function iconFor(it){
   if(it.icon==="lx") return ICON_LX;
   if(it.icon==="huawei") return ICON_HW;
   if(it.icon==="qd") return ICON_QD;
-  if(it.icon==="codebuddy") return '<div style="font-size:20px">🐝</div>';
   if(it.icon==="coze") return '<div style="font-size:20px">🧩</div>';
-  if(it.icon==="mmagent") return '<div style="font-size:20px">🌊</div>';
   if(it.icon==="growth") return ICON_GROWTH;
   if(it.icon==="daily") return ICON_DAILY;
   if(it.icon==="travel") return '<div style="font-size:20px">🧳</div>';
@@ -3970,7 +3800,7 @@ function showFocus(view){
   else if(view==='settings') focusSettings();
   else focusDaily();
 }
-var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",travel:"派猫猫旅行",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",codebuddy:"CodeBuddy",coze:"Coze 扣子",mmagent:"MiniMax Agent"};
+var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",travel:"派猫猫旅行",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",};
 function focusSettings(){
   var el=$('focus');
   el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
@@ -4619,9 +4449,7 @@ def run_daily_all(scope=None):
         ("linkai", "Link AI"),
         ("lingxi", "WPS 灵犀"),
         ("trae", "Trae Work"),
-        ("codebuddy", "CodeBuddy"),
         ("coze", "Coze 扣子"),
-        ("mmagent", "MiniMax Agent"),
         ("huawei", "华为码道"),
     ]
     if scope == "auto":

@@ -67,6 +67,7 @@ trae_cookie.txt
 trae_cookie.json
 linkai_token.txt
 lx_cookie.txt
+coze_cookie.txt
 
 # Qoder 登录态（本机从客户端取出的 access token，禁止入库）
 qoder_token.txt
