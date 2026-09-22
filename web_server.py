@@ -1750,12 +1750,17 @@ def _qd_validity_text(camp):
 
 
 def _qd_window(camp):
-    """返回 (是否在领取窗口内, 状态文案)。窗口：每日 10:00(UTC+8) 刷新，次日 09:59 截止。"""
+    """返回 (是否在领取窗口内, 状态文案)。
+
+    注意：Qoder 的每日额度由服务端控制刷新，实测清晨即开放（并非 10:00 才开）。
+    这里的 startAt/endAt 来自活动接口，仅当接口明确给出且当前不在区间内时才拦，
+    绝大多数情况下接口不返回这两个字段或已落在活动期内，因此默认放行。
+    """
     now = time.time()
     start_at = (camp or {}).get("startAt")
     end_at = (camp or {}).get("endAt")
     if isinstance(start_at, (int, float)) and now < start_at:
-        return False, "今日 10:00 刷新后开放"
+        return False, "暂未到开放时间（以 Qoder 服务端为准）"
     if isinstance(end_at, (int, float)) and now > end_at:
         return False, "本期已截止（无补领）"
     return True, "可领取"
@@ -1803,7 +1808,7 @@ def get_qd_card():
                 "v": "✅ 今日已领" if checked else window_txt,
             },
             {"k": "有效期限", "v": _qd_validity_text(camp)},
-            {"k": "领取窗口", "v": "每日 10:00 刷新，次日 09:59 截止（无补领）"},
+            {"k": "领取窗口", "v": "由 Qoder 服务端控制每日刷新（实测清晨即开放，无需等到 10:00）"},
         ]
         if exp:
             rows.append({"k": "登录态", "v": "有效期至 %s" % str(exp)[:10]})
@@ -2772,7 +2777,7 @@ def get_detail(name):
                 "checked_today": camp.get("claimStatus") == "CLAIMED",
                 "benefit": _qd_benefit_text(camp),
                 "validity": _qd_validity_text(camp),
-                "window": window_txt if not in_window else "每日 10:00 刷新",
+                "window": window_txt if not in_window else "由 Qoder 服务端控制每日刷新（实测清晨即开放）",
                 "campaign_id": camp.get("campaignId"),
                 "history": history,
             },
