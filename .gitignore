@@ -94,3 +94,10 @@ _t_*.out
 
 # 无头浏览器验证脚本 / 截图（一次性自检产物）
 _verify_*
+
+# 华为工具链本地运行产物（日志 / PID 文件 / 解包前端资产，非交付物，禁止入库）
+huawei/hw_watch.log
+huawei/hw_autopush.out.log
+huawei/hw_pids.txt
+huawei/hw_index.js
+
