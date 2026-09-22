@@ -833,8 +833,33 @@ TRAE_UG_BASE = "https://api.trae.cn/trae/api/v2/ug"
 TRAE_TOKEN_API = "https://api.trae.cn/cloudide/api/v3/common/GetUserToken"
 # 客户端通道标识：SOLO_CN 安装包固定为 2（之前误用网页通道 3，导致 claim 被后端 9004 拒绝）
 TRAE_REQ_SOURCE = int(os.environ.get("TRAE_REQ_SOURCE", "2"))
-# 伪客户端设备头：服务端无真实设备，用固定代表值；如 Trae 校验特定值可在环境变量覆盖
-TRAE_DEVICE_ID = os.environ.get("TRAE_DEVICE_ID") or ("wb-%s" % uuid.uuid4().hex[:16])
+# 伪客户端设备头：服务端无真实设备。device-id 必须「稳定」——原实现每次进程启动都生成新
+# uuid，等于每次重启/部署后都拿一个陌生设备去 claim，更容易撞 Trae 的设备风控（9074 限流）。
+# 现改为持久化到 trae_device_id.txt，首次生成后一直复用；环境变量 TRAE_DEVICE_ID 仍可覆盖。
+TRAE_DEVICE_ID_FILE = os.path.join(BASE_DIR, "trae_device_id.txt")
+
+
+def _trae_device_id():
+    """稳定的伪设备 id：env 覆盖 > 本地文件 > 首次生成并落盘。"""
+    env = os.environ.get("TRAE_DEVICE_ID")
+    if env:
+        return env
+    try:
+        with open(TRAE_DEVICE_ID_FILE, "r", encoding="utf-8") as f:
+            v = f.read().strip()
+        if v:
+            return v
+    except Exception:
+        pass
+    v = "wb-%s" % uuid.uuid4().hex[:16]
+    try:
+        with open(TRAE_DEVICE_ID_FILE, "w", encoding="utf-8") as f:
+            f.write(v)
+    except Exception:
+        pass
+    return v
+
+
 TRAE_DEVICE_MODEL = os.environ.get("TRAE_DEVICE_MODEL", "Windows")
 TRAE_DEVICE_SYSTEM = os.environ.get("TRAE_DEVICE_SYSTEM", "Windows 10 x64")
 TRAE_CLIENT_VERSION = os.environ.get("TRAE_CLIENT_VERSION", "2.0.0")
@@ -878,7 +903,7 @@ def _trae_post(url, body):
             "Origin": "https://work.trae.cn",
             "Referer": "https://work.trae.cn/",
             # 客户端实机必带的设备上下文（服务端侧之前缺失，导致 claim 被 9004 拒绝）
-            "x-device-id": TRAE_DEVICE_ID,
+            "x-device-id": _trae_device_id(),
             "x-device-model": TRAE_DEVICE_MODEL,
             "x-device-system": TRAE_DEVICE_SYSTEM,
             "x-client-version": TRAE_CLIENT_VERSION,
@@ -916,6 +941,49 @@ def _trae_read_last():
         return data
     except Exception:
         return None
+
+
+# ---- 9074 限流的「稍后自动再试」 -------------------------------------------
+# 9074（当前参与用户太多）是 Trae 服务端的并发限流：请求本身合法（同通道 status 正常、
+# 活动 Enabled=true），只是被排队容量挡下，属可自愈的临时状态。早高峰 08:3x 最易触发，
+# 往往要等一两个小时才放行。故失败后安排后台延迟重试（单飞，最多 4 轮，覆盖约 4 小时）。
+TRAE_RETRY_WAITS = [900, 1800, 3600, 7200]  # 15 分 / 30 分 / 60 分 / 120 分
+_TRAE_RETRY_LOCK = threading.Lock()
+_TRAE_RETRY_PENDING = [False]
+
+
+def _trae_schedule_retry(attempt=0):
+    """9074 时安排后台延迟重试；同一时刻只允许一个待重试任务（单飞）。"""
+    if attempt >= len(TRAE_RETRY_WAITS):
+        return
+    with _TRAE_RETRY_LOCK:
+        if _TRAE_RETRY_PENDING[0]:
+            return
+        _TRAE_RETRY_PENDING[0] = True
+
+    def _worker(_attempt=attempt):
+        still_throttled = False
+        try:
+            time.sleep(TRAE_RETRY_WAITS[_attempt])
+            try:
+                card = run_trae_checkin()
+                ok = bool(card.get("checked"))
+                print(
+                    "[trae] 限流自动重试 #%d（等待 %d 秒后）: %s"
+                    % (_attempt + 1, TRAE_RETRY_WAITS[_attempt], "成功" if ok else "仍失败")
+                )
+                if not ok:
+                    lr = _trae_read_last()
+                    still_throttled = bool(lr) and "9074" in (lr.get("message") or "")
+            except Exception as e:
+                print("[trae] 限流自动重试异常: %s" % e)
+        finally:
+            with _TRAE_RETRY_LOCK:
+                _TRAE_RETRY_PENDING[0] = False
+        if still_throttled:
+            _trae_schedule_retry(_attempt + 1)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def get_trae_card():
@@ -988,15 +1056,22 @@ def get_trae_card():
                 }
             )
         # 自动签到失败时明确提示真实原因，避免"账户已签但没跑成"或"cookie 过期"的误判
+        throttled = bool(lr) and ("9074" in (lr.get("message") or ""))
         if lr and not lr.get("ok"):
             last_msg = (lr.get("message") or "")[:60]
             rows.insert(
                 0,
                 {
-                    "k": "⚠️ 自动签到",
-                    "v": ("上次失败：%s" % last_msg)
-                    if last_msg
-                    else "上次失败（原因未记录）",
+                    "k": "⏳ 服务端限流" if throttled else "⚠️ 自动签到",
+                    "v": (
+                        ("排队中（当前参与用户太多），已安排稍后自动重试：%s" % last_msg)
+                        if throttled
+                        else (
+                            ("上次失败：%s" % last_msg)
+                            if last_msg
+                            else "上次失败（原因未记录）"
+                        )
+                    ),
                 },
             )
         return {
@@ -1006,8 +1081,11 @@ def get_trae_card():
             "brand2": "#374151",
             "icon": "trae",
             "checked": checked,
+            "badge": ("限流·稍后重试" if (throttled and not checked) else None),
             "metric_label": "今日状态",
-            "metric_value": "已签到" if checked else "待签到",
+            "metric_value": (
+                "已签到" if checked else ("限流排队中" if throttled else "待签到")
+            ),
             "last_run": lr,
             "rows": rows,
             "error": None,
@@ -1025,8 +1103,9 @@ def run_trae_checkin():
     """执行 Trae Work 每日签到（客户端通道 req_source=2 + 设备头）。
 
     注意：claim 仅 code=0 算签到成功；非 0 code 一律如实记为失败，不能误报已签。
-    9004 = "submitted order parameters are incorrect"：表示请求被后端拒绝（参数/通道不符），
-    不是「今日已签」也不是「账户未开通」——客户端实机已证明该账户签到功能正常。
+    9004 = "submitted order parameters are incorrect"：表示请求被后端拒绝（参数/通道不符）。
+    9074 = "当前参与用户太多，请稍后再试"：服务端并发限流（早高峰最易触发），请求本身合法、
+           同通道 status 正常、活动 Enabled=true —— 属可自愈的临时状态，故自动安排稍后重试。
     此前服务端用 req_source=3（网页通道）且缺设备头，正是 9004 的诱因；现改 2 + 补设备头。
     """
     if not (TRAE_COOKIE or TRAE_JWT):
@@ -1045,6 +1124,7 @@ def run_trae_checkin():
         )
     results = []
     claimed = False
+    throttled = False
     try:
         d = _trae_api("claim")
         if isinstance(d, dict):
@@ -1052,14 +1132,20 @@ def run_trae_checkin():
             if br == 0:
                 claimed = True
                 results.append("签到成功（checkin_credits/claim）")
+            elif br == 9074:
+                # 9074 = 服务端并发限流（"当前参与用户太多"）：请求合法但被排队容量挡下，
+                # 属可自愈的临时状态（早高峰最易触发），非账户问题、非参数错误 → 安排稍后重试。
+                throttled = True
+                results.append(
+                    "服务端限流(code=9074 当前参与用户太多)，已安排稍后自动重试"
+                )
+            elif br == 9004:
+                results.append(
+                    "claim 被拒:code=9004 参数/通道不符（需进一步对齐客户端校验）"
+                )
             else:
                 msg = d.get("message") or br
-                # 9004 = 请求被后端拒绝（参数/通道不符）。若改 2+设备头后仍出现，
-                # 说明还需对齐客户端其它校验（如请求签名），需进一步抓包。
-                results.append(
-                    "claim 接口拒绝:code=%s %s（请求被后端拒绝，非账户未开通）"
-                    % (br, msg)
-                )
+                results.append("claim 被拒:code=%s %s" % (br, msg))
         else:
             results.append("未知响应")
     except Exception as e:
@@ -1067,6 +1153,8 @@ def run_trae_checkin():
     # 防误报：仅有接口明确返回 code=0 才算签到成功；否则一律记为失败
     ok = claimed
     _trae_record(ok, "；".join(results))
+    if throttled:
+        _trae_schedule_retry()
     return get_trae_card()
 
 
@@ -3276,7 +3364,7 @@ button.entry:hover{background:#eef7f4;}
   </div>
 
   <div class="hint">页面分「自动签到 / 手动签到」两个标签：自动标签里的平台每天到点自动签；手动标签里的平台凭据短效或服务端拒绝自动签到，按卡面提示维护即可。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260921-9</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260922-1</div>
 </div>
 
 <script>

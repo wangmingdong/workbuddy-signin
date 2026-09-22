@@ -63,6 +63,7 @@ __pycache__/
 mm_web_token.json
 mm_token.json
 trae_jwt.txt
+trae_device_id.txt
 trae_cookie.txt
 trae_cookie.json
 linkai_token.txt
