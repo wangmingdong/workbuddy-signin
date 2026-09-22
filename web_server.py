@@ -154,6 +154,9 @@ def save_settings(d):
     for k in base:
         if k == "platforms":
             out[k] = {pk: bool((d.get("platforms") or {}).get(pk, True)) for pk in base[k]}
+        elif k == "notify_webhook":
+            # 前端未提供该字段 -> 保留原值；提供空串 -> 显式清除
+            out[k] = (d.get(k) or "").strip() if (k in d) else SETTINGS.get(k, base[k])
         else:
             out[k] = d.get(k, base[k])
     with open(SETTINGS_FILE, "w", encoding="utf-8") as _f:
@@ -3953,9 +3956,10 @@ function renderSettings(){
       +'<div class="fgroup"><h4>🎚 平台开关</h4>'+ph+'</div>'
       +'<div class="fgroup"><h4>🔔 完成通知</h4>'
       +'<label class="fld"><span>启用通知</span><input type="checkbox" id="notifyOn" '+(s.notify_on?'checked':'')+'></label>'
-      +'<label class="fld col"><span>Webhook 地址</span><input type="text" id="webhook" value="'+esc(s.notify_webhook||"")+'" placeholder="https://.../webhook"></label>'
+      +'<label class="fld col"><span>Webhook 地址</span><input type="password" id="webhook" placeholder="留空=保持当前配置；填新地址即覆盖"></label>'
+      +'<label class="fld col" style="margin-top:4px"><input type="checkbox" id="clearWebhook"> <span>清除已配置的 Webhook</span></label>'
       +'<button class="btn-mini" id="testWebhook" type="button">测试推送</button>'
-      +'<p class="ftip">支持「推送到个人微信」的地址：<br>· PushPlus：<code>https://www.pushplus.plus/send/你的token</code>（需先在 pushplus.plus 绑定微信）<br>· Server酱：<code>https://sctapi.ftqq.com/你的SendKey.send</code>（免费 5 条/天）<br>· 企业微信群机器人：<code>https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx</code>（消息进企业微信，非个人微信）<br>填好点「测试推送」验证，每天签到跑完自动发摘要。</p>'
+      +'<p class="ftip">支持「推送到个人微信」的地址：<br>· PushPlus：<code>https://www.pushplus.plus/send/你的token</code><br>· Server酱：<code>https://sctapi.ftqq.com/你的SendKey.send</code><br>· 企业微信群机器人：<code>https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx</code><br>当前状态：<b>'+(s.has_webhook?'已配置 ✅（出于安全不显示明文）':'未配置')+'</b>。测试时填入地址点「测试推送」即可，保存后同样不显示明文。</p>'
       +'</div>'
       +'<div style="text-align:center;padding:6px 0 18px"><button class="cta" id="saveSettings" type="button">💾 保存设置</button></div>';
     $('fbody').innerHTML=html;
@@ -3972,8 +3976,11 @@ function saveSettings(){
     access_key: $('newKey').value || '',
     platforms: plat,
     notify_on: $('notifyOn').checked,
-    notify_webhook: ($('webhook').value||'').trim(),
   };
+  var wh = ($('webhook').value||'').trim();
+  if ($('clearWebhook').checked) { body.notify_webhook = ""; }
+  else if (wh) { body.notify_webhook = wh; }
+  // 都不满足则不传该字段 -> 后端保留原值（修复「打开设置页保存即清空 webhook」的 bug）
   api("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){
     if(r.ok){
       var nk=($('newKey').value||'').trim();
@@ -4313,7 +4320,7 @@ class Handler(BaseHTTPRequestHandler):
                 "key_set": bool(SETTINGS.get("access_key")),
                 "platforms": SETTINGS.get("platforms", {}),
                 "notify_on": bool(SETTINGS.get("notify_on", False)),
-                "notify_webhook": SETTINGS.get("notify_webhook", ""),
+                "has_webhook": bool(SETTINGS.get("notify_webhook", "")),
             })
             return
         self._send(404, "not found", "text/plain; charset=utf-8")
