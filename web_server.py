@@ -1754,6 +1754,43 @@ QD_STATE_FILE = os.path.join(BASE_DIR, "qoder_last_run.json")
 QD_TOKEN_FILE = os.path.join(BASE_DIR, "qoder_token.txt")
 QD_BASE = os.environ.get("QODER_BASE_URL", "https://openapi.qoder.sh")
 QD_AUTH_URL = "https://qoder.com/account/profile"
+
+# Qoder 每日 100 Credits 活动每天 10:00(UTC+8) 才开放（活动 key 带日期 act-YYYYMMDD-xxx），
+# 而主定时任务在 08:35 跑、早于开放时间，会看到昨天期 CLAIMED 直接幂等跳过、漏掉当天额度。
+# 故起一个常驻线程，每天 10:30 起每 30 分钟补签一次，直到当日已领或 13:00 停止。
+_qoder_wake = threading.Event()
+
+
+def _qoder_topup_loop():
+    while True:
+        now = datetime.datetime.now()
+        start = now.replace(hour=10, minute=30, second=0, microsecond=0)
+        if now < start:
+            if _qoder_wake.wait((start - now).total_seconds()):
+                _qoder_wake.clear()
+                continue
+        done_today = False
+        while not done_today:
+            now = datetime.datetime.now()
+            if now.hour >= 13:
+                break
+            try:
+                run_qd_checkin()
+            except Exception as e:
+                print("[qoder-topup] 补签异常: %s" % e)
+            lr = _qd_read_last()
+            today = now.strftime("%Y-%m-%d")
+            if lr and lr.get("ok") and str(lr.get("ts", "")).startswith(today):
+                done_today = True
+                print("[qoder-topup] %s 今日已签，停止补签" % today)
+                break
+            if _qoder_wake.wait(1800):
+                _qoder_wake.clear()
+                break
+        now = datetime.datetime.now()
+        nxt = (now + datetime.timedelta(days=1)).replace(hour=10, minute=30, second=0, microsecond=0)
+        if _qoder_wake.wait((nxt - now).total_seconds()):
+            _qoder_wake.clear()
 QD_CAMPAIGN_PATH = "/sash/api/v1/me/campaigns"
 # 服务端绝不刷新 token（刷新会挤掉你本机 Qoder 客户端的登录态），只读着用；
 # token 过期只能靠本机脚本重新取一份推上来。
@@ -1921,8 +1958,8 @@ def get_qd_card():
             # 不视为故障，降级为中性卡片；若今天已成功领取过则标记为已领。
             lr = _qd_read_last()
             rows = [
-                {"k": "状态", "v": "服务端当前未返回可领取的每日活动（claimable=false）"},
-                {"k": "说明", "v": "Qoder 每日 100 Credits 活动每天 10:00(UTC+8)开放，需在 Qoder 桌面端 Usage 面板→礼物图标手动领取；本卡每隔一段时间自动检测"},
+                {"k": "状态", "v": "服务端当前未返回今日可领取活动（每日 10:00(UTC+8) 才开放新一轮）"},
+                {"k": "自动领取", "v": "系统每日 10:30 起自动补签（每 30 分钟一次，直到当日领到），无需手动去桌面端"},
                 {"k": "领取窗口", "v": "每天 10:00(UTC+8)开放，至次日 10:00 前可领（以 Qoder 官方公告为准）"},
             ]
             if lr:
@@ -3488,7 +3525,7 @@ button.entry:hover{background:#eef7f4;}
       <h1>签到中心</h1>
       <p>多个签到一目了然 · 一键完成</p>
     </div>
-    <a class="gear" href="?view=settings" title="设置" aria-label="设置">⚙️</a>
+    <a class="gear" href="?view=settings" title="设置" aria-label="设置" onclick="event.preventDefault(); showFocus('settings'); return false;">⚙️</a>
   </div>
 
   <div class="summary">
@@ -4065,16 +4102,25 @@ function showFocus(view){
   var p=document.querySelector('.brand p'); if(p) p.textContent = (view==='settings'?'傻瓜式配置你的签到中心':'WorkBuddy 成长中心');
   var el=$('focus'); el.style.display='block';
   el.innerHTML = '<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody"></div>';
-  $('backBtn').addEventListener('click', function(){ location.href = location.pathname; });
+  $('backBtn').addEventListener('click', function(){ showMain(); });
   if(view==='growth') focusGrowth();
   else if(view==='settings') focusSettings();
   else focusDaily();
+}
+function showMain(){
+  var sum=document.querySelector('.summary'); if(sum) sum.style.display='';
+  var cards=$('cards'); if(cards) cards.style.display='';
+  var hint=document.querySelector('.hint'); if(hint) hint.style.display='';
+  var h1=document.querySelector('.brand h1'); if(h1) h1.textContent='签到中心';
+  var p=document.querySelector('.brand p'); if(p) p.textContent='多个签到一目了然 · 一键完成';
+  var el=$('focus'); if(el){ el.style.display='none'; el.innerHTML=''; }
+  load();
 }
 var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",};
 function focusSettings(){
   var el=$('focus');
   el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
-  $('backBtn').addEventListener('click', function(){ location.href = location.pathname; });
+  $('backBtn').addEventListener('click', function(){ showMain(); });
   renderSettings();
 }
 function renderSettings(){
@@ -4687,6 +4733,8 @@ def main():
     threading.Thread(target=_travel_poll_loop, daemon=True).start()
     # 服务启动即恢复 Trae 限流重试（若上次未完成，避免重启丢队列假排队）
     _trae_restore_retry()
+    # Qoder 每日 10:00 开放，08:35 主定时会漏掉，起常驻补签线程（10:30 起每 30 分）
+    threading.Thread(target=_qoder_topup_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
