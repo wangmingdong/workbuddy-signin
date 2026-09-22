@@ -1428,7 +1428,7 @@ def run_lx_checkin():
 # 官方接口（link-ai.tech）：
 #   签到     GET https://link-ai.tech/api/chat/web/app/user/sign/in
 #   鉴权     Authorization: Bearer {token}
-#   重复签到 code:870 "签到失败"
+#   无验证码时返回 code:870 message="签到失败"（服务端要求图片验证码），自动签到不可行；870 非"已签"
 # 凭据优先级：环境变量 LINKAI_TOKEN > 同目录 linkai_token.txt
 LINKAI_TOKEN = os.environ.get("LINKAI_TOKEN", "")
 if not LINKAI_TOKEN:
@@ -2160,13 +2160,16 @@ def get_lk_card():
         d = _lk_api("/sign/in")
         lr = _lk_read_last()
         checked = False
-        if not d.get("success"):
-            if d.get("code") == 870:
-                checked = True
-            else:
-                raise RuntimeError(d.get("message") or "状态查询失败")
-        else:
+        needs_captcha = False
+        if d.get("success"):
+            # 真正签到成功（服务端返回积分）才认可
             checked = True
+        elif d.get("code") == 870:
+            # 870 真实 message 是「签到失败」：服务端要求图片验证码(captchaVerification)，
+            # 脚本无验证码、自动签到不可行；且无法确认用户是否已在网页手动签，故诚实标「需手动」
+            needs_captcha = True
+        else:
+            raise RuntimeError(d.get("message") or "状态查询失败")
         # 查积分余额
         bal = "--"
         try:
@@ -2180,11 +2183,16 @@ def get_lk_card():
         rows = [
             {
                 "k": "签到状态",
-                "v": "\u2705 \u4eca\u65e5\u5df2\u7b7e"
-                if checked
-                else "\u5f85\u7b7e\u5230",
+                "v": "✅ 今日已签" if checked else "需网页手动签到",
             },
         ]
+        if needs_captcha:
+            rows.append(
+                {
+                    "k": "说明",
+                    "v": "自动签到不可用：服务端要求图片验证码，脚本无法自动完成；请在网页手动签到",
+                }
+            )
         if lr:
             rows.append(
                 {
@@ -2192,7 +2200,7 @@ def get_lk_card():
                     "v": "%s %s"
                     % (
                         str(lr.get("ts"))[5:16],
-                        "\u2705" if lr.get("ok") else "\u26a0\ufe0f",
+                        "✅" if lr.get("ok") else "⚠️",
                     ),
                 }
             )
@@ -2203,11 +2211,12 @@ def get_lk_card():
             "brand2": "#2563EB",
             "icon": "lk",
             "checked": checked,
+            "badge": "需手动" if needs_captcha else None,
             "metric_label": "可用积分",
             "metric_value": bal,
             "last_run": lr,
             "rows": rows,
-            "error": None,
+            "error": ("需网页手动签到（图片验证码）" if needs_captcha else None),
         }
     except Exception as e:
         return _auth_fail_card(
@@ -2230,8 +2239,11 @@ def run_lk_checkin():
         return get_lk_card()
     code = d.get("code")
     if code == 870:
-        _lk_record(True, "今日已签到")
-        return get_lk_card()
+        # 服务端要求图片验证码，自动签到不可行，如实记录失败，不谎报成功
+        _lk_record(False, "自动签到失败：服务端要求图片验证码(captchaVerification)，脚本无法完成，请网页手动签到")
+        raise RuntimeError(
+            "Link AI 自动签到需网页图片验证码，暂不支持自动；请前往 link-ai.tech 手动签到"
+        )
     raise RuntimeError(d.get("message") or "Link AI 签到失败 (code=%s)" % code)
 
 
