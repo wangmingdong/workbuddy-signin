@@ -95,6 +95,9 @@ _t_*.out
 # 无头浏览器验证脚本 / 截图（一次性自检产物）
 _verify_*
 
+# Trae 限流重试持久化状态（运行态，重启后由服务自动恢复）
+trae_retry_state.json
+
 # 华为工具链本地运行产物（日志 / PID 文件 / 解包前端资产，非交付物，禁止入库）
 huawei/hw_watch.log
 huawei/hw_autopush.out.log
