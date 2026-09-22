@@ -259,3 +259,8 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 - 会话寿命短（静置 30~60 分失效）→ 每天 08:35 自动签必失败；真解：本机 `hw_keeper.js` 无头常驻每 5 分刷新 + `hw_autopush.py` 推 112。本机没开机/守护停了 → 华为卡转「登录态过期」→ 双击 `huawei/relogin_huawei.bat` 恢复。
 
 **千帆 / Link AI / WPS 灵犀 / Trae**：均为标准 token 或 Cookie 串鉴权，凭据见 `config.example.json`，过期后重新导出并经 `deploy_ui.py` 部署。
+
+其中 **Trae Work** 需注意两种失败码：
+- `code=9004`（参数/通道不符）→ 服务端走的是网页通道，须用客户端通道 `req_source=2` 并补齐设备头（已内置）。
+- `code=9074`（当前参与用户太多）→ 服务端**并发限流**（早高峰最易触发），属可自愈的临时状态。程序会自动安排稍后重试（15/30/60/120 分钟共 4 轮），卡片此时显示角标「限流·稍后重试」，**无需人工干预、也不要反复手点**。
+- 设备标识持久化在 `trae_device_id.txt`（首次自动生成，已 gitignore），请勿删除——每次重启换新设备 ID 更容易触发风控。
