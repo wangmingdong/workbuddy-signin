@@ -1036,6 +1036,12 @@ def get_trae_card():
             },
             {"k": "签到状态", "v": "✅ 今日已签" if checked else "待签到"},
         ]
+        # 诚实暴露 9074 凭据体系不匹配：上次 claim 失败且原因含 9074 时，卡片直接给
+        # 「需桌面登录态」角标 + 失败原因，避免用户以为在转圈/能自动签（点了没反应）。
+        badge = None
+        if (not checked) and lr and not lr.get("ok") and "9074" in str(lr.get("message", "")):
+            badge = "需桌面登录态"
+            rows.append({"k": "⚠️ 失败原因", "v": str(lr.get("message", ""))})
         if lr:
             rows.append(
                 {
@@ -1051,6 +1057,7 @@ def get_trae_card():
             "brand2": "#374151",
             "icon": "trae",
             "checked": checked,
+            "badge": badge,
             "metric_label": "今日状态",
             "metric_value": "已签到" if checked else "待签到",
             "last_run": lr,
