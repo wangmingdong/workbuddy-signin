@@ -248,7 +248,8 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 - 活动：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`
 - 领取：`POST https://openapi.qoder.sh/sash/api/v1/me/campaigns/{campaignId}/claim`
 - 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
-- 领取窗口：每日 **10:00（UTC+8）刷新，次日 09:59 截止，过期不可补领**——服务器定时器 08:35 跑的是「昨天 10:00 → 今天 09:59」窗口，正常每天领一次；若失败须赶在 09:59 前手动点补。
+- 领取窗口：每日 **10:00（UTC+8）刷新**；主定时 08:35 早于开放，由 `_qoder_topup_loop` 常驻线程**每日 10:01 起每 30 分钟补签一次，到 13:00 停止**（claim 成功即停）。
+- **⚠️ 关键行为**：Qoder 领取成功后，该每日活动会**从 `/me/campaigns` 列表移除**（顶层 `claimable` 变 `false`，只剩 `VIEW_DETAILS` 类促销）。因此「领完即查不到」属正常——卡片以**本地领取记录**判定「今日已领」，不会误显示成待领取；手动点若已领则幂等跳过（不再报错「未找到活动」）。若接口长期无 `CLAIM_BENEFIT` 活动且本地也无今日记录，才是真·活动改版/迁至桌面端，需去 Qoder 客户端手动领。
 
 **Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`）：
 - 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。

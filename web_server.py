@@ -1745,6 +1745,19 @@ def _qd_read_last():
         return None
 
 
+def _qd_claimed_today():
+    """本地记录是否显示「今日已成功领取」。
+
+    Qoder 领取成功后该活动即从 campaigns 列表移除，接口随后查不到，
+    故必须用本地领取记录判断真实状态，避免「明明已签却显示待领取 / 手动点报错」。
+    """
+    lr = _qd_read_last()
+    if not lr or not lr.get("ok"):
+        return False
+    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")
+    return str(lr.get("ts", "")).startswith(today)
+
+
 def _qd_find_daily(payload):
     """从 campaigns 里挑出「今日」的「每日领 100 Credits」（actionType=CLAIM_BENEFIT）。
 
@@ -1846,14 +1859,38 @@ def get_qd_card():
         d = _qd_api(QD_CAMPAIGN_PATH)
         camp = _qd_find_daily(d)
         if not camp:
-            # 服务端当前未下发「每日领取」活动：可能是每日 10:00(UTC+8) 才开放领取窗口、
-            # 活动改版（领取入口已迁至桌面端 Usage 面板）、或账号暂未纳入。
-            # 不视为故障，降级为中性卡片；若今天已成功领取过则标记为已领。
+            # 服务端当前未返回「每日领 100 Credits」活动：可能活动改版/迁至桌面端，
+            # 也可能是「当日领取成功后该活动即从 campaigns 列表移除」（Qoder 常见行为）。
+            # 后者需用本地领取记录判断真实状态，避免「明明已签却显示待领取 / 手动点报错」。
             lr = _qd_read_last()
+            if _qd_claimed_today():
+                rows = [
+                    {"k": "今日福利", "v": "100 Credits"},
+                    {"k": "领取状态", "v": "✅ 今日已领"},
+                    {
+                        "k": "说明",
+                        "v": "Qoder 领取成功后该活动即从 campaigns 列表移除，故当前接口查不到；"
+                             "以本地领取记录为准（%s）" % str(lr.get("ts"))[5:16],
+                    },
+                ]
+                return {
+                    "name": "qoder",
+                    "title": "Qoder 每日领 100 Credits",
+                    "brand": "#141414",
+                    "brand2": "#4A4A4A",
+                    "icon": "qd",
+                    "checked": True,
+                    "metric_label": "今日 Credits",
+                    "metric_value": "已领 100",
+                    "last_run": lr,
+                    "rows": rows,
+                    "error": None,
+                }
             rows = [
-                {"k": "状态", "v": "服务端当前未返回今日可领取活动（每日 10:00(UTC+8) 才开放新一轮）"},
-                {"k": "自动领取", "v": "系统每日 10:01 起自动补签（每 30 分钟一次，直到当日领到），无需手动去桌面端"},
+                {"k": "状态", "v": "服务端当前未返回今日可领取活动"},
+                {"k": "自动领取", "v": "系统每日 10:01 起自动补签（每 30 分钟一次，直到当日领到）"},
                 {"k": "领取窗口", "v": "每天 10:00(UTC+8)开放，至次日 10:00 前可领（以 Qoder 官方公告为准）"},
+                {"k": "若长期如此", "v": "活动可能已改版/迁至桌面端，需在本机 Qoder 客户端手动领"},
             ]
             if lr:
                 rows.append(
@@ -1964,12 +2001,16 @@ def run_qd_checkin():
         raise
     camp = _qd_find_daily(d)
     if not camp:
-        # 今天的活动尚未开放（每日 10:00(UTC+8) 才下发），由 _qoder_topup_loop（10:01 起）自动补签。
-        # 此时不记为失败，避免 08:35 主定时跑出一条误导性的「未签到」。
+        # 今天的活动尚未开放（每日 10:00(UTC+8) 才下发），由 _qoder_topup_loop（10:01 起）自动补签；
+        # 10:00 后若仍查不到，可能是活动改版，或「当日已领取后活动从列表移除」——后者按本地
+        # 记录判定为已领，避免手动点报错 / 误报未签到。
         utc8_hour = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).hour
         if utc8_hour < 10:
             return get_qd_card()
-        raise RuntimeError("未找到「每日领 100 Credits」活动（可能活动改版或账号暂未纳入）")
+        if _qd_claimed_today():
+            _qd_record(True, "今日已领取（幂等跳过）")
+            return get_qd_card()
+        raise RuntimeError("未找到「每日领 100 Credits」活动（可能活动已改版/迁至桌面端，请在 Qoder 客户端手动领）")
     if camp.get("claimStatus") == "CLAIMED":
         _qd_record(True, "今日已领取（幂等跳过）")
         return get_qd_card()
