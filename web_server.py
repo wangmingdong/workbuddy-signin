@@ -2415,11 +2415,95 @@ def get_qf_card():
             "metric_label": "可用积分",
             "metric_value": points.get("available", "--"),
             "last_run": last_run,
+            "qfdaily_entry": {
+                "ok": bool(signin.get("signedToday")),
+                "todo": 0 if signin.get("signedToday") else 1,
+            },
             "rows": rows,
             "error": None,
         }
     except Exception as e:
         return _qf_degraded_card(e)
+
+
+def get_qf_daily_card():
+    """千帆「每日任务」卡片：目前千帆服务端仅开放「每日签到」这一个每日动作，
+    故映射为单任务 + 积分/连签信息，结构对齐 WorkBuddy 的每日任务弹窗。"""
+    try:
+        if not QIANFAN_TOKEN or not QIANFAN_BASE:
+            raise RuntimeError("未配置千帆（请设置 QF_BASE_URL 与 QF_ACCESS_TOKEN）")
+        d = _http_json(
+            "%s/api/status?token=%s" % (QIANFAN_BASE, QIANFAN_TOKEN), retries=1
+        )
+        if not d.get("ok"):
+            raise RuntimeError(d.get("error") or "千帆状态获取失败")
+        data = d.get("data") or {}
+        signin = data.get("signin") or {}
+        points = data.get("points") or {}
+        signed = bool(signin.get("signedToday"))
+        total = signin.get("totalTimes") or 0
+        available = points.get("available", "--")
+        used = points.get("usedPoints", "--")
+        total_pts = points.get("totalPoints", "--")
+        rows = []
+        todo = 0
+        # 1) 每日签到（千帆侧唯一每日动作）
+        rows.append({
+            "code": "signin",
+            "title": "每日签到",
+            "reward": "已领取" if signed else "登录积分 +1（累计连签天数）",
+            "detail": "累计已签 %s 天" % total,
+            "status": "done" if signed else "todo",
+            "note": "今日已签" if signed else "可签到",
+        })
+        if not signed:
+            todo += 1
+        # 2) 积分余量（信息项）
+        rows.append({
+            "code": "points",
+            "title": "积分余量",
+            "reward": "可用 %s" % available,
+            "detail": "已用 %s / 累计 %s" % (used, total_pts),
+            "status": "done",
+            "note": "实时查询",
+        })
+        return {
+            "name": "qfdaily",
+            "title": "百度千帆 · 每日任务",
+            "brand": "#4E6EF2",
+            "brand2": "#2932E1",
+            "icon": "qf",
+            "daily": True,
+            "checked": todo == 0,
+            "metric_label": "今日任务",
+            "metric_value": ("%d 项待做" % todo) if todo else "已完成",
+            "claimable": todo,
+            "streak_days": total,
+            "energy": None,
+            "rows": rows,
+            "error": None,
+        }
+    except Exception as e:
+        return {
+            "name": "qfdaily",
+            "title": "百度千帆 · 每日任务",
+            "brand": "#4E6EF2",
+            "brand2": "#2932E1",
+            "icon": "qf",
+            "daily": True,
+            "checked": False,
+            "metric_label": "今日任务",
+            "metric_value": "--",
+            "claimable": 0,
+            "rows": [],
+            "error": str(e),
+        }
+
+
+def run_qf_daily():
+    """执行千帆每日任务：目前仅「每日签到」需要服务端动作（幂等），其余为信息项。"""
+    run_qf_checkin()
+    return get_qf_daily_card()
 
 
 # 本字典的插入顺序 = 手机页卡片顺序：WorkBuddy 固定第一，
@@ -3544,8 +3628,8 @@ function cardHTML(it){
 }
 // WorkBuddy 卡片内的入口：成长中心 / 每日任务（新标签页）+ 派猫猫旅行（弹窗）
 function entriesHTML(it){
-  var ge = it.growth_entry, de = it.daily_entry, te = it.travel_entry;
-  if(!ge && !de && !te) return '';
+  var ge = it.growth_entry, de = it.daily_entry, te = it.travel_entry, qe = it.qfdaily_entry;
+  if(!ge && !de && !te && !qe) return '';
   var e = '';
   if(ge){
     var g = ge.ok
@@ -3560,6 +3644,11 @@ function entriesHTML(it){
       : '暂不可用';
     e += '<button class="entry" type="button" id="dailyEntry" data-daily="1">'
        + '<span class="eic">🎯</span><span class="etx"><b>每日任务</b><small>'+esc(d)+'</small></span><span class="earrow">›</span></button>';
+  }
+  if(qe){
+    var qf = qe.ok ? '今日已签' : '可签到';
+    e += '<button class="entry" type="button" id="qfDailyEntry" data-qfdaily="1">'
+       + '<span class="eic">🧭</span><span class="etx"><b>每日任务</b><small>'+esc(qf)+'</small></span><span class="earrow">›</span></button>';
   }
   var html = e ? ('<div class="entries">'+e+'</div>') : '';
   // 派猫猫旅行：同样属于 WorkBuddy，但改成弹窗（数据量大、含明信片与操作按钮），独占一行
@@ -3708,6 +3797,74 @@ function loadDailyModal(){
   var b = $("modal-body"); if(!b) return;
   b.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
   api("api/daily").then(function(d){ renderDailyFocus(d); }).catch(function(e){ b.innerHTML = focusErr(e); });
+}
+
+// ===== 百度千帆「每日任务」弹窗（与 WorkBuddy 每日任务同款结构）=====
+function openQfDaily(){
+  var panel = $("modal-panel"); if(panel) panel.style.setProperty("--mc", "#4E6EF2");
+  var t = $("modal-title"); if(t) t.textContent = "🧭 百度千帆 · 每日任务";
+  var m = $("modal"); if(m){ m.classList.add("show"); document.body.style.overflow = "hidden"; }
+  loadQfDailyModal();
+}
+function loadQfDailyModal(){
+  var b = $("modal-body"); if(!b) return;
+  b.innerHTML = '<div class="dloading" style="padding:40px 0"><span class="spin"></span> 加载千帆每日任务…</div>';
+  api("api/qianfan/daily").then(function(d){ renderQfDailyFocus(d); }).catch(function(e){ b.innerHTML = focusErr(e); });
+}
+function renderQfDailyFocus(d){
+  var el = $("modal-body");
+  if(!el) return;
+  if(!d.ok){ el.innerHTML = focusErr(d.error); return; }
+  var c = d.card || {};
+  var rows = c.rows || [];
+  var html = ''
+    + '<div class="fhead" style="--c:#4E6EF2;--c2:#2932E1">'
+    +   '<h2>🧭 百度千帆 · 每日任务</h2>'
+    +   '<div class="fmeta">千帆每日可做的站内动作，与首页千帆卡互补（目前千帆侧仅开放「每日签到」一个每日动作）</div>'
+    +   '<div class="fstat">累计签到 '+(c.streak_days||0)+' 天　·　今日待做 '+(c.claimable||0)+' 项</div>'
+    + '</div>'
+    + '<button class="btn-mini qfdaily-run" style="width:100%;padding:14px;font-size:15px;--c:#4E6EF2;--c2:#2932E1">🧭 一键签到</button>'
+    + '<div class="fnote">千帆平台侧仅提供「每日签到」这一个每日动作（领取登录积分、累计连签天数）；积分兑换 / 任务中心等无服务端可代领接口，需在官网或客户端操作。</div>'
+    + '<div class="fgroup"><h4>今日动作</h4>';
+  if(rows.length){
+    html += rows.map(function(t){
+      var st = t.status==="done" ? '<span class="st claimed">✅ 已完成</span>'
+             : t.status==="locked" ? '<span class="st locked">🔒 未解锁</span>'
+             : '<span class="st todo">⏳ 待做</span>';
+      var meta = [];
+      if(t.reward) meta.push(t.reward);
+      if(t.note) meta.push(t.note);
+      return '<div class="task"><div class="tt"><div class="t1">'+esc(t.title)+'</div>'
+        + (meta.length?('<div class="t2">'+esc(meta.join(' · '))+'</div>'):'')
+        + (t.detail?('<div class="t2">'+esc(t.detail)+'</div>'):'')
+        + '</div><div class="tr">'+st+'</div></div>';
+    }).join('');
+  } else {
+    html += '<div class="dempty">暂无任务数据</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  bindFocusButtons(el);
+}
+function runQfDaily(btn){
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>签到中…'; }
+  showMsg("千帆签到执行中，请稍候…","ok");
+  api("api/qianfan/daily/run",{method:"POST"}).then(function(d){
+    if(!d.ok){ showMsg(d.error||"执行失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🧭 一键签到"; } return; }
+    pollQfDaily();
+  }).catch(function(e){
+    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    else showMsg("网络错误："+(e&&e.message),"err");
+    if(btn){ btn.disabled=false; btn.innerHTML="🧭 一键签到"; }
+  });
+}
+function pollQfDaily(){
+  api("api/qianfan/daily").then(function(d){
+    var done = d.card && d.card.checked;
+    if(done) showMsg("千帆每日任务已完成 ✅","ok");
+    else showMsg("千帆签到完成，请查看状态","ok");
+    renderQfDailyFocus(d);
+  }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
 }
 
 function openDetail(name){
@@ -4029,6 +4186,7 @@ function pollDaily(){
 function bindFocusButtons(el){
   Array.prototype.forEach.call(el.querySelectorAll('button.growth-run'), function(b){ b.addEventListener('click', function(){ runGrowth(b); }); });
   Array.prototype.forEach.call(el.querySelectorAll('button.daily-run'), function(b){ b.addEventListener('click', function(){ runDaily(b); }); });
+  Array.prototype.forEach.call(el.querySelectorAll('button.qfdaily-run'), function(b){ b.addEventListener('click', function(){ runQfDaily(b); }); });
   Array.prototype.forEach.call(el.querySelectorAll('button.claim'), function(b){ b.addEventListener('click', function(){ claimTask(b.getAttribute('data-code'), b); }); });
 }
 function showFocus(view){
@@ -4220,6 +4378,10 @@ function renderCenter(d){
   });
   Array.prototype.forEach.call(document.querySelectorAll('button.entry[data-daily]'), function(b){
     b.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openDaily(); });
+  });
+  // 百度千帆卡内的「每日任务」入口 → 打开弹窗（与 WorkBuddy 成长/每日任务同款）
+  Array.prototype.forEach.call(document.querySelectorAll('button.entry[data-qfdaily]'), function(b){
+    b.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openQfDaily(); });
   });
   // 重新检查签到状态（只刷新、不执行签到）
   Array.prototype.forEach.call(document.querySelectorAll("button.cta.recheck[data-name]"), function(b){
@@ -4414,6 +4576,19 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
+        if u.path == "/api/qianfan/daily":
+            if not self._key_ok(parse_qs(u.query)):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                self._json(200, {
+                    "ok": True,
+                    "card": get_qf_daily_card(),
+                    "running": False,
+                })
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         if u.path == "/api/detail":
             q = parse_qs(u.query)
             if not self._key_ok(q):
@@ -4566,6 +4741,17 @@ class Handler(BaseHTTPRequestHandler):
                 t = threading.Thread(target=run_daily_background, daemon=True)
                 t.start()
                 self._json(200, {"ok": True, "started": True, "running": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/qianfan/daily/run":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                card = run_qf_daily()
+                self._json(200, {"ok": True, "card": card})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
