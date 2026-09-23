@@ -261,6 +261,6 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 **千帆 / Link AI / WPS 灵犀 / Trae**：均为标准 token 或 Cookie 串鉴权，凭据见 `config.example.json`，过期后重新导出并经 `deploy_ui.py` 部署。
 
 其中 **Trae Work** 需注意两种失败码：
-- `code=9004`（参数/通道不符）→ 服务端走的是网页通道，须用客户端通道 `req_source=2` 并补齐设备头（已内置）。
-- `code=9074`（当前参与用户太多）→ 服务端**并发限流**（早高峰最易触发），属可自愈的临时状态。程序会自动安排稍后重试（15/30/60/120 分钟共 4 轮），卡片此时显示角标「限流·稍后重试」，**无需人工干预、也不要反复手点**。
+- `code=9004`（参数/通道不符）→ 此前臆加的 `x-device-model/-system/-client-version` 三个头服务端不认，现已移除、仅保留客户端真实使用的 `x-device-id`（见 `web_server.py` `_trae_post` 注释）。
+- `code=9074`（当前参与用户太多）→ **不是限流，是凭据/会话体系不匹配**。已逆向 `TRAE SOLO CN` 客户端 `main.js` 的 `eb()` 方法确认：服务端 `claim` 仅接受桌面客户端登录态 `getAuthUserInfo().token`（带设备绑定的长期凭证），用 cookie 换发的临时 JWT 能过认证却过不了 `claim`，固定返回 9074。本机直连（非服务器 IP）也 9074，已排除 IP 限流与早高峰并发。故重试/低峰补签均无效——解决路径只有两条：① 把桌面 Trae 客户端的 `userInfo.token` 提供给我（存 `trae_jwt.txt` 或环境变量 `TRAE_JWT`）；② 直接在桌面 Trae 客户端点签到。
 - 设备标识持久化在 `trae_device_id.txt`（首次自动生成，已 gitignore），请勿删除——每次重启换新设备 ID 更容易触发风控。

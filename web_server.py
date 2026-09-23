@@ -19,7 +19,6 @@ import socket
 import hashlib
 import time
 import datetime
-import random
 import uuid
 import urllib.request
 import urllib.error
@@ -864,14 +863,6 @@ def _trae_device_id():
     return v
 
 
-TRAE_DEVICE_MODEL = os.environ.get("TRAE_DEVICE_MODEL", "Windows")
-TRAE_DEVICE_SYSTEM = os.environ.get("TRAE_DEVICE_SYSTEM", "Windows 10 x64")
-TRAE_CLIENT_VERSION = os.environ.get("TRAE_CLIENT_VERSION", "2.0.0")
-# 低峰补签时刻：Trae 早高峰(如 8:35)常撞 9074 并发上限，单次重试可能不过；
-# 本线程每日在低峰时段对 Trae 单独补跑一次，保证当天能签上。可用 TRAE_OFFPEAK_TIME 覆盖。
-TRAE_OFFPEAK_TIME = os.environ.get("TRAE_OFFPEAK_TIME", "04:30")
-
-
 def _trae_get_token():
     """优先用 cookie 换发新 JWT（约 8h 有效）；无 cookie 时返回配置的静态 JWT。"""
     if TRAE_COOKIE:
@@ -898,23 +889,24 @@ def _trae_get_token():
 
 
 def _trae_post(url, body):
-    """统一的 Trae POST 调用（带 JWT + 浏览器同款头 + 客户端设备头）。"""
+    """统一的 Trae POST 调用（带 JWT + 浏览器同款头 + 客户端设备头）。
+
+    设备头严格对齐 TRAE SOLO CN 客户端 main.js 的 fb() 实现：
+    仅 x-device-id 必带（取自稳定伪设备 id）；x-device-brand/type/os-version/
+    app-version 仅在客户端 commonParams 有值时附，服务端无值则不带。
+    注：此前臆想的 x-device-model/x-device-system/x-client-version 三个头
+    客户端根本不存在，会导致 claim 被服务端判为异常请求（9004），已移除。
+    """
+    hdrs = {
+        "Authorization": "Cloud-IDE-JWT %s" % _trae_get_token(),
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Origin": "https://work.trae.cn",
+        "Referer": "https://work.trae.cn/",
+        "x-device-id": _trae_device_id(),
+    }
     req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        method="POST",
-        headers={
-            "Authorization": "Cloud-IDE-JWT %s" % _trae_get_token(),
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Origin": "https://work.trae.cn",
-            "Referer": "https://work.trae.cn/",
-            # 客户端实机必带的设备上下文（服务端侧之前缺失，导致 claim 被 9004 拒绝）
-            "x-device-id": _trae_device_id(),
-            "x-device-model": TRAE_DEVICE_MODEL,
-            "x-device-system": TRAE_DEVICE_SYSTEM,
-            "x-client-version": TRAE_CLIENT_VERSION,
-        },
+        url, data=json.dumps(body).encode(), method="POST", headers=hdrs
     )
     with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
         return json.loads(r.read().decode("utf-8", "replace"))
@@ -1078,10 +1070,14 @@ def run_trae_checkin():
     """执行 Trae Work 每日签到（客户端通道 req_source=2 + 设备头）。
 
     注意：claim 仅 code=0 算签到成功；非 0 code 一律如实记为失败，不能误报已签。
-    9004 = "submitted order parameters are incorrect"：表示请求被后端拒绝（参数/通道不符）。
-    9074 = "当前参与用户太多，请稍后再试"：服务端偶发返回，按实测并非持续限流，
-           本次视为签到未成功、由下次定时任务（设置里的签到时间）再次尝试。
-    此前服务端用 req_source=3（网页通道）且缺设备头，正是 9004 的诱因；现改 2 + 补设备头。
+    9004 = "submitted order parameters are incorrect"：请求被后端拒绝（参数/通道不符）。
+          实测诱因是此前臆加的 x-device-model/-system/-client-version 三个头，服务端不认；
+          已移除，仅保留客户端真实使用的 x-device-id（见 _trae_post 注释）。
+    9074 = "当前参与用户太多，请稍后再试"：经逆向 TRAE SOLO CN 客户端 main.js 确认，
+          服务端 claim 仅接受桌面客户端登录态 getAuthUserInfo().token（带设备绑定的长期凭证），
+          用 cookie 换发的临时 JWT 能过认证却过不了 claim，固定返回 9074。
+          故 9074 在这里 = 凭据/会话体系不匹配，NOT 限流，重试/低峰补签均无效。
+          解决路径：把桌面 Trae 客户端的 userInfo.token 提供给我，或直接在桌面客户端签到。
     """
     if not (TRAE_COOKIE or TRAE_JWT):
         raise RuntimeError(
@@ -1119,77 +1115,37 @@ def _run_trae_checkin_locked():
             return get_trae_card()
     except Exception:
         pass
-    # claim 含 9074 限流重试：Trae 服务端在早高峰有并发上限，
-    # 返回 9074「当前参与用户太多」。社区实测：带退避重试即可在间隙/低峰通过，
-    # 但 9074 不是鉴权错误，绝不能误判为 cookie 过期。9004 是参数/通道错误，不重试。
-    TRAE_9074_MAX = 12  # 最多 12 次（含首次），约 6 分钟窗口
-    for attempt in range(1, TRAE_9074_MAX + 1):
-        try:
-            d = _trae_api("claim")
-        except Exception as e:
-            results.append("claim 调用异常:%s" % e)
-            break
-        if not isinstance(d, dict):
-            results.append("未知响应")
-            break
+    # 单次 claim（不重试）。
+    # 已扒客户端 main.js 确认：服务端 claim 仅接受桌面客户端登录态
+    # getAuthUserInfo().token（带设备绑定的长期凭证）；用 cookie 换发的临时 JWT
+    # 会被拒绝并返回 9074「当前参与用户太多」。故此处 9074 = 凭据/会话体系不匹配，
+    # 重试无效——必须改用桌面登录态 token（见记忆/PLATFORMS.md）。
+    try:
+        d = _trae_api("claim")
+    except Exception as e:
+        results.append("claim 调用异常:%s" % e)
+        d = None
+    if isinstance(d, dict):
         br = d.get("code")
         if br == 0:
             claimed = True
             results.append("签到成功（checkin_credits/claim）")
-            break
-        if br == 9074:
-            if attempt < TRAE_9074_MAX:
-                wait = 20 + random.randint(0, 20)  # 20~40s 随机退避
-                results.append(
-                    "9074 限流，第%d/%d 次重试前等待%d秒" % (attempt, TRAE_9074_MAX, wait)
-                )
-                time.sleep(wait)
-                continue
-            results.append("9074 限流，已达最大重试(%d次)，今日稍后(低峰)再试" % TRAE_9074_MAX)
-            break
-        if br == 9004:
+        elif br == 9074:
+            results.append(
+                "claim 被拒:code=9074。服务端仅认桌面客户端登录态(userInfo.token)，"
+                "当前用 cookie 换发的临时 JWT 不带设备绑定被拒；请在桌面 Trae 客户端完成签到，"
+                "或把桌面 userInfo.token 提供给我"
+            )
+        elif br == 9004:
             results.append("claim 被拒:code=9004 参数/通道不符（需进一步对齐客户端校验）")
-            break
-        # 其他非 0：如实记录，不重试
-        results.append("claim 被拒:code=%s %s" % (br, d.get("message") or br))
-        break
+        else:
+            results.append("claim 被拒:code=%s %s" % (br, d.get("message") or br))
+    elif d is not None:
+        results.append("未知响应")
     # 防误报：仅有接口明确返回 code=0 才算签到成功；否则一律记为失败
     ok = claimed
     _trae_record(ok, "；".join(results))
     return get_trae_card()
-
-
-def _trae_offpeak_loop():
-    """低峰补签：Trae 在早高峰(如 8:35)常撞 9074 并发上限，单次重试可能不过。
-    本线程每日在低峰时段(默认 04:30，可用 TRAE_OFFPEAK_TIME 覆盖)对 Trae 单独
-    补跑一次；若当日已签则跳过，避免重复 claim。随 web_server 常驻(daemon 线程)。"""
-    while True:
-        try:
-            try:
-                hh, mm = (TRAE_OFFPEAK_TIME.split(":"))[:2]
-                hh, mm = int(hh), int(mm)
-            except Exception:
-                hh, mm = 4, 30
-            now = datetime.datetime.now()
-            target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
-            if target <= now:
-                target += datetime.timedelta(days=1)
-            wait = (target - now).total_seconds()
-            print("[trae-offpeak] 下次低峰补签: %s（约 %.0f 秒后）"
-                  % (target.strftime("%Y-%m-%d %H:%M"), wait))
-            time.sleep(wait)
-            # 先确认今天还没签上再跑，避免重复 claim（idempotent 亦无害）
-            try:
-                if get_trae_card().get("checked"):
-                    print("[trae-offpeak] 今日已签，跳过补签")
-                else:
-                    print("[trae-offpeak] 触发低峰补签 Trae")
-                    run_checkin_for("trae")
-            except Exception as e:
-                print("[trae-offpeak] 补签异常: %s" % e)
-        except Exception as e:
-            print("[trae-offpeak] 异常: %s" % e)
-            time.sleep(300)
 
 
 # ============================ WPS 灵犀签到适配器 ============================
@@ -4689,8 +4645,6 @@ def main():
     threading.Thread(target=_travel_poll_loop, daemon=True).start()
     # Qoder 每日 10:00(UTC+8) 开放，08:35 主定时会早于开放时间，起常驻补签线程（10:01 起每 30 分，至 13:00）
     threading.Thread(target=_qoder_topup_loop, daemon=True).start()
-    # Trae 低峰补签守护：每日低峰时段单独补跑 Trae（早高峰常撞 9074 并发上限）
-    threading.Thread(target=_trae_offpeak_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
