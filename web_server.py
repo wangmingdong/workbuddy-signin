@@ -836,19 +836,18 @@ TRAE_UG_BASE = "https://api.trae.cn/trae/api/v2/ug"
 TRAE_TOKEN_API = "https://api.trae.cn/cloudide/api/v3/common/GetUserToken"
 # 客户端通道标识：SOLO_CN 安装包固定为 2（之前误用网页通道 3，导致 claim 被后端 9004 拒绝）
 TRAE_REQ_SOURCE = int(os.environ.get("TRAE_REQ_SOURCE", "2"))
-# 设备 id：默认用客户端真实设备 id 2416059499433050（见 _trae_device_id 注释）。
-# 旧的 wb- 伪文件值会被忽略；环境变量 TRAE_DEVICE_ID 仍可覆盖。
+# 设备 id：从环境变量 TRAE_DEVICE_ID 或同目录 trae_device_id.txt 读取。
+# 必须是你自己的 Trae 客户端真实设备 id（storage.json 键名 iCubeAuthInfo://icube-dc:<id>
+# 或客户端日志 device_id=），否则服务端按设备记账会 9074 拒绝。详见 README「Trae 设备 id 获取」。
 TRAE_DEVICE_ID_FILE = os.path.join(BASE_DIR, "trae_device_id.txt")
 
 
 def _trae_device_id():
-    """设备 id：env 覆盖 > 本地文件(非 wb- 伪值) > 客户端真实设备 id。
+    """返回 Trae 客户端真实设备 id（服务端按设备记账，必须用与登录态一致的真实 id）。
 
-    9074 根因：此前默认用随机伪设备 id（wb-xxxx），服务端按设备记账，陌生设备
-    直接被拒。实测客户端真实设备 id 为 2416059499433050（icube-dc，来自 storage.json
-    键名 iCubeAuthInfo://icube-dc:2416059499433050 与 main.log 的 device_id=...），
-    配合原 cookie 换发的 JWT + req_source=2 即可 claim 成功（did_checked_in:true）。
-    故默认值改为该真实设备 id；旧的 wb- 伪文件值一律忽略，避免回退到伪 id。
+    优先级：环境变量 TRAE_DEVICE_ID > 同目录 trae_device_id.txt > 否则返回空字符串。
+    注意：不能随机生成伪 id（wb-xxxx 会被 9074 拒绝），也不能用他人 id；
+    必须从你自己的 Trae 客户端取真实设备 id。未配置时返回空，由 run_trae_checkin 报清晰错误。
     """
     env = os.environ.get("TRAE_DEVICE_ID")
     if env:
@@ -856,12 +855,11 @@ def _trae_device_id():
     try:
         with open(TRAE_DEVICE_ID_FILE, "r", encoding="utf-8") as f:
             v = f.read().strip()
-        if v and not v.startswith("wb-"):
+        if v:
             return v
     except Exception:
         pass
-    # 默认：TRAE SOLO CN 桌面客户端的真实设备 id（同账号 + 此设备 id 才能 claim 成功）
-    return "2416059499433050"
+    return ""
 
 
 def _trae_get_token():
@@ -1081,14 +1079,18 @@ def run_trae_checkin():
     9004 = "submitted order parameters are incorrect"：请求被后端拒绝（参数/通道不符）。
           实测诱因是此前臆加的 x-device-model/-system/-client-version 三个头，服务端不认；
           已移除，仅保留客户端真实使用的 x-device-id（见 _trae_post 注释）。
-    9074 = "当前参与用户太多，请稍后再试"：早前几轮曾误判为「凭据体系不匹配 / 限流」，
+    9074 = "当前参与用户太多，请稍后再试"：曾误判为「凭据体系不匹配 / 限流」，
           实测真因是脚本一直用随机伪设备 id（wb-xxxx），服务端按「设备」记账→陌生设备直接 9074。
-          现已把 _trae_device_id() 默认值改为客户端真实设备 id（2416059499433050，
-          取自 storage.json 键名 iCubeAuthInfo://icube-dc:2416059499433050 与客户端日志 device_id=）。
-          配合 cookie 换发的 JWT（req_source=2）即可 claim 成功（code=0）。
-          故再次出现 9074 时，先确认 _trae_device_id() 返回的是否仍是该真实设备 id、
-          以及 trae_cookie.txt 是否仍有效，而非去导出桌面 userInfo.token（已验证无需）。
+          现已将 _trae_device_id() 改为读取你自己的客户端真实设备 id（环境变量 TRAE_DEVICE_ID
+          或 trae_device_id.txt）。配合 cookie 换发的 JWT（req_source=2）即可 claim 成功（code=0）。
+          故再次出现 9074 时，先确认已配置真实设备 id、且 trae_cookie.txt 仍有效，
+          而非去导出桌面 userInfo.token（已验证无需）。
     """
+    if not _trae_device_id():
+        raise RuntimeError(
+            "未配置 Trae 设备 id：请在 trae_device_id.txt 或环境变量 TRAE_DEVICE_ID "
+            "填入你 Trae 客户端的真实设备 id（见 README「Trae 设备 id 获取」）"
+        )
     if not (TRAE_COOKIE or TRAE_JWT):
         raise RuntimeError(
             "未配置 Trae 凭据（trae_cookie.txt / TRAE_JWT 或 trae_jwt.txt）"
@@ -1127,8 +1129,8 @@ def _run_trae_checkin_locked():
         pass
     # 单次 claim（不重试）。
     # 真因已定位：服务端按「设备 id」记账，伪设备 id（wb-xxxx）会直接 9074；
-    # 真实设备 id（2416059499433050，来自客户端本地存储/日志）+ cookie 换发的 JWT
-    # + req_source=2 即可 code=0 成功。故正常路径不会再触发 9074，无需退避重试。
+    # 真实设备 id（从环境变量 TRAE_DEVICE_ID / trae_device_id.txt 读取你自己的 id）
+    # + cookie 换发的 JWT + req_source=2 即可 code=0 成功。正常路径不会再触发 9074，无需退避重试。
     try:
         d = _trae_api("claim")
     except Exception as e:
@@ -1141,8 +1143,8 @@ def _run_trae_checkin_locked():
             results.append("签到成功（checkin_credits/claim）")
         elif br == 9074:
             results.append(
-                "claim 被拒:code=9074。服务端按设备记账，伪设备 id 会被拒；"
-                "请确认 _trae_device_id() 返回的是真实设备 id(2416059499433050)，"
+                "claim 被拒:code=9074。服务端按设备记账，伪/未配置设备 id 会被拒；"
+                "请确认已配置真实设备 id（环境变量 TRAE_DEVICE_ID 或 trae_device_id.txt），"
                 "且 trae_cookie.txt 仍有效"
             )
         elif br == 9004:
@@ -2993,14 +2995,14 @@ def _manual_guide(name, it):
 
 # 各平台官网 / 登录入口（详情弹窗里统一提供「前往官网登录」链接，风格与其他卡片一致）
 OFFICIAL_SITES = {
-    "workbuddy": ("https://www.workbuddy.cn/", "WorkBuddy 官网"),
-    "qianfan":   ("https://qianfan.baidu.com/", "百度智能云千帆"),
+    "workbuddy": ("https://www.workbuddy.cn/events/invite?inviteCode=baprgd12dub6r2k", "WorkBuddy 官网"),
+    "qianfan":   ("https://www.dumate.cn/?track=yqyl", "百度搭子 DuMate"),
     "minimax":   ("https://platform.minimax.io/", "MiniMax 开放平台"),
     "qoder":     ("https://qoder.com/", "Qoder 官网"),
     "linkai":    ("https://link-ai.tech/console/account?bind=1", "Link AI 控制台"),
     "lingxi":    ("https://lingxi.wps.cn/", "WPS 灵犀"),
     "huawei":    ("https://devcloud.cn-north-4.huaweicloud.com/", "华为云 DevCloud"),
-    "trae":      ("https://work.trae.cn/", "Trae 官网"),
+    "trae":      ("https://www.trae.cn/events/code-fission/J237PUTE7HES?utm_source=copy_link&utm_medium=code_fission", "Trae 官网"),
     "coze":      ("https://www.coze.cn/", "扣子 Coze 官网"),
 }
 

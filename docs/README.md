@@ -8,14 +8,14 @@
 
 ## 它能签到哪些平台
 
-卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 9 张卡**：8 张全自动 + 1 张手动（华为）。
+卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 9 张卡**：多数可全自动（WorkBuddy / 千帆 / MiniMax / Link AI / 灵犀 / Trae / Coze）；Qoder 卡片仍展示，但每日 100 Credits 因官方限制需**桌面端手动领**（不在服务端自动签到列表）；华为为手动卡。
 
 | 平台 | 官网 | 每日奖励 | 凭据文件（根目录） | 维护频率 |
 |------|------|---------|------------------|----------|
 | WorkBuddy | workbuddy.cn | 100 积分 | `token.info` | 打开一次客户端自动续期 |
 | 百度千帆 | qianfan.baidu.com | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
 | MiniMax Code | platform.minimax.io | 400 智点 | `mm_web_token.json` | 约 40 天，过期重新登录 |
-| Qoder | qoder.com | 100 Credits | `qoder_token.txt` | 约 1 个月，失效重新取出 |
+| Qoder | qoder.com | 100 Credits（桌面端手动领） | `qoder_token.txt` | 约 1 个月，失效重新取出 |
 | Link AI | console.link-ai.tech | — | `linkai_token.txt` | 不定期 |
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
@@ -105,6 +105,67 @@ workbuddy-signin/
 3. 各平台 token/cookie 仍按上文「目录结构」各自放置（如 `trae_cookie.txt`、`lx_cookie.txt`、`coze_cookie.txt`），这些文件已在 `.gitignore` 忽略。
 
 > `.env` 含真实口令，**已被 .gitignore 忽略，绝不入库**；仓库里只有 `.env.example` 占位模板。所有凭据/状态文件（含 `hw/` 下华为登录态、`*_last_run.json`、`token.info`、`settings.json`）均已被 `.gitignore` 忽略。
+
+---
+
+## 🚀 开源首次配置指南（Clone 后从零跑起来）
+
+面向第一次拿到本仓库、想自己部署签到的用户。**核心代码已配置化，没有写死任何人的令牌 / 设备 id**—— clone 后只需按下面填好你自己的凭据即可。
+
+### 0. 运行环境
+- **Python 3.8+**（纯标准库，无需 `pip install`）
+- 一台常驻机器跑 `web_server.py`（本机 / 云服务器均可）；手机同 WiFi 或经 nginx 反代访问网页
+
+### 1. 启动服务（三选一）
+- **本机试用**：双击 `start_web.bat`，窗口打印手机访问地址（需同 WiFi + 防火墙允许）。
+- **服务器 systemd**（已部署示例）：`web_server.py` 监听 `127.0.0.1:8790`，由 nginx `location /checkin/` 反代；`wb-checkin-daily.timer` 每天 08:35 自动签到。
+- **手动前台**：`python web_server.py --daily` 跑一次签到；`python web_server.py` 起网页服务。
+
+### 2. 配置访问口令（建议）
+- 环境变量 `WB_ACCESS_KEY`（服务器 systemd 注入）或本地 `.env` 的 `ACCESS_KEY`。
+- 留空 = 不校验口令。设置后手机首次访问需输入一次，存 `localStorage`，不写 URL。
+
+### 3. 配置各平台凭据
+所有凭据**平铺在项目根目录**（文件名固定），或等价的同名环境变量（优先级：环境变量 > 本地文件）。两份模板已给出：
+- `config.example.json`：每个平台的「凭据文件 / 环境变量 / 如何获取」说明
+- `.env.example`：环境变量模板（复制为 `.env` 填值）
+
+| 平台 | 凭据文件 | 环境变量 | 获取方式（详见 config.example.json） |
+|------|---------|---------|--------------------------------------|
+| WorkBuddy | `token.info` | `WB_TOKEN_FILE` | 打开一次客户端，token 自动写入本地 |
+| 千帆 | `qf_token.txt` | `QF_ACCESS_TOKEN` / `QF_BASE_URL` | 千帆官网登录后取 token |
+| MiniMax Code | `mm_web_token.json` | `MM_WEB_TOKEN` | agent.minimax.cn 网页端 localStorage._token |
+| Qoder | `qoder_token.txt` | `QODER_TOKEN` | 桌面客户端取出（仅状态展示，领取见第 5 步） |
+| Link AI | `linkai_token.txt` | `LINKAI_TOKEN` | 平台生成的 API token |
+| WPS 灵犀 | `lx_cookie.txt` | `LX_COOKIE` | 浏览器 DevTools → Application → Cookies 全复制 |
+| **Trae Work** | `trae_cookie.txt` + `trae_device_id.txt` | `TRAE_COOKIE`/`TRAE_JWT` + `TRAE_DEVICE_ID` | Cookie 见 config.example；**设备 id 见第 4 步** |
+| Coze 扣子 | `coze_cookie.txt` | `COZE_COOKIE` | 浏览器登录 coze.cn 后复制全部 Cookie |
+| 华为码道 | `hw_cookie.txt` | `HW_COOKIE` | 由本机 `huawei/` 工具链自动同步（见仓库 huawei/ 说明） |
+
+> 凭据文件与 `.env` 均已被 `.gitignore` 忽略，绝不会进仓库。
+
+### 4. ⚠️ Trae 设备 id 获取（必做，否则 Trae 永远 9074）
+Trae 服务端**按设备记账**：`claim` 必须用与登录态一致的**你的真实设备 id**，随机 id 会被拒（9074）。
+1. 打开你的 `TRAE SOLO CN` 客户端并登录一次。
+2. 找到客户端用户数据目录（Windows 通常 `%APPDATA%\TRAE SOLO CN\User\globalStorage\storage.json`），搜索键名 `iCubeAuthInfo://icube-dc:<你的设备id>`，`<你的设备id>` 那段数字即真实设备 id；或在客户端日志里搜 `device_id=`。
+3. 把这段数字写入项目根目录 `trae_device_id.txt`（一行、无空格）；或设环境变量 `TRAE_DEVICE_ID=<你的设备id>`。
+4. 验证：网页打开 Trae 卡点「立即签到」，或 `python web_server.py --daily`，应显示「已签到」。
+
+> 这一步**不能省略、也不能用别人的 id**。文件已被 gitignore，只存在你本地/服务器。
+
+### 5. Qoder：每日 100 Credits 需桌面端手动领
+官方明文规定「领取渠道：仅限 Qoder 桌面端」。服务端令牌（哪怕从桌面导出的 PAT）调 `qcs/config/resolve` 返回空，拿不到领取入口，**服务端无法代领**。因此：
+- 卡片诚实标注「🔧 仅限 Qoder 桌面端领取」，不再谎报已领；
+- `qoder_token.txt` 仅用于展示状态/续期，**不作为领取凭据**；
+- 那 100 Credits 请每天在桌面 Qoder 客户端点一下「领取」。
+
+### 6. 成长中心 / 每日任务：WorkBuddy 卡内弹窗
+WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，点击在**当前页面弹窗**打开（与「派猫猫旅行」同一套卡内弹窗，不跳页），可一键完成/领取。它们复用 WorkBuddy 登录态，随 WorkBuddy 开关联动。
+
+### 7. 开启自动签到
+- **服务器**：`systemctl enable --now wb-checkin-daily.timer`（每天 08:35）；或在「⚙ 设置」页填「定时签到时间」热更新。
+- **本机**：管理员 PowerShell 跑 `.\setup_task.ps1`（每天 09:10）。
+- 任一平台失败不影响其余（单平台失败不阻塞）。
 
 ---
 
@@ -205,7 +266,7 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 
 ## WorkBuddy 成长中心 · 一键完成任务
 
-签到中心网页的 WorkBuddy 卡片底部有两个入口胶囊：「成长中心」（`?view=growth`）和「每日任务」（`?view=daily`），都是新开页，可一键领取成长任务奖励、显示任务完成状态。
+签到中心网页的 WorkBuddy 卡片底部有两个入口胶囊：「🌱 成长中心」和「🎯 每日任务」，点击在**当前页面弹窗**打开（与「派猫猫旅行」同一套卡内弹窗机制，不跳页、不新开标签），可一键领取成长任务奖励、显示任务完成状态（`?view=growth` / `?view=daily` 整页入口仍保留为兜底）。
 
 - 自动 `accept` 全部成长任务；
 - 对**已真实完成**的任务，一键 `claim` 领取积分/能量（幂等，重复点不重复领）；
@@ -246,10 +307,10 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 
 **Qoder**（对应 `get_qd_card` / `run_qd_checkin`）：
 - 活动：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`
-- 领取：`POST https://openapi.qoder.sh/sash/api/v1/me/campaigns/{campaignId}/claim`
 - 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
-- 领取窗口：每日 **10:00（UTC+8）刷新**；主定时 08:35 早于开放，由 `_qoder_topup_loop` 常驻线程**每日 10:01 起每 30 分钟补签一次，到 13:00 停止**（claim 成功即停）。
-- **⚠️ 关键行为**：Qoder 领取成功后，该每日活动会**从 `/me/campaigns` 列表移除**（顶层 `claimable` 变 `false`，只剩 `VIEW_DETAILS` 类促销）。因此「领完即查不到」属正常——卡片以**本地领取记录**判定「今日已领」，不会误显示成待领取；手动点若已领则幂等跳过（不再报错「未找到活动」）。若接口长期无 `CLAIM_BENEFIT` 活动且本地也无今日记录，才是真·活动改版/迁至桌面端，需去 Qoder 客户端手动领。
+- **🔧 每日 100 Credits 官方明文「仅限 Qoder 桌面端领取」**：服务端令牌（哪怕桌面导出的 PAT）调 `qcs/config/resolve`（`qodercli-feature-gates`）返回**空**，拿不到领取入口，故服务端脚本**无法代领**。卡片诚实标注「🔧 仅限 Qoder 桌面端领取」，不再谎报已领；Qoder 也已移出自动签到列表。
+- **处理方式**：那 100 Credits 需每天在桌面 Qoder 客户端手动点一下。`qoder_token.txt` 仅用于状态展示/续期，**不作为领取凭据**。
+- 早期曾误判「领完即查不到、以本地记录判已领 + 常驻补签线程」——已推翻，移除 `_qoder_topup_loop` 与「本地记录判已领」逻辑，改为诚实提示桌面端独占。
 
 **Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`）：
 - 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。
@@ -261,7 +322,9 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 
 **千帆 / Link AI / WPS 灵犀 / Trae**：均为标准 token 或 Cookie 串鉴权，凭据见 `config.example.json`，过期后重新导出并经 `deploy_ui.py` 部署。
 
-其中 **Trae Work** 需注意两种失败码：
-- `code=9004`（参数/通道不符）→ 此前臆加的 `x-device-model/-system/-client-version` 三个头服务端不认，现已移除、仅保留客户端真实使用的 `x-device-id`（见 `web_server.py` `_trae_post` 注释）。
-- `code=9074`（当前参与用户太多）→ **不是限流，是凭据/会话体系不匹配**。已逆向 `TRAE SOLO CN` 客户端 `main.js` 的 `eb()` 方法确认：服务端 `claim` 仅接受桌面客户端登录态 `getAuthUserInfo().token`（带设备绑定的长期凭证），用 cookie 换发的临时 JWT 能过认证却过不了 `claim`，固定返回 9074。本机直连（非服务器 IP）也 9074，已排除 IP 限流与早高峰并发。故重试/低峰补签均无效——解决路径只有两条：① 把桌面 Trae 客户端的 `userInfo.token` 提供给我（存 `trae_jwt.txt` 或环境变量 `TRAE_JWT`）；② 直接在桌面 Trae 客户端点签到。
-- 设备标识持久化在 `trae_device_id.txt`（首次自动生成，已 gitignore），请勿删除——每次重启换新设备 ID 更容易触发风控。
+其中 **Trae Work**（对应 `get_trae_card` / `run_trae_checkin`）：
+- 签到：`POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/claim`（`req_source=2`，客户端通道）
+- 鉴权：`Authorization: Cloud-IDE-JWT <cookie 换发的 JWT>` + `x-device-id: <你的真实设备 id>`
+- `code=9004`（参数/通道不符）→ 此前臆加的 `x-device-model/-system/-client-version` 三个头服务端不认，现已移除、仅保留客户端真实使用的 `x-device-id`。
+- `code=9074`（当前参与用户太多）→ **真因是伪设备 id，不是限流、也不是令牌体系问题**。服务端按「设备」记账：用随机伪设备 id（`wb-xxxx`）会被直接拒；必须用**你自己的 Trae 客户端真实设备 id**（`env TRAE_DEVICE_ID` 或 `trae_device_id.txt`）。实测真实设备 id + cookie 换发的 JWT + `req_source=2` 即 `code=0 success`（`did_checked_in:true`），**无需导出桌面 userInfo.token**。
+- **⚠️ Trae 设备 id 必配**：从你自己的 `TRAE SOLO CN` 客户端取真实设备 id（见下方「开源首次配置指南 · 第 4 步」），写入 `trae_device_id.txt` 或环境变量 `TRAE_DEVICE_ID`。留空会导致 9074、无法自动签。
