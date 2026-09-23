@@ -2147,7 +2147,7 @@ def get_lk_card():
             "icon": "lk",
             "checked": False,
             "needs_auth": True,
-            "auth_url": "https://link-ai.tech/console/account",
+            "auth_url": "https://link-ai.tech/console/account?bind=1",
             "metric_label": "状态",
             "metric_value": "未配置",
             "last_run": None,
@@ -2211,6 +2211,10 @@ def get_lk_card():
             "brand2": "#2563EB",
             "icon": "lk",
             "checked": checked,
+            "needs_auth": True,
+            "hide_auth_link": True,
+            "manual_cta_url": "https://link-ai.tech/console/account?bind=1",
+            "manual_cta_label": "🌐 网页签到",
             "badge": "需手动" if needs_captcha else None,
             "metric_label": "可用积分",
             "metric_value": bal,
@@ -2763,7 +2767,7 @@ ADAPTERS = {
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "linkai", "lingxi", "trae", "coze")
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "lingxi", "trae", "coze")
 # 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
 # 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
 AUTO_RUN = AUTO_PLATFORMS + ("travel",)
@@ -3123,7 +3127,7 @@ OFFICIAL_SITES = {
     "qianfan":   ("https://qianfan.baidu.com/", "百度智能云千帆"),
     "minimax":   ("https://platform.minimax.io/", "MiniMax 开放平台"),
     "qoder":     ("https://qoder.com/", "Qoder 官网"),
-    "linkai":    ("https://console.link-ai.tech/", "Link AI 控制台"),
+    "linkai":    ("https://link-ai.tech/console/account?bind=1", "Link AI 控制台"),
     "lingxi":    ("https://lingxi.wps.cn/", "WPS 灵犀"),
     "huawei":    ("https://devcloud.cn-north-4.huaweicloud.com/", "华为云 DevCloud"),
     "trae":      ("https://work.trae.cn/", "Trae 官网"),
@@ -3630,7 +3634,12 @@ function cardHTML(it){
   var last = it.last_run ? fmtLast(it.last_run) : "暂无记录";
   var lastTs = (it.last_run && it.last_run.ts) ? String(it.last_run.ts).slice(5,16) : "";
   var btn;
-  if(needsAuth){
+  if(it.manual_cta_url){
+    // 手动签到卡：底部「签到」按钮直接跳转网页签到页，不触发自动签到
+    var cta = '<a class="cta-link" href="'+esc(it.manual_cta_url)+'" target="_blank" rel="noopener">'+esc(it.manual_cta_label||'🌐 网页签到')+'</a>';
+    var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:8px">🔄 重新检查</button>';
+    btn = cta + retry;
+  } else if(needsAuth){
     // cookie 类平台：签到用「服务器自己那份 Cookie」，在本人浏览器登录并不会推给服务器，
     // 所以这里不摆「去登录」死路（hide_auth_link），只留一个诚实的「重新检查」。
     var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
