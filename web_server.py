@@ -2502,7 +2502,7 @@ def get_qf_daily_card():
 
 def run_qf_daily():
     """执行千帆每日任务：目前仅「每日签到」需要服务端动作（幂等），其余为信息项。"""
-    run_qf_checkin()
+    run_checkin_for("qianfan")  # 走千帆服务 /api/checkin/run，失败抛异常
     return get_qf_daily_card()
 
 
