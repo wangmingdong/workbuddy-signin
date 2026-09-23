@@ -69,6 +69,7 @@ trae_cookie.json
 linkai_token.txt
 lx_cookie.txt
 coze_cookie.txt
+jimeng_cookie.txt
 # 扣子官方 logo（已 base64 内联进 web_server.py，独立 png 仅本地留档，不入库）
 coze_logo.png
 
