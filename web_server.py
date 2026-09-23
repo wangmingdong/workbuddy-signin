@@ -1037,11 +1037,11 @@ def get_trae_card():
             },
             {"k": "签到状态", "v": "✅ 今日已签" if checked else "待签到"},
         ]
-        # 诚实暴露 9074 凭据体系不匹配：上次 claim 失败且原因含 9074 时，卡片直接给
-        # 「需桌面登录态」角标 + 失败原因，避免用户以为在转圈/能自动签（点了没反应）。
+        # 9074 现指「伪设备 id 被拒」（非凭据体系不匹配）：上次 claim 失败且原因含 9074 时，
+        # 卡片给角标提示检查设备 id / cookie，避免用户以为在转圈/能自动签（点了没反应）。
         badge = None
         if (not checked) and lr and not lr.get("ok") and "9074" in str(lr.get("message", "")):
-            badge = "需桌面登录态"
+            badge = "检查设备id/cookie"
             rows.append({"k": "⚠️ 失败原因", "v": str(lr.get("message", ""))})
         if lr:
             rows.append(
@@ -1081,11 +1081,13 @@ def run_trae_checkin():
     9004 = "submitted order parameters are incorrect"：请求被后端拒绝（参数/通道不符）。
           实测诱因是此前臆加的 x-device-model/-system/-client-version 三个头，服务端不认；
           已移除，仅保留客户端真实使用的 x-device-id（见 _trae_post 注释）。
-    9074 = "当前参与用户太多，请稍后再试"：经逆向 TRAE SOLO CN 客户端 main.js 确认，
-          服务端 claim 仅接受桌面客户端登录态 getAuthUserInfo().token（带设备绑定的长期凭证），
-          用 cookie 换发的临时 JWT 能过认证却过不了 claim，固定返回 9074。
-          故 9074 在这里 = 凭据/会话体系不匹配，NOT 限流，重试/低峰补签均无效。
-          解决路径：把桌面 Trae 客户端的 userInfo.token 提供给我，或直接在桌面客户端签到。
+    9074 = "当前参与用户太多，请稍后再试"：早前几轮曾误判为「凭据体系不匹配 / 限流」，
+          实测真因是脚本一直用随机伪设备 id（wb-xxxx），服务端按「设备」记账→陌生设备直接 9074。
+          现已把 _trae_device_id() 默认值改为客户端真实设备 id（2416059499433050，
+          取自 storage.json 键名 iCubeAuthInfo://icube-dc:2416059499433050 与客户端日志 device_id=）。
+          配合 cookie 换发的 JWT（req_source=2）即可 claim 成功（code=0）。
+          故再次出现 9074 时，先确认 _trae_device_id() 返回的是否仍是该真实设备 id、
+          以及 trae_cookie.txt 是否仍有效，而非去导出桌面 userInfo.token（已验证无需）。
     """
     if not (TRAE_COOKIE or TRAE_JWT):
         raise RuntimeError(
@@ -1124,10 +1126,9 @@ def _run_trae_checkin_locked():
     except Exception:
         pass
     # 单次 claim（不重试）。
-    # 已扒客户端 main.js 确认：服务端 claim 仅接受桌面客户端登录态
-    # getAuthUserInfo().token（带设备绑定的长期凭证）；用 cookie 换发的临时 JWT
-    # 会被拒绝并返回 9074「当前参与用户太多」。故此处 9074 = 凭据/会话体系不匹配，
-    # 重试无效——必须改用桌面登录态 token（见记忆/PLATFORMS.md）。
+    # 真因已定位：服务端按「设备 id」记账，伪设备 id（wb-xxxx）会直接 9074；
+    # 真实设备 id（2416059499433050，来自客户端本地存储/日志）+ cookie 换发的 JWT
+    # + req_source=2 即可 code=0 成功。故正常路径不会再触发 9074，无需退避重试。
     try:
         d = _trae_api("claim")
     except Exception as e:
@@ -1140,9 +1141,9 @@ def _run_trae_checkin_locked():
             results.append("签到成功（checkin_credits/claim）")
         elif br == 9074:
             results.append(
-                "claim 被拒:code=9074。服务端仅认桌面客户端登录态(userInfo.token)，"
-                "当前用 cookie 换发的临时 JWT 不带设备绑定被拒；请在桌面 Trae 客户端完成签到，"
-                "或把桌面 userInfo.token 提供给我"
+                "claim 被拒:code=9074。服务端按设备记账，伪设备 id 会被拒；"
+                "请确认 _trae_device_id() 返回的是真实设备 id(2416059499433050)，"
+                "且 trae_cookie.txt 仍有效"
             )
         elif br == 9004:
             results.append("claim 被拒:code=9004 参数/通道不符（需进一步对齐客户端校验）")
