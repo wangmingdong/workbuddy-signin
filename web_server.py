@@ -19,6 +19,7 @@ import socket
 import hashlib
 import time
 import datetime
+import random
 import uuid
 import urllib.request
 import urllib.error
@@ -866,6 +867,9 @@ def _trae_device_id():
 TRAE_DEVICE_MODEL = os.environ.get("TRAE_DEVICE_MODEL", "Windows")
 TRAE_DEVICE_SYSTEM = os.environ.get("TRAE_DEVICE_SYSTEM", "Windows 10 x64")
 TRAE_CLIENT_VERSION = os.environ.get("TRAE_CLIENT_VERSION", "2.0.0")
+# 低峰补签时刻：Trae 早高峰(如 8:35)常撞 9074 并发上限，单次重试可能不过；
+# 本线程每日在低峰时段对 Trae 单独补跑一次，保证当天能签上。可用 TRAE_OFFPEAK_TIME 覆盖。
+TRAE_OFFPEAK_TIME = os.environ.get("TRAE_OFFPEAK_TIME", "04:30")
 
 
 def _trae_get_token():
@@ -1001,6 +1005,33 @@ def get_trae_card():
         pass
     try:
         d = _trae_api("status")
+        # 接口返回非 0（如瞬时 1001 认证抖动）时诚实显示「暂不可用」，
+        # 不谎称「待签到」，也别误报「cookie 过期」。
+        dcode = d.get("code")
+        if dcode not in (0, None):
+            return {
+                "name": "trae",
+                "title": "Trae Work 每日签到",
+                "brand": "#111827",
+                "brand2": "#374151",
+                "icon": "trae",
+                "checked": False,
+                "badge": "接口暂不可用",
+                "metric_label": "状态",
+                "metric_value": "暂不可用",
+                "last_run": _trae_read_last(),
+                "rows": [
+                    {
+                        "k": "原因",
+                        "v": "服务端返回 code=%s：%s" % (dcode, d.get("message") or "未知"),
+                    },
+                    {
+                        "k": "说明",
+                        "v": "通常是接口瞬时抖动，稍后点「重新检查签到状态」即可，无需重导凭据。",
+                    },
+                ],
+                "error": None,
+            }
         lr = _trae_read_last()
         checked = bool(d.get("checked_in"))
         credits = d.get("credits") or 0
@@ -1088,32 +1119,77 @@ def _run_trae_checkin_locked():
             return get_trae_card()
     except Exception:
         pass
-    try:
-        d = _trae_api("claim")
-        if isinstance(d, dict):
-            br = d.get("code")
-            if br == 0:
-                claimed = True
-                results.append("签到成功（checkin_credits/claim）")
-            elif br == 9074:
-                # 9074 = 服务端返回"当前参与用户太多"；按实测并非持续限流，
-                # 本次视为签到未成功（定时任务会按设置时间再次尝试，接口幂等）。
-                results.append("服务端返回 code=9074（参与用户太多），本次签到未成功")
-            elif br == 9004:
-                results.append(
-                    "claim 被拒:code=9004 参数/通道不符（需进一步对齐客户端校验）"
-                )
-            else:
-                msg = d.get("message") or br
-                results.append("claim 被拒:code=%s %s" % (br, msg))
-        else:
+    # claim 含 9074 限流重试：Trae 服务端在早高峰有并发上限，
+    # 返回 9074「当前参与用户太多」。社区实测：带退避重试即可在间隙/低峰通过，
+    # 但 9074 不是鉴权错误，绝不能误判为 cookie 过期。9004 是参数/通道错误，不重试。
+    TRAE_9074_MAX = 12  # 最多 12 次（含首次），约 6 分钟窗口
+    for attempt in range(1, TRAE_9074_MAX + 1):
+        try:
+            d = _trae_api("claim")
+        except Exception as e:
+            results.append("claim 调用异常:%s" % e)
+            break
+        if not isinstance(d, dict):
             results.append("未知响应")
-    except Exception as e:
-        results.append("claim 调用异常:%s" % e)
+            break
+        br = d.get("code")
+        if br == 0:
+            claimed = True
+            results.append("签到成功（checkin_credits/claim）")
+            break
+        if br == 9074:
+            if attempt < TRAE_9074_MAX:
+                wait = 20 + random.randint(0, 20)  # 20~40s 随机退避
+                results.append(
+                    "9074 限流，第%d/%d 次重试前等待%d秒" % (attempt, TRAE_9074_MAX, wait)
+                )
+                time.sleep(wait)
+                continue
+            results.append("9074 限流，已达最大重试(%d次)，今日稍后(低峰)再试" % TRAE_9074_MAX)
+            break
+        if br == 9004:
+            results.append("claim 被拒:code=9004 参数/通道不符（需进一步对齐客户端校验）")
+            break
+        # 其他非 0：如实记录，不重试
+        results.append("claim 被拒:code=%s %s" % (br, d.get("message") or br))
+        break
     # 防误报：仅有接口明确返回 code=0 才算签到成功；否则一律记为失败
     ok = claimed
     _trae_record(ok, "；".join(results))
     return get_trae_card()
+
+
+def _trae_offpeak_loop():
+    """低峰补签：Trae 在早高峰(如 8:35)常撞 9074 并发上限，单次重试可能不过。
+    本线程每日在低峰时段(默认 04:30，可用 TRAE_OFFPEAK_TIME 覆盖)对 Trae 单独
+    补跑一次；若当日已签则跳过，避免重复 claim。随 web_server 常驻(daemon 线程)。"""
+    while True:
+        try:
+            try:
+                hh, mm = (TRAE_OFFPEAK_TIME.split(":"))[:2]
+                hh, mm = int(hh), int(mm)
+            except Exception:
+                hh, mm = 4, 30
+            now = datetime.datetime.now()
+            target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            if target <= now:
+                target += datetime.timedelta(days=1)
+            wait = (target - now).total_seconds()
+            print("[trae-offpeak] 下次低峰补签: %s（约 %.0f 秒后）"
+                  % (target.strftime("%Y-%m-%d %H:%M"), wait))
+            time.sleep(wait)
+            # 先确认今天还没签上再跑，避免重复 claim（idempotent 亦无害）
+            try:
+                if get_trae_card().get("checked"):
+                    print("[trae-offpeak] 今日已签，跳过补签")
+                else:
+                    print("[trae-offpeak] 触发低峰补签 Trae")
+                    run_checkin_for("trae")
+            except Exception as e:
+                print("[trae-offpeak] 补签异常: %s" % e)
+        except Exception as e:
+            print("[trae-offpeak] 异常: %s" % e)
+            time.sleep(300)
 
 
 # ============================ WPS 灵犀签到适配器 ============================
@@ -4613,6 +4689,8 @@ def main():
     threading.Thread(target=_travel_poll_loop, daemon=True).start()
     # Qoder 每日 10:00(UTC+8) 开放，08:35 主定时会早于开放时间，起常驻补签线程（10:01 起每 30 分，至 13:00）
     threading.Thread(target=_qoder_topup_loop, daemon=True).start()
+    # Trae 低峰补签守护：每日低峰时段单独补跑 Trae（早高峰常撞 9074 并发上限）
+    threading.Thread(target=_trae_offpeak_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
