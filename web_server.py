@@ -3548,15 +3548,15 @@ function entriesHTML(it){
     var g = ge.ok
       ? ((ge.completed||0)+'/'+(ge.total||0)+' 已完成'+(ge.claimable>0?(' · 可领 '+ge.claimable+' 项'):' · 暂无待领'))
       : '暂不可用';
-    e += '<a class="entry" href="?view=growth" target="_blank" rel="noopener">'
-       + '<span class="eic">🌱</span><span class="etx"><b>成长中心</b><small>'+esc(g)+'</small></span><span class="earrow">›</span></a>';
+    e += '<button class="entry" type="button" id="growthEntry" data-growth="1">'
+       + '<span class="eic">🌱</span><span class="etx"><b>成长中心</b><small>'+esc(g)+'</small></span><span class="earrow">›</span></button>';
   }
   if(de){
     var d = de.ok
       ? ((de.todo>0?('今日可做 '+de.todo+' 项'):'今日已全部完成')+(de.streak_days?(' · 连登 '+de.streak_days+' 天'):''))
       : '暂不可用';
-    e += '<a class="entry" href="?view=daily" target="_blank" rel="noopener">'
-       + '<span class="eic">🎯</span><span class="etx"><b>每日任务</b><small>'+esc(d)+'</small></span><span class="earrow">›</span></a>';
+    e += '<button class="entry" type="button" id="dailyEntry" data-daily="1">'
+       + '<span class="eic">🎯</span><span class="etx"><b>每日任务</b><small>'+esc(d)+'</small></span><span class="earrow">›</span></button>';
   }
   var html = e ? ('<div class="entries">'+e+'</div>') : '';
   // 派猫猫旅行：同样属于 WorkBuddy，但改成弹窗（数据量大、含明信片与操作按钮），独占一行
@@ -3671,6 +3671,42 @@ function travelModalAction(act, btn){
     loadTravelModal();
   });
 }
+
+// ===== 成长中心 / 每日任务：改成跟「派猫猫旅行」一样的 WorkBuddy 卡内弹窗 =====
+// 默认视图为 ?view= 整页（focus）；从卡片入口打开时切到 modal，渲染进 #modal-body。
+var GROWTH_VIEW = "focus";
+var DAILY_VIEW = "focus";
+function growthTargetEl(){ return (GROWTH_VIEW === "modal") ? $("modal-body") : focusBody(); }
+function dailyTargetEl(){ return (DAILY_VIEW === "modal") ? $("modal-body") : focusBody(); }
+function refreshGrowth(){ if(GROWTH_VIEW === "modal") loadGrowthModal(); else focusGrowth(); }
+function refreshDaily(){ if(DAILY_VIEW === "modal") loadDailyModal(); else focusDaily(); }
+function openGrowth(){
+  GROWTH_VIEW = "modal";
+  var panel = $("modal-panel"); if(panel) panel.style.setProperty("--mc", "#7C5CFF");
+  var t = $("modal-title"); if(t) t.textContent = "🌱 WorkBuddy 成长中心";
+  var m = $("modal"); if(m){ m.classList.add("show"); document.body.style.overflow = "hidden"; }
+  loadGrowthModal();
+}
+function loadGrowthModal(){
+  GROWTH_VIEW = "modal";
+  var b = $("modal-body"); if(!b) return;
+  b.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+  api("api/growth").then(function(d){ renderGrowthFocus(d); }).catch(function(e){ b.innerHTML = focusErr(e); });
+}
+function openDaily(){
+  DAILY_VIEW = "modal";
+  var panel = $("modal-panel"); if(panel) panel.style.setProperty("--mc", "#F79009");
+  var t = $("modal-title"); if(t) t.textContent = "🎯 成长中心 · 每日任务";
+  var m = $("modal"); if(m){ m.classList.add("show"); document.body.style.overflow = "hidden"; }
+  loadDailyModal();
+}
+function loadDailyModal(){
+  DAILY_VIEW = "modal";
+  var b = $("modal-body"); if(!b) return;
+  b.innerHTML = '<div class="dloading"><span class="spin"></span> 加载中…</div>';
+  api("api/daily").then(function(d){ renderDailyFocus(d); }).catch(function(e){ b.innerHTML = focusErr(e); });
+}
+
 function openDetail(name){
   var card = document.querySelector('.card[data-name="'+name+'"]');
   var brand = card ? (card.style.getPropertyValue('--c')||'').trim() : '';
@@ -3689,6 +3725,8 @@ function closeModal(){
   var m = $('modal');
   if(m){ m.classList.remove('show'); document.body.style.overflow = ''; }
   var b = $('modal-body'); if(b) b.innerHTML = '';
+  GROWTH_VIEW = 'focus';
+  DAILY_VIEW = 'focus';
 }
 function renderDetail(d, name){
   var detail = $('modal-body');
@@ -3830,12 +3868,15 @@ function taskRow(t, right){
   return '<div class="task"><div class="tt"><div class="t1">'+esc(t.title)+'</div>'+sub+hint+'</div><div class="tr">'+right+'</div></div>';
 }
 function focusGrowth(){
+  GROWTH_VIEW = "focus";
   var el = focusBody();
+  if(!el) return;
   el.innerHTML = '<div class="dloading" style="padding:40px 0"><span class="spin"></span> 加载成长中心…</div>';
   api("api/growth").then(function(d){ renderGrowthFocus(d); }).catch(function(e){ el.innerHTML = focusErr(e); });
 }
 function renderGrowthFocus(d){
-  var el = focusBody();
+  var el = growthTargetEl();
+  if(!el){ return; }
   if(!d.ok){ el.innerHTML = focusErr(d.error); return; }
   var c = d.card||{};
   var rows = c.rows||[];
@@ -3902,7 +3943,7 @@ function claimTask(code, btn){
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
   api("api/growth/claim?code="+encodeURIComponent(code),{method:"POST"}).then(function(d){
     if(d.ok) showMsg(d.msg||"领取成功 ✅","ok"); else showMsg(d.msg||d.error||"领取失败","err");
-    focusGrowth();
+    refreshGrowth();
   }).catch(function(e){
     if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
     else showMsg("网络错误："+(e&&e.message),"err");
@@ -3911,12 +3952,15 @@ function claimTask(code, btn){
 }
 // ===== 每日任务独立页（?view=daily）=====
 function focusDaily(){
+  DAILY_VIEW = "focus";
   var el = focusBody();
+  if(!el) return;
   el.innerHTML = '<div class="dloading" style="padding:40px 0"><span class="spin"></span> 加载每日任务…</div>';
   api("api/daily").then(function(d){ renderDailyFocus(d); }).catch(function(e){ el.innerHTML = focusErr(e); });
 }
 function renderDailyFocus(d){
-  var el = focusBody();
+  var el = dailyTargetEl();
+  if(!el){ return; }
   if(!d.ok){ el.innerHTML = focusErr(d.error); return; }
   var c = d.card||{};
   var rows = c.rows||[];
@@ -4166,6 +4210,13 @@ function renderCenter(d){
   // 注意：弹窗里的按钮由 bindTravelModal() 单独绑定；这里只绑卡片内的入口，避免重复触发。
   Array.prototype.forEach.call(document.querySelectorAll('button.entry[data-travel]'), function(b){
     b.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openTravel(); });
+  });
+  // WorkBuddy 卡内的「成长中心 / 每日任务」入口 → 打开弹窗（与派猫猫旅行同款）
+  Array.prototype.forEach.call(document.querySelectorAll('button.entry[data-growth]'), function(b){
+    b.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openGrowth(); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('button.entry[data-daily]'), function(b){
+    b.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openDaily(); });
   });
   // 重新检查签到状态（只刷新、不执行签到）
   Array.prototype.forEach.call(document.querySelectorAll("button.cta.recheck[data-name]"), function(b){
