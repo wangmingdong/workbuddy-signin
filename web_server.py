@@ -836,31 +836,32 @@ TRAE_UG_BASE = "https://api.trae.cn/trae/api/v2/ug"
 TRAE_TOKEN_API = "https://api.trae.cn/cloudide/api/v3/common/GetUserToken"
 # 客户端通道标识：SOLO_CN 安装包固定为 2（之前误用网页通道 3，导致 claim 被后端 9004 拒绝）
 TRAE_REQ_SOURCE = int(os.environ.get("TRAE_REQ_SOURCE", "2"))
-# 伪客户端设备头：服务端无真实设备。device-id 必须「稳定」——原实现每次进程启动都生成新
-# uuid，等于每次重启/部署后都拿一个陌生设备去 claim，更容易撞 Trae 的设备风控（9074 限流）。
-# 现改为持久化到 trae_device_id.txt，首次生成后一直复用；环境变量 TRAE_DEVICE_ID 仍可覆盖。
+# 设备 id：默认用客户端真实设备 id 2416059499433050（见 _trae_device_id 注释）。
+# 旧的 wb- 伪文件值会被忽略；环境变量 TRAE_DEVICE_ID 仍可覆盖。
 TRAE_DEVICE_ID_FILE = os.path.join(BASE_DIR, "trae_device_id.txt")
 
 
 def _trae_device_id():
-    """稳定的伪设备 id：env 覆盖 > 本地文件 > 首次生成并落盘。"""
+    """设备 id：env 覆盖 > 本地文件(非 wb- 伪值) > 客户端真实设备 id。
+
+    9074 根因：此前默认用随机伪设备 id（wb-xxxx），服务端按设备记账，陌生设备
+    直接被拒。实测客户端真实设备 id 为 2416059499433050（icube-dc，来自 storage.json
+    键名 iCubeAuthInfo://icube-dc:2416059499433050 与 main.log 的 device_id=...），
+    配合原 cookie 换发的 JWT + req_source=2 即可 claim 成功（did_checked_in:true）。
+    故默认值改为该真实设备 id；旧的 wb- 伪文件值一律忽略，避免回退到伪 id。
+    """
     env = os.environ.get("TRAE_DEVICE_ID")
     if env:
         return env
     try:
         with open(TRAE_DEVICE_ID_FILE, "r", encoding="utf-8") as f:
             v = f.read().strip()
-        if v:
+        if v and not v.startswith("wb-"):
             return v
     except Exception:
         pass
-    v = "wb-%s" % uuid.uuid4().hex[:16]
-    try:
-        with open(TRAE_DEVICE_ID_FILE, "w", encoding="utf-8") as f:
-            f.write(v)
-    except Exception:
-        pass
-    return v
+    # 默认：TRAE SOLO CN 桌面客户端的真实设备 id（同账号 + 此设备 id 才能 claim 成功）
+    return "2416059499433050"
 
 
 def _trae_get_token():
@@ -1639,44 +1640,13 @@ _qoder_wake = threading.Event()
 
 
 def _qoder_topup_loop():
-    while True:
-        now = datetime.datetime.now()
-        start = now.replace(hour=10, minute=1, second=0, microsecond=0)
-        if now < start:
-            if _qoder_wake.wait((start - now).total_seconds()):
-                _qoder_wake.clear()
-                continue
-        done_today = False
-        while not done_today:
-            now = datetime.datetime.now()
-            if now.hour >= 13:
-                break
-            try:
-                run_qd_checkin()
-            except Exception as e:
-                print("[qoder-topup] 补签异常: %s" % e)
-            lr = _qd_read_last()
-            today = now.strftime("%Y-%m-%d")
-            if lr and lr.get("ok") and str(lr.get("ts", "")).startswith(today):
-                done_today = True
-                print("[qoder-topup] %s 今日已签，停止补签" % today)
-                break
-            if _qoder_wake.wait(1800):
-                _qoder_wake.clear()
-                break
-        now = datetime.datetime.now()
-        nxt = (now + datetime.timedelta(days=1)).replace(hour=10, minute=1, second=0, microsecond=0)
-        if _qoder_wake.wait((nxt - now).total_seconds()):
-            _qoder_wake.clear()
+    # Qoder 每日 100 Credits 仅限桌面端领取，服务端无法代领（详见 run_qd_checkin 注释）。
+    # 此前的常驻补签线程已无意义，停用，避免无谓地每 30 分钟重试并污染日志。
+    print("[qoder-topup] 已停用：每日 100 Credits 仅限 Qoder 桌面端领取，服务端无法代领")
+    return
 QD_CAMPAIGN_PATH = "/sash/api/v1/me/campaigns"
 # 服务端绝不刷新 token（刷新会挤掉你本机 Qoder 客户端的登录态），只读着用；
 # token 过期只能靠本机脚本重新取一份推上来。
-QD_SESSION_DEAD_MSG = (
-    "服务器侧 Qoder 登录态已失效（HTTP 401）：领取由服务器携带自己保存的 token 发起，"
-    "服务端不会自动刷新 token（刷新会顶掉你本机 Qoder 客户端的登录态）。"
-    "恢复办法：在电脑上双击 push_qoder.bat，它从本机 Qoder 客户端取出最新 token 推送上来，"
-    "约 1 分钟本卡自动变绿。"
-)
 
 
 def _qd_token():
@@ -1745,17 +1715,9 @@ def _qd_read_last():
         return None
 
 
-def _qd_claimed_today():
-    """本地记录是否显示「今日已成功领取」。
-
-    Qoder 领取成功后该活动即从 campaigns 列表移除，接口随后查不到，
-    故必须用本地领取记录判断真实状态，避免「明明已签却显示待领取 / 手动点报错」。
-    """
-    lr = _qd_read_last()
-    if not lr or not lr.get("ok"):
-        return False
-    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")
-    return str(lr.get("ts", "")).startswith(today)
+# _qd_claimed_today() 已移除：此前靠「本地记录即已领」假报 Qoder 每日 100 已领取，
+# 但服务端本就拿不到领取入口（feature-gate 为空），桌面端也确实没领到。现在以「桌面端独占」
+# 诚实提示取代，不再用本地记录伪造已领状态。
 
 
 def _qd_find_daily(payload):
@@ -1859,42 +1821,35 @@ def get_qd_card():
         d = _qd_api(QD_CAMPAIGN_PATH)
         camp = _qd_find_daily(d)
         if not camp:
-            # 服务端当前未返回「每日领 100 Credits」活动：可能活动改版/迁至桌面端，
-            # 也可能是「当日领取成功后该活动即从 campaigns 列表移除」（Qoder 常见行为）。
-            # 后者需用本地领取记录判断真实状态，避免「明明已签却显示待领取 / 手动点报错」。
+            # 每日 100 Credits 仅限 Qoder 桌面端领取，服务端令牌无法获取领取入口
+            # （qcs/config/resolve 的 qodercli-feature-gates 命名空间对本账号返回空）。
+            # 因此服务端永远查不到「今日可领」活动，也绝不据此假报已领——必须去桌面端手动领。
             lr = _qd_read_last()
-            if _qd_claimed_today():
-                rows = [
-                    {"k": "今日福利", "v": "100 Credits"},
-                    {"k": "领取状态", "v": "✅ 今日已领"},
-                    {
-                        "k": "说明",
-                        "v": "Qoder 领取成功后该活动即从 campaigns 列表移除，故当前接口查不到；"
-                             "以本地领取记录为准（%s）" % str(lr.get("ts"))[5:16],
-                    },
-                ]
-                return {
-                    "name": "qoder",
-                    "title": "Qoder 每日领 100 Credits",
-                    "brand": "#141414",
-                    "brand2": "#4A4A4A",
-                    "icon": "qd",
-                    "checked": True,
-                    "metric_label": "今日 Credits",
-                    "metric_value": "已领 100",
-                    "last_run": lr,
-                    "rows": rows,
-                    "error": None,
-                }
             rows = [
-                {"k": "状态", "v": "服务端当前未返回今日可领取活动"},
-                {"k": "自动领取", "v": "系统每日 10:01 起自动补签（每 30 分钟一次，直到当日领到）"},
-                {"k": "领取窗口", "v": "每天 10:00(UTC+8)开放，至次日 10:00 前可领（以 Qoder 官方公告为准）"},
-                {"k": "若长期如此", "v": "活动可能已改版/迁至桌面端，需在本机 Qoder 客户端手动领"},
+                {"k": "每日福利", "v": "100 Credits"},
+                {"k": "领取状态", "v": "🔧 仅限 Qoder 桌面端领取"},
+                {
+                    "k": "说明",
+                    "v": "Qoder 官方规定每日 100 Credits 仅限 Qoder 桌面端主动领取，"
+                         "服务端令牌拿不到领取入口（feature-gate 下发为空），本服务无法代领。"
+                         "请在本机打开 Qoder 客户端手动点击领取。",
+                },
             ]
+            if exp:
+                rows.append({"k": "登录态", "v": "有效期至 %s" % str(exp)[:10]})
+            # 参考：服务端可见的其他活动（如有），仅供参考，不影响每日 100 领取
+            try:
+                items = (d or {}).get("campaigns") or []
+                visible = [c for c in items if isinstance(c, dict) and c.get("actionType") != "CLAIM_BENEFIT"]
+                if visible:
+                    names = "、".join((c.get("title") or c.get("campaignKey") or "活动") for c in visible[:3])
+                    rows.append({"k": "服务端可见活动", "v": names + "（仅供参考）"})
+            except Exception:
+                pass
             if lr:
+                msg = (lr.get("message") or "").replace("桌面端独占：", "")
                 rows.append(
-                    {"k": "上次执行", "v": "%s %s" % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️")}
+                    {"k": "上次服务端尝试", "v": "%s %s" % (str(lr.get("ts"))[5:16], msg or ("成功" if lr.get("ok") else "未领取"))}
                 )
             return {
                 "name": "qoder",
@@ -1903,9 +1858,9 @@ def get_qd_card():
                 "brand2": "#4A4A4A",
                 "icon": "qd",
                 "checked": False,
-                "badge": "活动未开放",
+                "badge": "桌面端独占",
                 "metric_label": "今日 Credits",
-                "metric_value": "待领取",
+                "metric_value": "桌面端领取",
                 "last_run": lr,
                 "rows": rows,
                 "error": None,
@@ -1988,47 +1943,20 @@ def get_qd_card():
 
 
 def run_qd_checkin():
-    """执行 Qoder「每日领 100 Credits」领取，已领则幂等跳过。"""
+    """Qoder 每日 100 Credits 仅限桌面端领取，服务端无法代领。
+
+    实测依据：Qoder 开放接口 qcs/config/resolve（命名空间 qodercli-feature-gates）
+    对本账号 PAT 返回空——官方未向服务端令牌下发任何「领取」定义；领取入口由
+    Qoder 桌面端内置 bridge 持有。故本服务无论怎么调 campaigns/claim 都拿不到可领活动，
+    此前靠「本地记录即已领」假报成功，是误判（桌面端实际并未领到）。
+
+    现在改为诚实：一键签到只返回「桌面端独占」卡片并提示去客户端手动领，不再假报。
+    因此也不再需要常驻补签线程（_qoder_topup_loop 已停用）。
+    """
     tok, _ = _qd_token()
     if not tok:
         raise RuntimeError("未配置 Qoder 登录态（qoder_token.txt 或 QODER_TOKEN）")
-    try:
-        d = _qd_api(QD_CAMPAIGN_PATH)
-    except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
-            _qd_record(False, "登录态失效 HTTP %s" % e.code)
-            raise RuntimeError(QD_SESSION_DEAD_MSG)
-        raise
-    camp = _qd_find_daily(d)
-    if not camp:
-        # 今天的活动尚未开放（每日 10:00(UTC+8) 才下发），由 _qoder_topup_loop（10:01 起）自动补签；
-        # 10:00 后若仍查不到，可能是活动改版，或「当日已领取后活动从列表移除」——后者按本地
-        # 记录判定为已领，避免手动点报错 / 误报未签到。
-        utc8_hour = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).hour
-        if utc8_hour < 10:
-            return get_qd_card()
-        if _qd_claimed_today():
-            _qd_record(True, "今日已领取（幂等跳过）")
-            return get_qd_card()
-        raise RuntimeError("未找到「每日领 100 Credits」活动（可能活动已改版/迁至桌面端，请在 Qoder 客户端手动领）")
-    if camp.get("claimStatus") == "CLAIMED":
-        _qd_record(True, "今日已领取（幂等跳过）")
-        return get_qd_card()
-    cid = camp.get("campaignId")
-    if not cid:
-        raise RuntimeError("活动缺少 campaignId，无法领取")
-    in_window, window_txt = _qd_window(camp)
-    if not in_window:
-        _qd_record(True, "领取窗口未开启：%s" % window_txt)
-        return get_qd_card()
-    r = _qd_api(
-        "%s/%s/claim" % (QD_CAMPAIGN_PATH, cid), method="POST", body={}
-    )
-    if (r or {}).get("status") != "CLAIMED":
-        msg = (r or {}).get("message") or "领取失败"
-        _qd_record(False, msg)
-        raise RuntimeError(msg)
-    _qd_record(True, "今日领取成功 +%s" % _qd_benefit_text(camp))
+    _qd_record(False, "桌面端独占：每日 100 Credits 仅限 Qoder 桌面端领取，服务端无法代领")
     return get_qd_card()
 
 
@@ -2706,7 +2634,9 @@ ADAPTERS = {
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "lingxi", "trae", "coze")
+# 注：qoder 已从 AUTO_PLATFORMS 移除——其每日 100 Credits 仅限桌面端领取，服务端无法代领
+# （详见 run_qd_checkin 注释），故归入「需手动在客户端操作」组，不再参与自动/补签。
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "lingxi", "trae", "coze")
 # 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
 # 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
 AUTO_RUN = AUTO_PLATFORMS + ("travel",)
@@ -4728,7 +4658,6 @@ def run_daily_all(scope=None):
         ("travel", "派猫猫旅行"),
         ("qianfan", "百度千帆"),
         ("minimax", "MiniMax Code"),
-        ("qoder", "Qoder"),
         ("linkai", "Link AI"),
         ("lingxi", "WPS 灵犀"),
         ("trae", "Trae Work"),
