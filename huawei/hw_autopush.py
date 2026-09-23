@@ -18,6 +18,11 @@ import time
 import urllib.error
 import urllib.request
 
+# ⚠️ envconf.py 在仓库根目录，本脚本在 huawei/ 子目录；
+# run_autopush.bat 先 cd 到本目录再启动，根目录不在 sys.path 上会
+# `ModuleNotFoundError: No module named 'envconf'` 秒退（常驻推送静默失效）。
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 COOKIES = os.path.join(BASE, "hw_cookies.json")
 OUT = os.path.join(BASE, "hw_cookie.txt")

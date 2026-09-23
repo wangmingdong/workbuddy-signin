@@ -8,6 +8,9 @@
 import os
 import sys
 
+# ⚠️ envconf.py 在仓库根目录，本脚本在 huawei/ 子目录 → 补 sys.path 兜底
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import paramiko
 
 from envconf import load_local_env

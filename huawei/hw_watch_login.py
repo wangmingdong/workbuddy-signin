@@ -9,8 +9,16 @@ import os
 import ssl
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.request
+
+# ⚠️ envconf.py 在仓库根目录，而本脚本位于 huawei/ 子目录。
+# relogin_huawei.bat / run_*.bat 都会先 `cd /d "%~dp0"` 再启动本脚本，
+# 那时根目录不在 sys.path 上 → `ModuleNotFoundError: No module named 'envconf'`
+# → 脚本 0.1 秒秒退，表现为「窗口一闪就说没检测到有效登录」。
+# 这里显式补上父目录，保证任何方式启动都能 import 到 envconf。
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import paramiko
 
@@ -30,6 +38,22 @@ WEB_PORT = os.environ.get("WEB_PORT", "8790")
 LOCAL = os.path.dirname(os.path.abspath(__file__))
 COOKIES = os.path.join(LOCAL, "hw_cookies.json")
 OUT = os.path.join(LOCAL, "hw_cookie.txt")
+WATCH_LOG = os.path.join(LOCAL, "hw_watch.log")
+
+
+def logline(m):
+    """同时打到控制台与 hw_watch.log。
+
+    以前只 print 到控制台，窗口一关就查无此据（本次排查就吃了这个亏：
+    脚本其实早就崩了，却没有任何日志可看）。现在每条进展都留痕。
+    """
+    s = str(m)
+    print(s, flush=True)
+    try:
+        with open(WATCH_LOG, "a", encoding="utf-8") as f:
+            f.write(s + "\n")
+    except Exception:
+        pass
 NEEDED = ["HWWAFSESTIME", "HWWAFSESID", "devclouddevuibjtcftk",
           "devclouddevuibjJ_SESSION_ID", "devclouddevuibjagencyID", "BENSESSCC_TAG"]
 URL = ("https://devcloud.cn-north-4.huaweicloud.com"
@@ -112,31 +136,42 @@ def push(cookie):
         "systemctl restart wb-checkin >/dev/null 2>&1; "
         "systemctl restart wb-hw-keepalive.service; sleep 3; "
         "tail -3 %s/hw_keepalive.log 2>/dev/null" % REMOTE)
-    log = out.read().decode("utf-8", "replace")
-    _, out2, _ = c.exec_command("curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:%s/" % WEB_PORT)
+    logtxt = out.read().decode("utf-8", "replace")
+    # 注意 `%{http_code}`：这里的 % 必须写成 %% ，否则会被后面的 % 格式化吃掉，
+    # 触发 ValueError: unsupported format character '{' —— 之前就是它让 push()
+    # 在最后一步必崩、守望永远报"没检测到有效登录"（明明已经推成功了）。
+    _, out2, _ = c.exec_command(
+        "curl -s -o /dev/null -w '%%{http_code}' http://127.0.0.1:%s/" % WEB_PORT)
     code = out2.read().decode("utf-8", "replace")
     c.close()
-    return log, code
+    return logtxt, code
 
 
 def main():
     minutes = int(sys.argv[1]) if len(sys.argv) > 1 else 40
     deadline = time.time() + minutes * 60
+    logline("\n=== %s 守望启动（最长 %d 分钟）==="
+            % (time.strftime("%Y-%m-%d %H:%M:%S"), minutes))
     n = 0
     while time.time() < deadline:
         n += 1
         ok, cookie, why = try_session()
-        print("[%s] #%d %s" % (time.strftime("%H:%M:%S"), n, why), flush=True)
+        logline("[%s] #%d %s" % (time.strftime("%H:%M:%S"), n, why))
         if ok:
             log, code = push(cookie)
-            print("\n=== 抓到有效会话，已推送 ===", flush=True)
-            print("server web:", code, flush=True)
-            print("keepalive log:\n" + log, flush=True)
+            logline("\n=== 抓到有效会话，已推送 ===")
+            logline("server web: %s" % code)
+            logline("keepalive log:\n" + log)
             return 0
         time.sleep(20)
-    print("TIMEOUT: %d 分钟内未检测到有效会话" % minutes, flush=True)
+    logline("TIMEOUT: %d 分钟内未检测到有效会话" % minutes)
     return 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception:
+        # 把崩溃写进日志：以前这种异常只留在控制台，窗口一关就没人知道
+        logline("[FATAL] 守望脚本异常退出：\n" + traceback.format_exc())
+        sys.exit(1)

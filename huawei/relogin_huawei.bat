@@ -7,6 +7,9 @@ title 华为码道签到 - 重新授权
 set "NODE=C:\Users\54004\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"
 set "PY=D:\Dev\python.exe"
 set "WIN=%SystemRoot%\System32"
+rem 本目录是 huawei/，而公共配置 envconf.py 在上一级根目录 —— 显式加进模块搜索路径，
+rem 否则 hw_watch_login.py 会 ModuleNotFoundError 秒退（表现为"没检测到有效登录"）
+set "PYTHONPATH=%~dp0.."
 
 echo ================================================================
 echo    华为码道签到 / 一次性重新授权
@@ -78,7 +81,12 @@ pause
 exit /b 0
 
 :NOTYET
-echo [X] 40 分钟内没有检测到有效登录。
+echo [X] 没有检测到有效登录（或本工具启动失败）。
+echo.
+echo     先看证据：本目录下的 hw_watch.log
+echo       - 里面是 "#1 HTTP 401 NOT-LOGGED-IN" 之类 -^> 说明确实还没登录成功
+echo       - 里面是 "[FATAL]" 或 traceback        -^> 是脚本自身报错，请把这行发给小B
+echo       - 里面没有任何本次记录                -^> 脚本根本没跑起来
 echo.
 echo     常见原因：
 echo       1) 忘了在弹出的新窗口里登录（它和平时浏览器不是一个）
@@ -86,7 +94,6 @@ echo       2) 登录了但没走到「码道」首页
 echo       3) 卡在短信验证码页面没填完
 echo.
 echo     专用窗口还开着的话，就在里面继续登录，然后重跑本脚本。
-echo     排查线索见抓取日志：hw_capture.log
 echo.
 pause
 exit /b 1
