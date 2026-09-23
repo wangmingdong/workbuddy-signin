@@ -946,125 +946,10 @@ def _trae_read_last():
         return None
 
 
-# ---- 9074 限流的「稍后自动再试」 -------------------------------------------
-# 9074（当前参与用户太多）是 Trae 服务端的并发限流：请求本身合法（同通道 status 正常、
-# 活动 Enabled=true，且已验证与设备指纹/UA/客户端版本无关——换设备 ID 与版本号同样返回 9074，
-# 而 req_source=3/4/0 会返回 9004 参数错，说明 1/2 是正确的通道），只是被排队容量挡下。
-# 用常驻后台线程按递增间隔持续重试，直到签到成功或当天 23:59（跨天停）；状态落盘，
-# 服务重启后自动恢复，彻底消除"重试窗口太短"与"重启丢队列导致假排队"两个问题。
-TRAE_RETRY_WAITS = [600, 900, 1800, 3600, 3600, 7200]  # 10 分 / 15 分 / 30 分 / 1 小时 / 1 小时 / 2 小时（之后封顶 2 小时）
-_TRAE_RETRY_LOCK = threading.Lock()
-_TRAE_RETRY_PENDING = [False]
-# 并发互斥：避免"重试线程"与"手动点/定时任务"同时 claim，导致重复请求与重复记录
+# 并发互斥：避免「手动点」与「定时任务」同时 claim 造成重复请求
 _TRAE_CLAIM_LOCK = threading.Lock()
-TRAE_RETRY_STATE_FILE = os.path.join(BASE_DIR, "trae_retry_state.json")
 
 
-def _trae_retry_state():
-    """读取限流重试持久化状态：{active, attempt, started_at, last_try}。"""
-    try:
-        with open(TRAE_RETRY_STATE_FILE, "r", encoding="utf-8") as f:
-            d = json.load(f)
-        if isinstance(d, dict):
-            return d
-    except Exception:
-        pass
-    return {"active": False, "attempt": 0, "started_at": 0, "last_try": 0}
-
-
-def _trae_save_retry_state(d):
-    try:
-        tmp = TRAE_RETRY_STATE_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(d, f)
-        os.replace(tmp, TRAE_RETRY_STATE_FILE)
-    except Exception:
-        pass
-
-
-def _end_of_today():
-    now = datetime.datetime.now()
-    eod = now.replace(hour=23, minute=59, second=59, microsecond=0)
-    return time.mktime(eod.timetuple())
-
-
-def _trae_mark_signed(source=""):
-    """确认签到成功后：停掉重试、修正状态记录（把尾部的限流记录改写成成功，避免卡片误报）。"""
-    _trae_save_retry_state({"active": False})
-    lr = _trae_read_last()
-    if not lr or not lr.get("ok") or "9074" in (lr.get("message") or ""):
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        _trae_record(True, "签到成功（%s）" % (source or "checkin_credits/claim"))
-    print("[trae] 已确认今日签到成功，停止重试（来源：%s）" % (source or "claim"))
-
-
-def _trae_retry_loop():
-    """常驻后台：按递增间隔反复尝试，直到签到成功或当日 23:59（跨天停）。
-
-    每轮先查 status（已签则直接收尾，省掉无谓请求）；未签才 claim。
-    """
-    try:
-        while True:
-            st = _trae_retry_state()
-            if not st.get("active"):
-                break
-            waits = TRAE_RETRY_WAITS
-            idx = min(int(st.get("attempt", 0)), len(waits) - 1)
-            time.sleep(waits[idx])
-            st = _trae_retry_state()
-            if not st.get("active"):
-                break
-            # 先看服务端真实状态：已签则收尾（关键：避免"其实已签却仍在重试"）
-            try:
-                if _trae_api("status").get("checked_in"):
-                    _trae_mark_signed("status.checked_in")
-                    break
-            except Exception:
-                pass
-            # 未签 → 发一次 claim（run_trae_checkin 内部 9074 只记录、不自调度，避免递归）
-            card = run_trae_checkin()
-            if card and card.get("checked"):
-                _trae_mark_signed("claim code=0")
-                break
-            # claim 返回 code=0 也算成功（run_trae_checkin 已记录，这里再兜一次）
-            lr = _trae_read_last()
-            if lr and lr.get("ok"):
-                _trae_mark_signed("claim ok")
-                break
-            st = _trae_retry_state()
-            st["attempt"] = int(st.get("attempt", 0)) + 1
-            st["last_try"] = time.time()
-            if time.time() > _end_of_today():
-                _trae_save_retry_state({"active": False})
-                print("[trae] 已到当日 23:59，停止重试（次日重新触发）")
-                break
-            _trae_save_retry_state(st)
-            nxt = waits[min(int(st["attempt"]), len(waits) - 1)]
-            print("[trae] 限流重试 #%d 仍失败，继续（下次 %ds 后）" % (st["attempt"], nxt))
-    finally:
-        with _TRAE_RETRY_LOCK:
-            _TRAE_RETRY_PENDING[0] = False
-
-
-def _trae_ensure_retry():
-    """确保后台重试线程在跑（单飞：内存锁 + 文件状态），无则启动。"""
-    with _TRAE_RETRY_LOCK:
-        if _TRAE_RETRY_PENDING[0]:
-            return
-        _TRAE_RETRY_PENDING[0] = True
-    st = _trae_retry_state()
-    if not st.get("active"):
-        _trae_save_retry_state(
-            {"active": True, "attempt": 0, "started_at": time.time(), "last_try": 0}
-        )
-    threading.Thread(target=_trae_retry_loop, daemon=True).start()
-    print("[trae] 已启动/恢复限流自动重试线程")
-
-
-def _trae_restore_retry():
-    """服务启动时调用：若上次有未完成的重试，则恢复线程（消除重启丢队列假排队）。"""
-    if _trae_retry_state().get("active"):
-        _trae_ensure_retry()
 
 
 def get_trae_card():
@@ -1136,40 +1021,6 @@ def get_trae_card():
                     % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
                 }
             )
-        # 自动签到失败时明确提示真实原因，避免"账户已签但没跑成"或"cookie 过期"的误判。
-        # 关键：以服务端 checked_in 为准 —— 已签则一切"限流/重试"状态都作废（防误报）。
-        retry_state = _trae_retry_state()
-        if checked:
-            if retry_state.get("active"):
-                _trae_mark_signed("card 交叉校验")
-            throttled = False
-        else:
-            throttled = bool(retry_state.get("active"))
-        if lr and not lr.get("ok"):
-            last_msg = (lr.get("message") or "")[:60]
-            if checked:
-                # 已签但尾部遗留失败记录：纠正展示，不再吓人
-                rows.insert(
-                    0,
-                    {"k": "✅ 今日已签", "v": "服务端已确认签到成功（尾部失败记录为历史重试残留，已作废）"},
-                )
-            else:
-                rows.insert(
-                    0,
-                    {
-                        "k": "⏳ 服务端限流中" if throttled else "⚠️ 自动签到",
-                        "v": (
-                            ("服务端持续限流，后台自动重试中（已重试 %d 次，将一直尝试到今日 24:00）：%s"
-                             % (int(retry_state.get("attempt", 0)), last_msg))
-                            if throttled
-                            else (
-                                ("上次失败：%s" % last_msg)
-                                if last_msg
-                                else "上次失败（原因未记录）"
-                            )
-                        ),
-                    },
-                )
         return {
             "name": "trae",
             "title": "Trae Work 每日签到",
@@ -1177,11 +1028,8 @@ def get_trae_card():
             "brand2": "#374151",
             "icon": "trae",
             "checked": checked,
-            "badge": ("限流·重试中" if (throttled and not checked) else None),
             "metric_label": "今日状态",
-            "metric_value": (
-                "已签到" if checked else ("限流重试中" if throttled else "待签到")
-            ),
+            "metric_value": "已签到" if checked else "待签到",
             "last_run": lr,
             "rows": rows,
             "error": None,
@@ -1200,8 +1048,8 @@ def run_trae_checkin():
 
     注意：claim 仅 code=0 算签到成功；非 0 code 一律如实记为失败，不能误报已签。
     9004 = "submitted order parameters are incorrect"：表示请求被后端拒绝（参数/通道不符）。
-    9074 = "当前参与用户太多，请稍后再试"：服务端并发限流（早高峰最易触发），请求本身合法、
-           同通道 status 正常、活动 Enabled=true —— 属可自愈的临时状态，故自动安排稍后重试。
+    9074 = "当前参与用户太多，请稍后再试"：服务端偶发返回，按实测并非持续限流，
+           本次视为签到未成功、由下次定时任务（设置里的签到时间）再次尝试。
     此前服务端用 req_source=3（网页通道）且缺设备头，正是 9004 的诱因；现改 2 + 补设备头。
     """
     if not (TRAE_COOKIE or TRAE_JWT):
@@ -1232,13 +1080,11 @@ def _run_trae_checkin_locked():
         )
     results = []
     claimed = False
-    throttled = False
-    # 前置：先看服务端真实状态，已签则直接收尾（避免"其实已签却仍 claim 撞限流"的误报）
+    # 前置：先看服务端真实状态，已签则直接收尾（避免重复 claim）
     try:
         if _trae_api("status").get("checked_in"):
             results.append("今日已签到（status.checked_in，幂等跳过）")
             _trae_record(True, "；".join(results))
-            _trae_mark_signed("status.checked_in")
             return get_trae_card()
     except Exception:
         pass
@@ -1250,12 +1096,9 @@ def _run_trae_checkin_locked():
                 claimed = True
                 results.append("签到成功（checkin_credits/claim）")
             elif br == 9074:
-                # 9074 = 服务端并发限流（"当前参与用户太多"）：请求合法但被排队容量挡下，
-                # 属可自愈的临时状态（早高峰最易触发），非账户问题、非参数错误 → 安排稍后重试。
-                throttled = True
-                results.append(
-                    "服务端限流(code=9074 当前参与用户太多)，已安排稍后自动重试"
-                )
+                # 9074 = 服务端返回"当前参与用户太多"；按实测并非持续限流，
+                # 本次视为签到未成功（定时任务会按设置时间再次尝试，接口幂等）。
+                results.append("服务端返回 code=9074（参与用户太多），本次签到未成功")
             elif br == 9004:
                 results.append(
                     "claim 被拒:code=9004 参数/通道不符（需进一步对齐客户端校验）"
@@ -1270,11 +1113,6 @@ def _run_trae_checkin_locked():
     # 防误报：仅有接口明确返回 code=0 才算签到成功；否则一律记为失败
     ok = claimed
     _trae_record(ok, "；".join(results))
-    if ok:
-        # 成功即收尾：停掉重试、修正尾部记录（防"其实已签却仍显示限流重试中"）
-        _trae_mark_signed("claim code=0")
-    elif throttled:
-        _trae_ensure_retry()
     return get_trae_card()
 
 
@@ -1764,7 +1602,7 @@ _qoder_wake = threading.Event()
 def _qoder_topup_loop():
     while True:
         now = datetime.datetime.now()
-        start = now.replace(hour=10, minute=30, second=0, microsecond=0)
+        start = now.replace(hour=10, minute=1, second=0, microsecond=0)
         if now < start:
             if _qoder_wake.wait((start - now).total_seconds()):
                 _qoder_wake.clear()
@@ -1788,7 +1626,7 @@ def _qoder_topup_loop():
                 _qoder_wake.clear()
                 break
         now = datetime.datetime.now()
-        nxt = (now + datetime.timedelta(days=1)).replace(hour=10, minute=30, second=0, microsecond=0)
+        nxt = (now + datetime.timedelta(days=1)).replace(hour=10, minute=1, second=0, microsecond=0)
         if _qoder_wake.wait((nxt - now).total_seconds()):
             _qoder_wake.clear()
 QD_CAMPAIGN_PATH = "/sash/api/v1/me/campaigns"
@@ -1869,23 +1707,39 @@ def _qd_read_last():
 
 
 def _qd_find_daily(payload):
-    """从 campaigns 里挑出「每日领 100 Credits」（actionType=CLAIM_BENEFIT）。
+    """从 campaigns 里挑出「今日」的「每日领 100 Credits」（actionType=CLAIM_BENEFIT）。
 
-    列表里还有 actionType=VIEW_DETAILS 的展示型活动，必须跳过；
-    已领取的那条优先，避免同 key 多条时误判成「可领」。
+    Qoder 每日活动每天 10:00(UTC+8) 刷新一轮，campaignKey 形如 act-YYYYMMDD-XXX，
+    其 startAt 落在当天。每天刷新前接口仍挂着「昨天」已签的那条（claimStatus=CLAIMED），
+    若只看 claimStatus 会把昨天的已签误判成「今日已领」。因此只认 campaignKey 含今日日期
+    （或 startAt 落在今日）的活动；今天的活动尚未开放时返回 None，由调用方显示「今日未开放」。
     """
     items = (payload or {}).get("campaigns") or []
-    best = None
-    for c in items:
-        if not isinstance(c, dict):
-            continue
-        if c.get("actionType") != "CLAIM_BENEFIT":
-            continue
-        if c.get("claimStatus") == "CLAIMED":
+    # 用 UTC+8 日期判定「今天」，与官方「10:00(UTC+8) 刷新」一致
+    utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    today_key = "act-" + utc8.strftime("%Y%m%d")
+    today_date = utc8.date()
+    benefits = [
+        c for c in items
+        if isinstance(c, dict) and c.get("actionType") == "CLAIM_BENEFIT"
+    ]
+    if not benefits:
+        return None
+    # 主匹配：campaignKey 含今日日期
+    for c in benefits:
+        if today_key in (c.get("campaignKey") or ""):
             return c
-        if best is None:
-            best = c
-    return best
+    # 兜底：startAt 落在今日（防止 key 格式变动）
+    for c in benefits:
+        sa = c.get("startAt")
+        if isinstance(sa, (int, float)):
+            try:
+                if datetime.datetime.utcfromtimestamp(sa).date() == today_date:
+                    return c
+            except Exception:
+                pass
+    # 今天的活动尚未开放（每日 10:00(UTC+8) 才下发），返回 None → 卡片显示「今日未开放」
+    return None
 
 
 def _qd_benefit_text(camp):
@@ -1959,7 +1813,7 @@ def get_qd_card():
             lr = _qd_read_last()
             rows = [
                 {"k": "状态", "v": "服务端当前未返回今日可领取活动（每日 10:00(UTC+8) 才开放新一轮）"},
-                {"k": "自动领取", "v": "系统每日 10:30 起自动补签（每 30 分钟一次，直到当日领到），无需手动去桌面端"},
+                {"k": "自动领取", "v": "系统每日 10:01 起自动补签（每 30 分钟一次，直到当日领到），无需手动去桌面端"},
                 {"k": "领取窗口", "v": "每天 10:00(UTC+8)开放，至次日 10:00 前可领（以 Qoder 官方公告为准）"},
             ]
             if lr:
@@ -2071,7 +1925,12 @@ def run_qd_checkin():
         raise
     camp = _qd_find_daily(d)
     if not camp:
-        raise RuntimeError("未找到「每日领 100 Credits」活动")
+        # 今天的活动尚未开放（每日 10:00(UTC+8) 才下发），由 _qoder_topup_loop（10:01 起）自动补签。
+        # 此时不记为失败，避免 08:35 主定时跑出一条误导性的「未签到」。
+        utc8_hour = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).hour
+        if utc8_hour < 10:
+            return get_qd_card()
+        raise RuntimeError("未找到「每日领 100 Credits」活动（可能活动改版或账号暂未纳入）")
     if camp.get("claimStatus") == "CLAIMED":
         _qd_record(True, "今日已领取（幂等跳过）")
         return get_qd_card()
@@ -4752,9 +4611,7 @@ def main():
         return
     threading.Thread(target=_scheduler_loop, daemon=True).start()
     threading.Thread(target=_travel_poll_loop, daemon=True).start()
-    # 服务启动即恢复 Trae 限流重试（若上次未完成，避免重启丢队列假排队）
-    _trae_restore_retry()
-    # Qoder 每日 10:00 开放，08:35 主定时会漏掉，起常驻补签线程（10:30 起每 30 分）
+    # Qoder 每日 10:00(UTC+8) 开放，08:35 主定时会早于开放时间，起常驻补签线程（10:01 起每 30 分，至 13:00）
     threading.Thread(target=_qoder_topup_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
