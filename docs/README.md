@@ -162,10 +162,17 @@ Trae 服务端**按设备记账**：`claim` 必须用与登录态一致的**你�
 ### 6. 成长中心 / 每日任务：WorkBuddy 卡内弹窗
 WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，点击在**当前页面弹窗**打开（与「派猫猫旅行」同一套卡内弹窗，不跳页），可一键完成/领取。它们复用 WorkBuddy 登录态，随 WorkBuddy 开关联动。
 
-### 7. 百度千帆「每日任务」：卡内弹窗（对齐 WorkBuddy）
-百度千帆卡片底部的「🧭 每日任务」入口，交互与 WorkBuddy 的「🎯 每日任务」完全一致——点击在**当前页面弹窗**打开（同一套卡内弹窗，不跳页），含一键签到按钮。
-- ⚠️ **诚实映射**：百度千帆平台侧**仅开放「每日签到」这一个每日动作**（领登录积分、累计连签天数），没有「任务中心 / 每日任务」可代领接口。因此弹窗内任务列表为 `[每日签到（一键签） + 积分余量（信息项）]`，并在弹窗文案明示「千帆侧仅每日签到一个每日动作，积分兑换/任务中心无服务端接口」，绝不臆造不存在的任务。
-- 数据来自千帆服务 `/api/status`（`signin.signedToday` / `signin.totalTimes` / `points.available` 等）；后端新增 `get_qf_daily_card()` / `run_qf_daily()`，接口 `GET /api/qianfan/daily`、`POST /api/qianfan/daily/run`（签名 `?k=KEY` 鉴权）。
+### 7. 百度千帆「活动中心」：卡内弹窗（对齐 WorkBuddy）
+百度千帆卡片底部的「🧭 活动中心」入口，交互与 WorkBuddy 的「🎯 每日任务」完全一致——点击在**当前页面弹窗**打开（同一套卡内弹窗，不跳页），展示**真实活动任务分组** +「🚀 一键完成今日任务」+「🎰 抽奖」按钮。
+
+- **真实任务来源**：逆向百度搭子（DuMate）桌面客户端 `app.asar` 找到「成长计划 growth_plan_2026」活动接口，经千帆服务（121.40.208.54:8021）代理。接口组：`GET /api/dumate/activity/growth-plan/{modules,tasks,draw/status}`、`POST /api/dumate/activity/growth-plan/{task/complete,draw}`（需 `console.bce.baidu.com` 的 Cookie + `csrfToken`；cookie 由桌面客户端 AES-GCM 解密导出到 `data/cookies.json`）。
+- **任务分组**：`每日推荐任务` / `进阶挑战` / `邀请码福利`（实测还出现过 `搭子初启` 等，随活动动态分配）。卡片按 `completed_count >= repeat_count` 判完成。
+- **⚠️ 诚实映射（关键）**：活动任务分两类，按钮**只做接口允许的**：
+  1. **接口允许自动完成**的（各类 `QUERY_INPUT` AI 任务，如关键信息提取/图视频生成/全格式文档处理/无代码创作/飞书全家桶等）→ 一键批量上报完成、发放奖励。
+  2. **官方接口明确拒绝自动完成**的（下载并登录手机端、邀请好友注册、兑换好友邀请码等需真实动作）→ 上报时服务端返回「该任务不支持通过此接口完成」，**自动跳过并诚实保留为待完成**，绝不伪造。
+  - 任务存在「完成即解锁」的链式关系（完成一批会解锁下一批），故一键完成多轮轮询、且每个任务**至多上报一次**（避免对 `repeat_count>1` 的重复型任务反复伪造、且防止调用量爆炸卡死）。
+- **抽奖**：「🎰 抽奖」按钮一次抽完所有剩余次数（每次新 `request_id`），奖品以官方为准。
+- **接口与函数**：112 端 `GET /api/qianfan/daily`、`POST /api/qianfan/daily/run`、`POST /api/qianfan/daily/draw`（均 `?k=KEY` 鉴权）；112 后端 `get_qf_daily_card()` / `run_qf_daily()` / `run_qf_draw()`；千帆服务端 `app/checkin_service.py` 的 `collect_activity()` / `complete_activity_all()` / `draw_activity()`。
 
 ### 8. 开启自动签到
 - **服务器**：`systemctl enable --now wb-checkin-daily.timer`（每天 08:35）；或在「⚙ 设置」页填「定时签到时间」热更新。
