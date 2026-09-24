@@ -1352,6 +1352,37 @@ if not HW_COOKIE:
         HW_COOKIE = ""
 
 
+def set_hw_cookie(cookie):
+    """保存网页粘贴的华为会话 Cookie（来自用户浏览器登录态），并验证可用性。
+
+    华为 J_SESSION_ID 是 HttpOnly，页面 JS 读不到，所以无法「输入账号密码自动登录」；
+    最稳妥的「网页里登录」方式就是用户从浏览器 DevTools 复制登录后的 Cookie 粘进来，
+    服务器持有它即可立即签到。返回 verified（是否实测可访问华为接口）。
+    """
+    global HW_COOKIE
+    cookie = (cookie or "").strip()
+    if not cookie:
+        raise RuntimeError("Cookie 不能为空")
+    if "devclouddevuibjJ_SESSION_ID=" not in cookie and "J_SESSION_ID=" not in cookie:
+        raise RuntimeError("Cookie 里没发现华为会话标识（devclouddevuibjJ_SESSION_ID），请从登录后的浏览器复制完整 Cookie")
+    HW_COOKIE = cookie
+    # 持久化到 hw_cookie.txt（已在 .gitignore，不会入库）
+    try:
+        with open(os.path.join(BASE_DIR, "hw_cookie.txt"), "w", encoding="utf-8") as _f:
+            _f.write(cookie)
+    except Exception:
+        pass  # 内存里已生效，文件保存失败仅影响重启后
+    # 实测验证：能否访问华为接口
+    verified = False
+    try:
+        d = _hw_api("/v1/ops/delivery?channel=WEB")
+        if d.get("code") == 0:
+            verified = True
+    except Exception:
+        verified = False
+    return verified
+
+
 def _hw_api(path, method="GET", body=None):
     # 必须带浏览器同款头，否则华为网关会把接口请求当普通页面访问、
     # 返回 SPA 的 HTML 而非 JSON（导致解析失败）。实测关键头：
@@ -1470,6 +1501,7 @@ def _hw_done_card(mark):
         "checked": True,
         "badge": "今日已签",
         "hide_auth_link": True,
+        "login_supported": True,
         "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
         "metric_label": "今日积分",
         "metric_value": "已领 1000",
@@ -1512,13 +1544,14 @@ def _hw_live_card():
             "needs_auth": True,
             "badge": "未配置",
             "hide_auth_link": True,
+            "login_supported": True,
             "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
             "metric_label": "状态",
             "metric_value": "未配置",
             "last_run": None,
             "rows": [
                 {"k": "原因", "v": "服务器上还没有华为会话 Cookie（hw_cookie.txt 为空）"},
-                {"k": "如何恢复", "v": "在电脑上双击 relogin_huawei.bat，弹出的窗口里登录一次华为云"},
+                {"k": "如何登录", "v": "点下方「🔑 配置会话 Cookie」，从浏览器粘贴登录后的 Cookie 即可"},
             ],
             "error": None,
         }
@@ -1580,14 +1613,15 @@ def _hw_live_card():
                 "needs_auth": True,
                 "badge": "登录态过期",
                 "hide_auth_link": True,
+                "login_supported": True,
                 "auth_url": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
                 "metric_label": "登录态",
                 "metric_value": "已过期",
                 "last_run": _hw_read_last(),
                 "rows": [
                     {"k": "原因", "v": "服务器侧华为会话（Cookie）已失效，非配置错误"},
-                    {"k": "如何恢复", "v": "在电脑上双击 relogin_huawei.bat，弹出的窗口里登录一次华为云（一次性）"},
-                    {"k": "为什么登录没用", "v": "签到用服务器自己那份 Cookie；你在本人浏览器登录，服务器拿不到（HttpOnly）"},
+                    {"k": "如何恢复", "v": "点下方「🔑 配置会话 Cookie」，从浏览器粘贴新的登录态即可"},
+                    {"k": "为什么登录没用", "v": "J_SESSION_ID 是 HttpOnly，你在本人浏览器登录，服务器读不到；只能粘 Cookie 给服务器"},
                 ],
                 "error": None,
             }
@@ -3589,6 +3623,10 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
 .card:hover{box-shadow:0 2px 4px rgba(15,23,42,.04),0 22px 40px -26px rgba(15,23,42,.85);transform:translateY(-1px);}
 .card-err{margin-top:12px;padding:10px 12px;border-radius:11px;font-size:12.5px;line-height:1.55;
   color:#912018;background:rgba(240,68,56,.07);border:1px solid rgba(240,68,56,.16);}
+.hw-cookie-input{width:100%;min-height:104px;box-sizing:border-box;margin-top:4px;padding:11px 12px;border-radius:11px;
+  border:1px solid var(--line);background:#fbfdfd;color:var(--ink);font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  resize:vertical;overflow-wrap:anywhere;word-break:break-all;}
+.hw-cookie-input:focus{outline:none;border-color:#804FED;box-shadow:0 0 0 3px rgba(128,79,237,.14);}
 .dtab{display:flex;gap:18px;margin-bottom:14px;font-size:13px;font-weight:700;color:var(--sub);}
 .dtab span{cursor:pointer;padding:4px 2px;border-bottom:2px solid transparent;}
 .dtab span.on{color:var(--mc,#00C29A);border-color:var(--mc,#00C29A);}
@@ -3851,12 +3889,16 @@ function cardHTML(it){
     var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:8px">🔄 重新检查</button>';
     btn = cta + retry;
   } else if(needsAuth){
-    // cookie 类平台：签到用「服务器自己那份 Cookie」，在本人浏览器登录并不会推给服务器，
-    // 所以这里不摆「去登录」死路（hide_auth_link），只留一个诚实的「重新检查」。
+    // cookie 类平台：签到用「服务器自己那份 Cookie」。华为支持在网页里粘贴登录态 Cookie 直接登录。
     var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
-    btn = it.hide_auth_link
-      ? retry
-      : ('<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>' + retry);
+    if(it.login_supported){
+      var loginBtn = '<button class="cta login-cookie" type="button" data-name="'+esc(it.name)+'">🔑 配置会话 Cookie</button>';
+      btn = loginBtn + retry;
+    } else {
+      btn = it.hide_auth_link
+        ? retry
+        : ('<a class="cta-link" href="'+esc(it.auth_url)+'" target="_blank" rel="noopener">🔑 前往登录</a>' + retry);
+    }
   } else if(it.checked){
     // 已签到：顶部徽标已说明状态，底部只留一行「上次签到 + 重新检查」，不再重复「今日已签到」
     btn = '<div class="foot"><span class="ftxt">'+(lastTs?('上次签到 '+lastTs):'暂无签到记录')+'</span>'
@@ -4174,6 +4216,43 @@ function closeModal(){
   GROWTH_VIEW = 'focus';
   DAILY_VIEW = 'focus';
 }
+function openHwLogin(name){
+  var m = $('modal'); if(!m) return;
+  var panel = $('modal-panel'); if(panel) panel.style.setProperty('--mc', '#804FED');
+  var titleEl = $('modal-title'); if(titleEl) titleEl.textContent = '配置华为会话 Cookie';
+  var body = $('modal-body'); if(!body) return;
+  body.innerHTML = ''
+    + '<div class="mg-note" style="margin-bottom:10px">华为会话 Cookie 为 <b>HttpOnly</b>，网页读不到，所以无法「输入账号密码自动登录」。请在电脑浏览器登录 '
+    + '<b>devcloud.cn-north-4.huaweicloud.com</b> 后，按 <b>F12 → Application → Cookies</b>，复制 <b>devclouddevuibjJ_SESSION_ID</b>（或整个 Cookie 字符串）粘贴到下方，保存后服务器即可立即签到。</div>'
+    + '<textarea id="hwCookie" class="hw-cookie-input" placeholder="粘贴 Cookie，例如：devclouddevuibjJ_SESSION_ID=xxxx; devclouddevuibjtcftk=yyyy; ..."></textarea>'
+    + '<div style="display:flex;gap:8px;margin-top:10px">'
+    +   '<button class="cta" id="hwSave" type="button">💾 保存并验证</button>'
+    +   '<button class="cta ghost" type="button" onclick="closeModal()">取消</button>'
+    + '</div>'
+    + '<div id="hwLoginMsg" class="mg-note" style="margin-top:10px"></div>';
+  m.classList.add('show'); document.body.style.overflow = 'hidden';
+  var saveBtn = $('hwSave');
+  if(saveBtn) saveBtn.addEventListener('click', function(){
+    var v = $('hwCookie').value.trim();
+    var msg = $('hwLoginMsg');
+    if(!v){ if(msg){ msg.style.color='#c0392b'; msg.textContent='请先粘贴 Cookie'; } return; }
+    saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spin"></span> 验证中…';
+    api("api/huawei/login", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({cookie:v})}).then(function(r){
+      if(r.ok){
+        if(msg){ msg.style.color = r.verified ? "#0a7" : "#b8860b"; msg.textContent = r.message || "已保存"; }
+        showMsg(r.message || "华为会话已配置 ✅", "ok");
+        setTimeout(function(){ closeModal(); load(function(){ showMsg("华为会话已配置，可点立即签到 ✅", "ok"); }); }, 900);
+      } else {
+        if(msg){ msg.style.color = "#c0392b"; msg.textContent = "❌ " + (r.error || "保存失败"); }
+        saveBtn.disabled = false; saveBtn.textContent = "💾 保存并验证";
+      }
+    }).catch(function(e){
+      if(e && e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+      else { showMsg("网络错误："+((e&&e.message)||e),"err"); }
+      saveBtn.disabled = false; saveBtn.textContent = "💾 保存并验证";
+    });
+  });
+}
 function renderDetail(d, name){
   var detail = $('modal-body');
   if(!detail) return;
@@ -4223,6 +4302,8 @@ function renderDetail(d, name){
   } else if(d.name === 'jimeng'){
     signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">'+(signin.checked_today?'✅ 已领取':'⏳ 待领取')+'</span></div>';
     signinHTML += '<div class="drow"><span class="dk">赠送积分</span><span class="dv">'+esc(signin.gift_credit!=null?signin.gift_credit:'查询失败')+'</span></div>';
+  } else if(d.name === 'huawei'){
+    signinHTML += '<button class="cta login-cookie" type="button" data-name="huawei" style="margin:6px 0 2px">🔑 配置 / 更换会话 Cookie</button>';
   }
   if(!signinHTML){
     var _note = (signin && signin.note) ? signin.note : "该平台为状态卡，详情见卡片。";
@@ -4284,6 +4365,8 @@ consumeHTML += pkgs.map(function(p){
   Array.prototype.forEach.call(tabs, function(t){
     t.addEventListener('click', function(){ switchTab(t, name, t.getAttribute('data-tab')); });
   });
+  var lb = detail.querySelector('button.login-cookie');
+  if(lb){ lb.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openHwLogin('huawei'); }); }
 }
 function switchTab(el, name, tab){
   var tabs = el.parentElement.querySelectorAll('span');
@@ -4656,7 +4739,7 @@ function renderCenter(d){
     });
   });
   // 立即签到（排除成长/每日任务、重新检查、旅行专属按钮）
-  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run):not(.travel-act)"), function(b){
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run):not(.travel-act):not(.login-cookie)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
   });
   // WorkBuddy 卡内的「派猫猫旅行」入口 → 打开弹窗
@@ -4678,6 +4761,10 @@ function renderCenter(d){
   // 重新检查签到状态（只刷新、不执行签到）
   Array.prototype.forEach.call(document.querySelectorAll("button.cta.recheck[data-name]"), function(b){
     b.addEventListener("click", function(){ recheck(b.getAttribute("data-name"), b); });
+  });
+  // 华为「配置会话 Cookie」入口（网页里粘贴登录态再签到）
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta.login-cookie[data-name]"), function(b){
+    b.addEventListener("click", function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openHwLogin(b.getAttribute("data-name")); });
   });
   // 自动 Tab 的「立即全部签到」
   var ra = $('runAll'); if(ra) ra.addEventListener('click', runAllAuto);
@@ -5138,6 +5225,22 @@ class Handler(BaseHTTPRequestHandler):
                     ok, res, used = wb_travel.claim(sess, cookie=cookie, record_id=rec)
                     self._json(200, {"ok": ok, "data": res,
                                      "msg": ("领取成功" if ok else "领取失败")})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/huawei/login":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                cookie = (body.get("cookie") or "").strip()
+                verified = set_hw_cookie(cookie)
+                self._json(200, {"ok": True, "verified": verified,
+                                 "message": ("✅ 华为会话已保存并验证可用，现在可以立即签到" if verified
+                                              else "⚠️ 已保存，但实测无法访问华为接口（可能 Cookie 已过期或粘贴不完整）")})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
