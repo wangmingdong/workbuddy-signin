@@ -2063,6 +2063,7 @@ def get_lk_card():
             "error": None,
         }
     try:
+        manual = _lk_manual_signed_today()
         d = _lk_api("/sign/in")
         lr = _lk_read_last()
         checked = False
@@ -2076,6 +2077,9 @@ def get_lk_card():
             needs_captcha = True
         else:
             raise RuntimeError(d.get("message") or "状态查询失败")
+        # 用户在网页手动签到后点了「我已在网页签到」确认：本地记录即视为今日已签
+        if manual:
+            checked = True
         # 查积分余额
         bal = "--"
         try:
@@ -2089,14 +2093,22 @@ def get_lk_card():
         rows = [
             {
                 "k": "签到状态",
-                "v": "✅ 今日已签" if checked else "需网页手动签到",
+                "v": ("✅ 今日已签（网页手动确认）" if manual
+                      else ("✅ 今日已签" if checked else "需网页手动签到")),
             },
         ]
-        if needs_captcha:
+        if manual:
             rows.append(
                 {
                     "k": "说明",
-                    "v": "自动签到不可用：服务端要求图片验证码，脚本无法自动完成；请在网页手动签到",
+                    "v": "你已在网页完成签到并确认；服务器无法自动代签，此状态为本地记录，每日重置",
+                }
+            )
+        elif needs_captcha:
+            rows.append(
+                {
+                    "k": "说明",
+                    "v": "自动签到不可用：服务端要求图片验证码，脚本无法自动完成；请在网页手动签到后点「我已在网页签到」",
                 }
             )
         if lr:
@@ -2119,14 +2131,15 @@ def get_lk_card():
             "checked": checked,
             "needs_auth": True,
             "hide_auth_link": True,
+            "manual_signed_today": manual,
             "manual_cta_url": "https://link-ai.tech/console/account?bind=1",
             "manual_cta_label": "🌐 网页签到",
-            "badge": "需手动" if needs_captcha else None,
+            "badge": ("已签·手动确认" if manual else ("需手动" if needs_captcha else None)),
             "metric_label": "可用积分",
             "metric_value": bal,
             "last_run": lr,
             "rows": rows,
-            "error": ("需网页手动签到（图片验证码）" if needs_captcha else None),
+            "error": (None if manual else ("需网页手动签到（图片验证码）" if needs_captcha else None)),
         }
     except Exception as e:
         return _auth_fail_card(
@@ -2170,6 +2183,35 @@ def _lk_read_last():
     return None
 
 
+def _lk_manual_signed_today():
+    """用户已在网页手动签到后，点「我已在网页签到」确认；本地记录今天已签，
+    使卡片如实显示「已签」而无需服务器代签（LinkAI 签到接口已加图片验证码，服务端无法自动完成）。"""
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    for rec in _load_json_records(LK_STATE_FILE, 30):
+        if isinstance(rec, dict) and rec.get("manual_signed") and rec.get("date") == today:
+            return True
+    return False
+
+
+def set_lk_manual_signed():
+    if not LINKAI_TOKEN:
+        raise RuntimeError("未配置 Link AI Token（linkai_token.txt 或 LINKAI_TOKEN）")
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    _append_rec(
+        LK_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": True,
+            "manual_signed": True,
+            "date": today,
+            "message": "用户在网页手动签到后确认（服务端无法自动代签）",
+            "source": "manual",
+        },
+        30,
+    )
+    return get_lk_card()
+
+
 def get_lk_detail():
     if not LINKAI_TOKEN:
         raise RuntimeError("未配置 Link AI Token")
@@ -2188,6 +2230,7 @@ def get_lk_detail():
         "signin": {
             "history": history,
             "checked": get_lk_card().get("checked"),
+            "manual_signed_today": _lk_manual_signed_today(),
         },
         "consumption": {
             "balance": bal,
@@ -3887,7 +3930,10 @@ function cardHTML(it){
     // 手动签到卡：底部「签到」按钮直接跳转网页签到页，不触发自动签到
     var cta = '<a class="cta-link" href="'+esc(it.manual_cta_url)+'" target="_blank" rel="noopener">'+esc(it.manual_cta_label||'🌐 网页签到')+'</a>';
     var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:8px">🔄 重新检查</button>';
-    btn = cta + retry;
+    var msigned = it.manual_signed_today
+      ? ''
+      : '<button class="cta manual-signed" data-name="'+esc(it.name)+'" style="margin-top:8px">✅ 我已在网页签到</button>';
+    btn = cta + msigned + retry;
   } else if(needsAuth){
     // cookie 类平台：签到用「服务器自己那份 Cookie」。华为支持在网页里粘贴登录态 Cookie 直接登录。
     var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
@@ -4304,6 +4350,13 @@ function renderDetail(d, name){
     signinHTML += '<div class="drow"><span class="dk">赠送积分</span><span class="dv">'+esc(signin.gift_credit!=null?signin.gift_credit:'查询失败')+'</span></div>';
   } else if(d.name === 'huawei'){
     signinHTML += '<button class="cta login-cookie" type="button" data-name="huawei" style="margin:6px 0 2px">🔑 配置 / 更换会话 Cookie</button>';
+  } else if(d.name === 'linkai'){
+    if(signin.manual_signed_today){
+      signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">✅ 已签（网页手动确认）</span></div>';
+    } else {
+      signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">⏳ 需网页手动签到</span></div>';
+      signinHTML += '<button class="cta manual-signed" type="button" data-name="linkai" style="margin:6px 0 2px">✅ 我已在网页签到</button>';
+    }
   }
   if(!signinHTML){
     var _note = (signin && signin.note) ? signin.note : "该平台为状态卡，详情见卡片。";
@@ -4367,6 +4420,8 @@ consumeHTML += pkgs.map(function(p){
   });
   var lb = detail.querySelector('button.login-cookie');
   if(lb){ lb.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openHwLogin('huawei'); }); }
+  var msb = detail.querySelector('button.manual-signed');
+  if(msb){ msb.addEventListener('click', function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); markManualSigned(msb.getAttribute('data-name')||'linkai', msb); }); }
 }
 function switchTab(el, name, tab){
   var tabs = el.parentElement.querySelectorAll('span');
@@ -4766,6 +4821,13 @@ function renderCenter(d){
   Array.prototype.forEach.call(document.querySelectorAll("button.cta.login-cookie[data-name]"), function(b){
     b.addEventListener("click", function(ev){ if(ev && ev.stopPropagation) ev.stopPropagation(); openHwLogin(b.getAttribute("data-name")); });
   });
+  // Link AI 等手动平台：用户在网页签到后点「我已在网页签到」→ 本地记录今日已签
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta.manual-signed[data-name]"), function(b){
+    b.addEventListener("click", function(ev){
+      if(ev && ev.stopPropagation) ev.stopPropagation();
+      markManualSigned(b.getAttribute("data-name"), b);
+    });
+  });
   // 自动 Tab 的「立即全部签到」
   var ra = $('runAll'); if(ra) ra.addEventListener('click', runAllAuto);
 }
@@ -4778,6 +4840,15 @@ function recheck(name, btn){
     if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); if(btn){btn.disabled=false;btn.textContent="重试";} return; }
     var msg="网络错误："+((e&&e.message)||e); load(function(){ showMsg(msg,"err"); });
   });
+}
+// Link AI 等手动平台：用户在网页签到后确认，本地记录今日已签（服务器无法自动代签）
+function markManualSigned(name, btn){
+  if(!confirm("确认你已在网页（link-ai.tech/console/account）完成今日签到？\n确认后本卡片将标记为「今日已签」（服务器无法自动代签，仅本地记录）。")) return;
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>记录中…'; }
+  api("api/linkai/manual-signed",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})}).then(function(r){
+    if(r&&r.ok){ load(function(){ showMsg("✅ 已记录：今日 Link AI 网页签到完成","ok"); }); }
+    else { if(btn){btn.disabled=false; btn.textContent='重试';} load(function(){ showMsg("记录失败："+((r&&r.error)||"未知错误"),"err"); }); }
+  }).catch(function(e){ if(btn){btn.disabled=false; btn.textContent='重试';} load(function(){ showMsg("网络错误："+((e&&e.message)||e),"err"); }); });
 }
 
 function runAllAuto(){
@@ -5241,6 +5312,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"ok": True, "verified": verified,
                                  "message": ("✅ 华为会话已保存并验证可用，现在可以立即签到" if verified
                                               else "⚠️ 已保存，但实测无法访问华为接口（可能 Cookie 已过期或粘贴不完整）")})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/linkai/manual-signed":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                card = set_lk_manual_signed()
+                self._json(200, {"ok": True, "card": card,
+                                 "message": "✅ 已记录：今日 Link AI 网页签到完成"})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
