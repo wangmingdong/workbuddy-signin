@@ -8,7 +8,9 @@
 
 ## 它能签到哪些平台
 
-卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 9 张卡**：多数可全自动（WorkBuddy / 千帆 / MiniMax / Link AI / 灵犀 / Trae / Coze）；Qoder 卡片仍展示，但每日 100 Credits 因官方限制需**桌面端手动领**（不在服务端自动签到列表）；华为为手动卡。
+卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 10 张卡**：多数可全自动（WorkBuddy / 千帆 / MiniMax / 即梦 / 灵犀 / Trae / Coze）；Link AI 因接口强制图片验证码、服务端无法代签，需网页手动签到后卡片「✅ 我已在网页签到」确认；Qoder 卡片仍展示，但每日 100 Credits 因官方限制需**桌面端手动领**（不在服务端自动签到列表）；华为为手动卡，支持**网页粘贴会话 Cookie 直接登录**。
+
+> 所有卡片底部统一显示「可用积分」（4 家真实有余额：即梦 / 千帆 / WorkBuddy / Link AI；其余接口不提供余额则诚实显示「—」）；即梦额外显示「88 积分将于 x月x日 过期」提示。
 
 | 平台 | 官网 | 每日奖励 | 凭据文件（根目录） | 维护频率 |
 |------|------|---------|------------------|----------|
@@ -16,11 +18,12 @@
 | 百度千帆 | qianfan.baidu.com | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
 | MiniMax Code | platform.minimax.io | 400 智点 | `mm_web_token.json` | 约 40 天，过期重新登录 |
 | Qoder | qoder.com | 100 Credits（桌面端手动领） | `qoder_token.txt` | 约 1 个月，失效重新取出 |
-| Link AI | console.link-ai.tech | — | `linkai_token.txt` | 不定期 |
+| Link AI | console.link-ai.tech | 需网页手动签到后卡片确认（接口强制图片验证码，服务端无法代签） | `linkai_token.txt` | 不定期 |
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
 | **Coze 扣子** | coze.cn | 1500 活动分（登录自动发） | `coze_cookie.txt` | 约 60 天，过期重新导出 Cookie |
-| 华为码道（手动卡） | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步） | 会话失效后双击 `huawei/relogin_huawei.bat` |
+| 即梦 AI | jimeng.jianying.com | 每日登录发放免费额度（实测 88 赠送积分） | `jimeng_cookie.txt` | 字节风控强，Cookie 周期失效需重捕 |
+| 华为码道（手动卡） | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步；亦支持网页「🔑 配置会话 Cookie」粘贴登录） | 会话失效后双击 `huawei/relogin_huawei.bat` |
 
 > **派猫猫旅行**已并入 WorkBuddy：它共用 WorkBuddy 登录态，在 WorkBuddy 卡内作为弹窗入口，不单独成卡、也不在设置页单独配置（开关跟随 WorkBuddy）。
 >
@@ -50,7 +53,7 @@ workbuddy-signin/
 │
 ├─ ★ 凭据 & 状态文件（平铺根目录，服务端平铺读取）★
 │   token.info  qf_token.txt  mm_token.json  mm_web_token.json  qoder_token.txt
-│   linkai_token.txt  lx_cookie.txt  trae_cookie.txt  coze_cookie.txt
+│   linkai_token.txt  lx_cookie.txt  trae_cookie.txt  coze_cookie.txt  jimeng_cookie.txt
 │   hw_cookie.txt（注：实际由 huawei/ 工具链产生并推送）
 │   settings.json  *_last_run.json（各平台签到历史） travel_state.json
 │
@@ -77,7 +80,7 @@ workbuddy-signin/
 
 | 文件 | 作用 |
 |------|------|
-| `web_server.py` | 手机网页版服务：9 个平台签到适配器 + 单页 UI；`--daily` 模式供服务器定时跑全部平台 |
+| `web_server.py` | 手机网页版服务：10 个平台签到适配器 + 单页 UI（含统一「可用积分」显示、即梦过期提示、华为网页登录、Link AI 手动确认）；`--daily` 模式供服务器定时跑全部平台 |
 | `wb_icon.py` | 各平台官方图标（64×64 圆角内联 SVG/PNG，含 Coze 官方 logo 已 base64 内联） |
 | `wb_travel.py` | 派猫猫旅行（WorkBuddy 卡内弹窗）逻辑，共用 WorkBuddy 登录态 |
 | `wb_growth.py` | WorkBuddy 成长中心 / 每日任务 一键完成（纯标准库） |
@@ -140,7 +143,8 @@ workbuddy-signin/
 | WPS 灵犀 | `lx_cookie.txt` | `LX_COOKIE` | 浏览器 DevTools → Application → Cookies 全复制 |
 | **Trae Work** | `trae_cookie.txt` + `trae_device_id.txt` | `TRAE_COOKIE`/`TRAE_JWT` + `TRAE_DEVICE_ID` | Cookie 见 config.example；**设备 id 见第 4 步** |
 | Coze 扣子 | `coze_cookie.txt` | `COZE_COOKIE` | 浏览器登录 coze.cn 后复制全部 Cookie |
-| 华为码道 | `hw_cookie.txt` | `HW_COOKIE` | 由本机 `huawei/` 工具链自动同步（见仓库 huawei/ 说明） |
+| 即梦 AI | `jimeng_cookie.txt` | `JIMENG_COOKIE` | 浏览器登录 jimeng.jianying.com 后复制全部 Cookie（sessionid 即凭证） |
+| 华为码道 | `hw_cookie.txt` | `HW_COOKIE` | 由本机 `huawei/` 工具链自动同步；亦可在网页「🔑 配置会话 Cookie」粘贴登录态 |
 
 > 凭据文件与 `.env` 均已被 `.gitignore` 忽略，绝不会进仓库。
 
@@ -204,7 +208,7 @@ WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，
 > 设置后本机需用新口令访问（页面把口令存 `localStorage['wb_center_key']`，**不放在 URL**）。
 
 ### 3. 🎚 平台开关
-按 `PLATFORM_TITLES` 列出每个平台一个开关（WorkBuddy / 百度千帆 / MiniMax Code / Qoder / Link AI / WPS 灵犀 / Trae Work / 华为码道）：
+按 `PLATFORM_TITLES` 列出每个平台一个开关（WorkBuddy / 百度千帆 / MiniMax Code / 即梦 AI / Qoder / Link AI / WPS 灵犀 / Trae Work / 华为码道）：
 - 关掉的平台在 `get_center` 标 `disabled`、灰显「已停用」，并在 `run_daily_all` 中跳过；
 - **派猫猫旅行**不在此列——它跟随 WorkBuddy（关 WorkBuddy 即关 travel）。
 
@@ -300,6 +304,9 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 - **Qoder 卡片显示「登录态过期」**：`qoder_token.txt` 失效，约 1 个月有效期。重新从本机已登录的 Qoder 客户端取出最新 token、经 `deploy_ui.py` 部署到服务器即可（服务端不会自动刷新，否则会顶掉你本机客户端登录态）。
 - **Coze 卡片显示「未配置」**：`coze_cookie.txt` 缺失或 Cookie 过期（约 60 天）。浏览器登录 coze.cn 后从 DevTools → Application → Cookies 复制全部 cookie 存为 `coze_cookie.txt`，再 `deploy_ui.py` 推 112。
 - **华为卡显示「登录态过期」**：本机双击 `huawei/relogin_huawei.bat` 重新登录一次；之后 `hw_keeper.js` + `hw_autopush.py` 会自动维持并推送（本机需常驻运行）。
+- **华为卡想从网页直接登录**：卡片 / 详情页点「🔑 配置会话 Cookie」，从浏览器 DevTools 复制登录后的华为 Cookie 粘贴保存即可（因 `J_SESSION_ID` 是 HttpOnly，JS 读不到，无法做「输账号密码自动登录」；粘贴方案是最诚实可行的网页登录方式）。保存后寿命仍仅 30~60 分，够当下立即签到一次。
+- **即梦卡显示「Cookie 可能已失效」**：字节风控强，`jimeng_cookie.txt` 会周期失效。重捕 Cookie 后重部署即可——经 `deploy_ui.py` 上传新 `jimeng_cookie.txt`（覆盖线上）后重启服务，`get_jimeng_card()` 即恢复。
+- **Link AI 卡一直显示「需手动」，重新检查也没变已签**：这是预期的——Link AI 接口强制图片验证码，服务端代签不了，也无从得知你浏览器里的签到。请先在网页 `console.link-ai.tech` 手动签到，再回到卡片点「✅ 我已在网页签到」确认，卡片即标记「今日已签」（本地记录，每天重置，诚实不谎报）。
 - **设置改了不生效**：口令/通知即时生效；定时时间在保存时已热更新。若仍不对，确认 `settings.json` 已写入（被 gitignored，不会进仓库）。
 
 ---
@@ -328,11 +335,22 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 - 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。
 - 凭据：`coze_cookie.txt`（Cookie 串，含 `sessionid`/`sid_guard`，约 60 天）
 
+**即梦 AI Jimeng**（对应 `get_jimeng_card` / `run_jimeng_checkin`，自动卡）：
+- 端点前缀 `https://jimeng.jianying.com`，`aid=513695` / `PLATFORM_CODE=7` / `VERSION_CODE=8.4.0`。
+- **sessionid 即凭证**：`acquireToken()` 直接返回 sessionid，无需换 token；Cookie 存 `jimeng_cookie.txt`（已 gitignored）。
+- 余额：`POST /commerce/v1/benefits/user_credit`（读 `credit.gift_credit`）；领取：`POST /commerce/v1/benefits/credit_receive`（body `{"time_zone":"Asia/Shanghai"}`）。
+- **签名**：`Sign = MD5("9e2c|{uri末7位}|7|8.4.0|{deviceTime}||11ac")`，需带 `Device-Time` / `Sign-Ver:1` / `Appid` 头。
+- **幂等**：当日已领返回 `is_first_receive:false`、不再加积分 → 每日定时跑安全不重复。
+- 卡片底部统一显示「可用积分」，并额外展示「88 积分将于 x月x日 过期」（取自 `expiring_credits[].expire_time`）。字节风控强，`jimeng_cookie.txt` 会周期失效，届时卡片诚实标「Cookie 可能已失效」，需重捕经 `deploy_ui.py` 部署。
+
 **华为码道 DevCloud**（对应 `get_hw_card` / `run_hw_checkin`，手动卡）：
 - 端点前缀 `https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService/v1/ops/`，每日签到需带浏览器同款头（`cftk` CSRF）否则回 SPA HTML。
 - 会话寿命短（静置 30~60 分失效）→ 每天 08:35 自动签必失败；真解：本机 `hw_keeper.js` 无头常驻每 5 分刷新 + `hw_autopush.py` 推 112。本机没开机/守护停了 → 华为卡转「登录态过期」→ 双击 `huawei/relogin_huawei.bat` 恢复。
+- **网页直接登录**：因 `devclouddevuibjJ_SESSION_ID` 是 HttpOnly（JS 读不到），无法做「输账号密码自动登录」。卡片 / 详情页提供「🔑 配置会话 Cookie」按钮（`openHwLogin()` 弹窗），从浏览器 DevTools 复制登录后的 Cookie 粘贴保存即可——后端 `set_hw_cookie()` 写入 `hw_cookie.txt`（已 gitignored）并实测验证可用性，立即可「立即签到」。寿命仍仅 30~60 分，够当下签到一次；每日自动定时仍靠本机守护。
 
 **千帆 / Link AI / WPS 灵犀 / Trae**：均为标准 token 或 Cookie 串鉴权，凭据见 `config.example.json`，过期后重新导出并经 `deploy_ui.py` 部署。
+
+其中 **Link AI**（对应 `get_lk_card`，手动卡）：签到接口 `/sign/in` 现强制要求图片验证码（返回 `code=870`），服务端无解验证码能力，故**无法自动代签**；卡片标「需手动」，并在网页手动签到后提供「✅ 我已在网页签到」按钮（`set_lk_manual_signed()` 本地记录今日已签，每天自动重置，诚实不谎报）。
 
 其中 **Trae Work**（对应 `get_trae_card` / `run_trae_checkin`）：
 - 签到：`POST https://api.trae.cn/trae/api/v2/ug/checkin_credits/claim`（`req_source=2`，客户端通道）
