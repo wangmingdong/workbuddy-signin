@@ -3164,6 +3164,33 @@ def get_detail(name):
             },
         }
 
+    if name == "jimeng":
+        history = _load_json_records(JIMENG_STATE_FILE, 30)
+        lr = _read_json_last(JIMENG_STATE_FILE)
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        claimed_today = bool(lr and lr.get("date") == today and lr.get("ok"))
+        gift = None
+        if JIMENG_COOKIE:
+            try:
+                d = _jm_request("/commerce/v1/benefits/user_credit", {}, params=None,
+                                referer_path="/ai-tool/image/generate")
+                gift = (d.get("credit") or {}).get("gift_credit")
+            except Exception:
+                gift = None
+        return {
+            "ok": True,
+            "name": name,
+            "title": "即梦 AI 每日积分",
+            "signin": {
+                "checked_today": claimed_today,
+                "gift_credit": gift,
+                "history": history,
+            },
+            "consumption": {
+                "note": "即梦每日登录发放免费额度，连续签到 7 天额外 +300；额度当日有效、仅够试做",
+            },
+        }
+
     raise RuntimeError("未知平台：%s" % name)
 
 
@@ -4193,6 +4220,9 @@ function renderDetail(d, name){
     signinHTML += '<div class="drow"><span class="dk">今日福利</span><span class="dv">'+esc(signin.benefit||'--')+'</span></div>';
     signinHTML += '<div class="drow"><span class="dk">有效期限</span><span class="dv">'+esc(signin.validity||'--')+'</span></div>';
     if(signin.window){ signinHTML += '<div class="drow"><span class="dk">领取窗口</span><span class="dv">'+esc(signin.window)+'</span></div>'; }
+  } else if(d.name === 'jimeng'){
+    signinHTML += '<div class="drow"><span class="dk">今日状态</span><span class="dv">'+(signin.checked_today?'✅ 已领取':'⏳ 待领取')+'</span></div>';
+    signinHTML += '<div class="drow"><span class="dk">赠送积分</span><span class="dv">'+esc(signin.gift_credit!=null?signin.gift_credit:'查询失败')+'</span></div>';
   }
   if(!signinHTML){
     var _note = (signin && signin.note) ? signin.note : "该平台为状态卡，详情见卡片。";
@@ -4232,6 +4262,8 @@ consumeHTML += pkgs.map(function(p){
     } else {
       consumeHTML += '<div class="dempty">暂无消耗数据</div>';
     }
+  } else if(d.name === 'jimeng'){
+    consumeHTML += '<div class="drow"><span class="dk">额度说明</span><span class="dv">'+esc(consumption.note||'即梦每日登录发放免费额度')+'</span></div>';
   }
   // 统一官网登录入口：从已加载的 center 数据里取该卡的 official_url
   var off = null;
