@@ -4843,7 +4843,7 @@ function recheck(name, btn){
 }
 // Link AI 等手动平台：用户在网页签到后确认，本地记录今日已签（服务器无法自动代签）
 function markManualSigned(name, btn){
-  if(!confirm("确认你已在网页（link-ai.tech/console/account）完成今日签到？\n确认后本卡片将标记为「今日已签」（服务器无法自动代签，仅本地记录）。")) return;
+  if(!confirm("确认你已在网页（link-ai.tech/console/account）完成今日签到？\\n确认后本卡片将标记为「今日已签」（服务器无法自动代签，仅本地记录）。")) return;
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>记录中…'; }
   api("api/linkai/manual-signed",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})}).then(function(r){
     if(r&&r.ok){ load(function(){ showMsg("✅ 已记录：今日 Link AI 网页签到完成","ok"); }); }
