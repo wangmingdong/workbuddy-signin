@@ -169,7 +169,7 @@ WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，
 ### 7. 百度千帆「活动中心」：卡内弹窗（对齐 WorkBuddy）
 百度千帆卡片底部的「🧭 活动中心」入口，交互与 WorkBuddy 的「🎯 每日任务」完全一致——点击在**当前页面弹窗**打开（同一套卡内弹窗，不跳页），展示**真实活动任务分组** +「🚀 一键完成今日任务」+「🎰 抽奖」按钮。
 
-- **真实任务来源**：逆向百度搭子（DuMate）桌面客户端 `app.asar` 找到「成长计划 growth_plan_2026」活动接口，经千帆服务（121.40.208.54:8021）代理。接口组：`GET /api/dumate/activity/growth-plan/{modules,tasks,draw/status}`、`POST /api/dumate/activity/growth-plan/{task/complete,draw}`（需 `console.bce.baidu.com` 的 Cookie + `csrfToken`；cookie 由桌面客户端 AES-GCM 解密导出到 `data/cookies.json`）。
+- **真实任务来源**：逆向百度搭子（DuMate）桌面客户端 `app.asar` 找到「成长计划 growth_plan_2026」活动接口，经千帆服务（`QF_BASE_URL`，由环境变量注入，见 `config.example.json`）代理。接口组：`GET /api/dumate/activity/growth-plan/{modules,tasks,draw/status}`、`POST /api/dumate/activity/growth-plan/{task/complete,draw}`（需 `console.bce.baidu.com` 的 Cookie + `csrfToken`；cookie 由桌面客户端 AES-GCM 解密导出到 `data/cookies.json`）。
 - **任务分组**：`每日推荐任务` / `进阶挑战` / `邀请码福利`（实测还出现过 `搭子初启` 等，随活动动态分配）。卡片按 `completed_count >= repeat_count` 判完成。
 - **⚠️ 诚实映射（关键）**：活动任务分两类，按钮**只做接口允许的**：
   1. **接口允许自动完成**的（各类 `QUERY_INPUT` AI 任务，如关键信息提取/图视频生成/全格式文档处理/无代码创作/飞书全家桶等）→ 一键批量上报完成、发放奖励。
