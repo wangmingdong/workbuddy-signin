@@ -2137,6 +2137,7 @@ def get_lk_card():
             "badge": ("已签·手动确认" if manual else ("需手动" if needs_captcha else None)),
             "metric_label": "可用积分",
             "metric_value": bal,
+            "credit": {"balance": (str(bal) if bal not in (None, "--") else None), "unit": "积分", "expiring": None},
             "last_run": lr,
             "rows": rows,
             "error": (None if manual else ("需网页手动签到（图片验证码）" if needs_captcha else None)),
@@ -2366,6 +2367,7 @@ def get_wb_card():
             "checked": bool(st.get("checked")),
             "metric_label": "累计积分",
             "metric_value": st.get("total"),
+            "credit": {"balance": (str(st["remaining"]) if st.get("remaining") is not None else None), "unit": "积分", "expiring": None},
             "last_run": lr,
             "rows": rows,
             "error": None,
@@ -2510,6 +2512,7 @@ def get_qf_card():
             "checked": bool(signin.get("signedToday")),
             "metric_label": "可用积分",
             "metric_value": points.get("available", "--"),
+            "credit": {"balance": (str(points.get("available")) if points.get("available") not in (None, "--") else None), "unit": "积分", "expiring": None},
             "last_run": last_run,
             "qfdaily_entry": _qf_activity_entry(),
             "rows": rows,
@@ -2955,6 +2958,20 @@ def _jm_record_claim(receive_quota, is_first):
     return rec
 
 
+def _fmt_expire(ts):
+    """Unix 时间戳(秒/毫秒) → 'M月D日'；无法解析返回 None。"""
+    try:
+        ts = int(ts)
+        if ts <= 0:
+            return None
+        if ts > 1e12:  # 毫秒级
+            ts = ts / 1000.0
+        dt = datetime.datetime.fromtimestamp(ts)
+        return "%d月%d日" % (dt.month, dt.day)
+    except Exception:
+        return None
+
+
 def get_jimeng_card():
     if not JIMENG_COOKIE:
         return {"name": "jimeng", "title": "即梦 AI 每日积分", "brand": "#3B6CFF", "brand2": "#7B5CFF",
@@ -2965,9 +2982,17 @@ def get_jimeng_card():
                 "error": None}
     # 查余额（只读，不触发领取）
     gift = None
+    expiring = None
     try:
         d = _jm_request("/commerce/v1/benefits/user_credit", {}, params=None, referer_path="/ai-tool/image/generate")
         gift = (d.get("credit") or {}).get("gift_credit")
+        ec = (d.get("expiring_credits") or [])
+        if isinstance(ec, list) and ec:
+            f = ec[0]
+            amt = f.get("credit_amount")
+            exp = _fmt_expire(f.get("expire_time"))
+            if amt is not None and exp:
+                expiring = {"amount": amt, "date": exp}
     except Exception as e:
         return {"name": "jimeng", "title": "即梦 AI 每日积分", "brand": "#3B6CFF", "brand2": "#7B5CFF",
                 "icon": "jimeng", "checked": False, "needs_auth": True, "hide_auth_link": True,
@@ -2989,6 +3014,7 @@ def get_jimeng_card():
     return {"name": "jimeng", "title": "即梦 AI 每日积分", "brand": "#3B6CFF", "brand2": "#7B5CFF",
             "icon": "jimeng", "checked": claimed_today,
             "metric_label": "当前赠送积分", "metric_value": ("%s" % gift) if gift is not None else "—",
+            "credit": {"balance": ("%s" % gift) if gift is not None else None, "unit": "积分", "expiring": expiring},
             "last_run": lr, "rows": rows, "error": None}
 
 
@@ -3422,6 +3448,8 @@ OFFICIAL_SITES = {
 def get_center():
     items = [fn() for fn in ADAPTERS.values()]
     for it in items:
+        if "credit" not in it:
+            it["credit"] = {"balance": None, "unit": "积分"}
         it["disabled"] = not platform_enabled(it.get("name"))
         # 统一挂载官网入口（详情弹窗用），覆盖成长/每日任务等无官网的子卡
         _oname = it.get("name")
@@ -3641,6 +3669,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .row:last-child{border-bottom:0;}
 .row .k{color:var(--sub);white-space:nowrap;}
 .row .v{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere;}
+/* 统一「可用积分」区块：每张卡都显示，缺数据诚实标 — */
+.credit-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:11px;padding:10px 12px;border-radius:12px;
+  background:linear-gradient(135deg,rgba(245,247,255,.92),rgba(238,242,255,.72));border:1px solid rgba(99,102,241,.14);font-size:13px;}
+.credit-row .cl{color:#5b6472;font-weight:600;white-space:nowrap;}
+.credit-row .cv{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#4338ca;letter-spacing:-.2px;}
+.credit-exp{margin-top:6px;font-size:12px;color:#b54708;background:rgba(247,144,9,.1);border:1px solid rgba(247,144,9,.18);
+  padding:6px 10px;border-radius:9px;line-height:1.45;}
 .last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
 button.cta{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;color:#fff;
   background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
@@ -3902,6 +3937,16 @@ function fmtLast(lr){
   }
   return "暂无记录";
 }
+function creditHTML(it){
+  var c = it.credit || {balance:null, unit:""};
+  var bal = (c.balance!=null && c.balance!=="") ? (esc(c.balance)+' '+(c.unit||'')) : '—';
+  var h = '<div class="credit-row"><span class="cl">可用积分</span><span class="cv">'+bal+'</span></div>';
+  if(c.expiring && c.expiring.amount!=null && c.expiring.date){
+    h += '<div class="credit-exp">⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' 将于 '+esc(c.expiring.date)+' 过期</div>';
+  }
+  return h;
+}
+
 function cardHTML(it){
   var manualTag = it.group==='manual' ? '<span class="badge manual">✋ 手动</span>' : '';
   if(it.disabled){
@@ -3963,6 +4008,7 @@ function cardHTML(it){
           '<div class="ctitle">'+esc(it.title)+'</div>'+ manualTag + badge +
         '</div>'+
         '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
+        creditHTML(it) +
         '<div class="rows">'+rows+'</div>'+
         (it.checked ? '' : '<div class="last">上次签到：'+last+'</div>')+
         '<div class="card-acts">'+btn + entries + err +'</div>'+
