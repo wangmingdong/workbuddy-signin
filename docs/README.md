@@ -316,7 +316,8 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 **WorkBuddy**（对应 `get_wb_card` / `run_wb_checkin`）：
 - 签到：`POST https://copilot.tencent.com/v2/billing/meter/daily-checkin`
 - 状态：`POST https://copilot.tencent.com/v2/billing/meter/checkin-activity-status`
-- 余额：`POST https://copilot.tencent.com/v2/billing/meter/get-user-resource`（**必须带浏览器 `User-Agent`，否则 403**；`data.Response.Data.Accounts[].CapacityRemainPrecise` 求和即剩余积分）
+- 余额：`POST https://copilot.tencent.com/v2/billing/meter/get-user-resource`（**必须带浏览器 `User-Agent`，否则 403**）
+  - ⚠️ **两个口径别混**（否则数值虚高）：`Accounts[].CapacityRemainPrecise` 是资源包**生命周期总余额**；`Accounts[].CycleCapacityRemainPrecise` 是**本周期剩余**，官方客户端「可用积分」用的就是它。对周期型包（`CapacityType=4`，如「CodeBuddy个人体验版」按自然月发 500 分）用总量口径会把本周期已消耗的算成可用 —— 实测总量 4343 vs 客户端 3918，差额 424.65 正是体验版本周期已用。故本页可用余额取 `min(总量剩余, 本期剩余)`，另在详情里回显「资源包总量」供对照。
 - 鉴权：`Authorization: Bearer <accessToken>` + `X-User-Id` + `X-Domain: copilot.tencent.com`
 - token 来源：`%LOCALAPPDATA%\CodeBuddyExtension\Data\Public\auth\workbuddy-desktop.info`
 

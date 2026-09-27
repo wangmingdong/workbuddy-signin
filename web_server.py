@@ -460,7 +460,17 @@ def _record_state(ok, message, st, source="web"):
 
 
 def get_remaining():
-    """查询账户资源余额（资源包 CapacityRemainPrecise 之和）。独立接口，失败不影响主流程。"""
+    """查询账户可用积分（与官方客户端同口径）。
+
+    ⚠️ 接口里有两个上限口径，别混（2026-09-27 踩过）：
+    - CapacityRemainPrecise       = 资源包**生命周期总余额**（含本周期已消耗）
+    - CycleCapacityRemainPrecise  = 资源包**本周期剩余** ← 官方客户端「可用积分」用的就是它
+    对周期型资源包（CapacityType=4，如「CodeBuddy个人体验版」按自然月发 500 分），
+    用总量口径会把本周期已经用掉的量也当成可用，导致虚高。
+    实测：总量 4343 分 vs 客户端 3918 分，差额 424.65 = 体验版本周期已用。
+    故本函数统一取 min(总量剩余, 本期剩余) 作为「可用」，另回传总量供参考。
+    独立接口，失败不影响签到主流程。
+    """
     sess = _session()
     base = _base(sess)
     body = {
@@ -477,20 +487,33 @@ def get_remaining():
     d = json.loads(b)
     resp = (d.get("data") or {}).get("Response") or {}
     accounts = (resp.get("Data") or {}).get("Accounts") or []
-    total = 0.0
+    total = 0.0  # 可用（本期口径，与客户端一致）
+    total_raw = 0.0  # 资源包总量口径（仅参考）
     pkgs = []
     for a in accounts:
         rem = float(a.get("CapacityRemainPrecise") or 0)
-        total += rem
+        cyc_size = float(a.get("CycleCapacitySizePrecise") or 0)
+        cyc_raw = a.get("CycleCapacityRemainPrecise")
+        cyc = float(cyc_raw) if cyc_raw not in (None, "") else None
+        # 周期型包按「本期剩余」算可用；接口没给本期字段时退回总量
+        avail = min(rem, cyc) if (cyc is not None and cyc_size > 0) else rem
+        total += avail
+        total_raw += rem
         pkgs.append(
             {
                 "name": a.get("PackageName"),
-                "remain": round(rem, 2),
+                "remain": round(avail, 2),
+                "cycle_remain": round(cyc, 2) if cyc is not None else None,
+                "total_remain": round(rem, 2),
                 "used": round(float(a.get("CapacityUsedPrecise") or 0), 2),
                 "capacity": round(float(a.get("CapacitySizePrecise") or 0), 2),
             }
         )
-    return {"remaining": round(total, 2), "packages": pkgs}
+    return {
+        "remaining": round(total, 2),
+        "total_remain": round(total_raw, 2),
+        "packages": pkgs,
+    }
 
 
 # 消耗明细接口（官方"积分消耗明细"）的 base：与 get-user-resource 同域名，但路径不带 /v2
@@ -562,6 +585,7 @@ def get_status():
         "streak": d.get("streak_days"),
         "checked": bool(d.get("today_checked_in")),
         "remaining": None,
+        "total_remain": None,
         "usage": None,
         "packages": [],
     }
@@ -569,6 +593,7 @@ def get_status():
     try:
         res = get_remaining()
         st["remaining"] = res["remaining"]
+        st["total_remain"] = res.get("total_remain")
         st["packages"] = res["packages"]
     except Exception:
         pass
@@ -2347,9 +2372,16 @@ def get_wb_card():
                 "v": ("+%s 分" % st["today"]) if st.get("today") is not None else "--",
             },
             {
-                "k": "资源余额",
+                "k": "可用积分",
                 "v": ("%s 分" % st["remaining"])
                 if st.get("remaining") is not None
+                else "--",
+            },
+            {
+                # 资源包总量含本周期已消耗，仅作参考（官方客户端「可用积分」用的是本期口径）
+                "k": "资源包总量",
+                "v": ("%s 分" % st["total_remain"])
+                if st.get("total_remain") is not None
                 else "--",
             },
             {
@@ -3091,6 +3123,7 @@ def get_detail(name):
             },
             "consumption": {
                 "remaining": st.get("remaining"),
+                "total_remain": st.get("total_remain"),
                 "usage_yesterday": st.get("usage"),
                 "packages": st.get("packages", []),
             },
@@ -4421,7 +4454,10 @@ historyHTML += history.slice(0,5).map(function(h){
   }
   var consumeHTML = '';
   if(d.name === 'workbuddy'){
-    consumeHTML += '<div class="drow"><span class="dk">资源余额</span><span class="dv">'+esc(consumption.remaining||'--')+' 分</span></div>';
+    consumeHTML += '<div class="drow"><span class="dk">可用积分</span><span class="dv">'+esc(nz(consumption.remaining,'--'))+' 分</span></div>';
+    if(consumption.total_remain != null && String(consumption.total_remain) !== String(consumption.remaining)){
+      consumeHTML += '<div class="drow"><span class="dk">资源包总量</span><span class="dv">'+esc(consumption.total_remain)+' 分</span></div>';
+    }
     consumeHTML += '<div class="drow"><span class="dk">昨日消耗</span><span class="dv">'+esc(consumption.usage_yesterday||'--')+' 分</span></div>';
     var pkgs = consumption.packages || [];
     if(pkgs.length){
@@ -4430,6 +4466,7 @@ consumeHTML += pkgs.map(function(p){
         return '<div class="drow"><span class="dk">'+esc(p.name||'资源包')+'</span><span class="dv">剩 '+esc(nz(p.remain,'--'))+' / 共 '+esc(nz(p.capacity,'--'))+'</span></div>';
       }).join('');
     }
+    consumeHTML += '<div class="fnote">可用积分 = 各资源包<b>本期剩余</b>之和（与官方客户端口径一致）；资源包总量含本周期已消耗，仅作参考。</div>';
   } else if(d.name === 'qianfan'){
     consumeHTML += '<div class="drow"><span class="dk">总积分</span><span class="dv">'+esc(consumption.total_points||'--')+'</span></div>';
     consumeHTML += '<div class="drow"><span class="dk">可用积分</span><span class="dv">'+esc(consumption.available||'--')+'</span></div>';
