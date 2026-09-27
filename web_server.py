@@ -1958,17 +1958,31 @@ QD_LOCAL_FILE = os.path.join(BASE_DIR, "qoder_local_status.json")  # 本机守�
 QD_BASE = os.environ.get("QODER_BASE_URL", "https://openapi.qoder.sh")
 QD_AUTH_URL = "https://qoder.com/account/profile"
 
-# Qoder 每日 100 Credits 活动每天 10:00(UTC+8) 才开放（活动 key 带日期 act-YYYYMMDD-xxx），
-# 而主定时任务在 08:35 跑、早于开放时间，会看到昨天期 CLAIMED 直接幂等跳过、漏掉当天额度。
-# 故起一个常驻线程，每天 10:30 起每 30 分钟补签一次，直到当日已领或 13:00 停止。
+# Qoder 每日 100 Credits 活动每天 10:00(UTC+8) 才刷新新轮次，而主定时任务在 08:35 跑、
+# 早于刷新时间。故起一个常驻线程：10:05~13:00 每 30 分钟用守护推送的指纹尝试「服务端代领」
+# 一次，直到当日已领（本机守护/服务端任一路径先到都行，claim 幂等）或窗口结束。
 _qoder_wake = threading.Event()
 
 
 def _qoder_topup_loop():
-    # Qoder 每日 100 Credits 由本机守护 qoder_keeper/ 领取（需 Cosy-Machine 设备指纹，
-    # 服务端无法代领，详见 run_qd_checkin 注释）。服务端补签线程无意义，停用。
-    print("[qoder-topup] 已停用：领取由本机守护 qoder_keeper 完成，服务端只展示其上报结果")
-    return
+    # 2026-09-27 恢复：指纹可跨机重放（守护上报 Cosy-Machine* 到 qoder_local_status.json），
+    # 服务端重新具备代领能力；此前「本机守护独占」版线程停用。
+    print("[qoder-topup] 服务端代领线程启动（10:05~13:00 每 30 分钟，claim 幂等安全）")
+    while True:
+        try:
+            utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+            hm = (utc8.hour, utc8.minute)
+            local = _qd_local_today()
+            if (10, 5) <= hm <= (13, 0) and not (local and local.get("checked")):
+                tok, _ = _qd_token()
+                if tok and _qd_fp() is not None:
+                    status, message, balance = _qd_try_server_claim()
+                    if status in ("claimed", "token_expired"):
+                        _qd_record_server_claim(status, message, balance)
+                    print("[qoder-topup] %s: %s" % (status, message))
+        except Exception as e:
+            print("[qoder-topup] 异常: %r" % e)
+        time.sleep(1800)
 QD_CAMPAIGN_PATH = "/sash/api/v1/me/campaigns"
 # 服务端绝不刷新 token（刷新会挤掉你本机 Qoder 客户端的登录态），只读着用；
 # token 过期只能靠本机脚本重新取一份推上来。
@@ -2070,8 +2084,162 @@ def set_qd_local_status(data):
     data.setdefault("source", "local_keeper")
     with open(QD_LOCAL_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
-    _qd_record(bool(data.get("checked")), "[本机守护] %s" % (data.get("message") or ""))
+    src_label = "服务端代领" if data.get("source") == "server_claim" else "本机守护"
+    _qd_record(bool(data.get("checked")), "[%s] %s" % (src_label, data.get("message") or ""))
     return data
+
+
+# ---------------- 服务端代领（指纹跨机重放，2026-09-27 实验验证可行） ----------------
+# 本机守护 qoder_keeper 每轮把 Cosy-Machine* 设备指纹（runtime-info.exe 生成）随状态
+# 推送到 qoder_local_status.json 的 fingerprint 字段；服务端用同一套头重放即可查活动、
+# 领取——指纹不绑 IP，只认值。claim 接口幂等（replayed），守护/服务端谁先到都不重复发。
+
+
+def _qd_fp():
+    """取守护推送的设备指纹；无效或未上报返回 None。"""
+    d = _qd_local_read() or {}
+    fp = d.get("fingerprint")
+    if isinstance(fp, dict) and (fp.get("machineToken") or fp.get("machineCode")):
+        return fp
+    return None
+
+
+def _qd_fp_headers(tok, fp):
+    """用守护推送的指纹重建完整请求头（与服务端 build_headers 字段一一对应）。"""
+    return {
+        "Authorization": "Bearer %s" % tok,
+        "User-Agent": "Qoder",
+        "Cosy-ClientType": "10",
+        "Cosy-Version": fp.get("cosyVersion") or "0.4.1",
+        "Accept": "application/json",
+        "Cosy-MachineToken": fp.get("machineToken") or "",
+        "Cosy-MachineType": fp.get("machineType") or "",
+        "Cosy-MachineCode": fp.get("machineCode") or "",
+        "Cosy-MachineOS": fp.get("machineOS") or "",
+        "Cosy-MachineId": fp.get("machineId") or fp.get("machineCode") or "",
+    }
+
+
+def _qd_api_fp(path, headers, method="GET", body=None):
+    """带指纹头调 Qoder 接口（重放）。"""
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        "%s%s" % (QD_BASE, path), data=data, method=method, headers=headers
+    )
+    with urllib.request.urlopen(req, timeout=25, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _qd_find_addon_remaining(obj):
+    """递归在 quota/usage 返回里找 addOnQuota.remaining（Credits 余额）。"""
+    if isinstance(obj, dict):
+        aq = obj.get("addOnQuota")
+        if isinstance(aq, dict) and aq.get("remaining") is not None:
+            return aq.get("remaining")
+        for v in obj.values():
+            r = _qd_find_addon_remaining(v)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = _qd_find_addon_remaining(v)
+            if r is not None:
+                return r
+    return None
+
+
+def _qd_try_server_claim():
+    """服务端代领一次（用守护推送的指纹重放）。返回 (status, message, balance)。
+
+    status: claimed=今日轮次已领（含本轮刚领/幂等重放/守护先领）
+            token_expired=服务端 token 过期；empty=指纹查询无活动（可能失效）；error=其它异常。
+    调用方须自行保证在每日 10:05(UTC+8) 之后（10:00 前 CLAIMED 是昨天轮次，不可当今日已领）。
+    """
+    tok, _ = _qd_token()
+    fp = _qd_fp()
+    if not tok or not fp:
+        return "error", "缺 token 或设备指纹", None
+    headers = _qd_fp_headers(tok, fp)
+
+    def _balance():
+        try:
+            return _qd_find_addon_remaining(_qd_api_fp("/api/v2/quota/usage", headers))
+        except Exception:
+            return None
+
+    try:
+        d = _qd_api_fp(QD_CAMPAIGN_PATH, headers)
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return "token_expired", "服务端 token 已过期(HTTP %s)，待本机更新" % e.code, None
+        return "error", "campaigns 接口异常 HTTP %s" % e.code, None
+    except Exception as e:
+        return "error", "campaigns 请求失败: %s" % e, None
+
+    camps = [c for c in (d.get("campaigns") or [])
+             if isinstance(c, dict) and c.get("actionType") == "CLAIM_BENEFIT"]
+    claimable = [c for c in camps if (c.get("claimStatus") or "").upper() == "CLAIMABLE"]
+    if claimable:
+        camp = claimable[0]
+        cid = camp.get("campaignId") or ""
+        try:
+            cres = _qd_api_fp("%s/%s/claim" % (QD_CAMPAIGN_PATH, cid), headers,
+                              method="POST", body={})
+        except urllib.error.HTTPError as e:
+            return "error", "claim 失败 HTTP %s" % e.code, None
+        except Exception as e:
+            return "error", "claim 请求失败: %s" % e, None
+        if (cres.get("status") or "").upper() == "CLAIMED":
+            msg = ("今日已领取（幂等重放）" if cres.get("replayed")
+                   else "服务端代领成功 +100 Credits（%s）" % (camp.get("campaignKey") or cid))
+            return "claimed", msg, _balance()
+        return "error", "claim 返回异常: %s" % json.dumps(cres, ensure_ascii=False)[:160], None
+    if camps:
+        # 全部 CLAIMED：今日轮次已被领过（本机守护/桌面端/上一轮代领任一路径都算）
+        return "claimed", "今日已领取（活动状态 CLAIMED）", _balance()
+    return "empty", "指纹查询无 CLAIM_BENEFIT 活动（指纹可能已失效，待本机守护刷新）", None
+
+
+def _qd_record_server_claim(status, message, balance):
+    """把服务端代领结果写入状态文件（保留守护推送的 fingerprint 字段，卡片统一渲染）。"""
+    merged = dict(_qd_local_read() or {})
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    merged.update({
+        "date": utc8.strftime("%Y-%m-%d"),
+        "checked": status == "claimed",
+        "message": message,
+        "balance": balance if balance is not None else merged.get("balance"),
+        "claimed_at": now if status == "claimed" else merged.get("claimed_at"),
+        "token_expired": status == "token_expired",
+        "ts": now,
+        "source": "server_claim",
+    })
+    set_qd_local_status(merged)
+
+
+def _qd_token_expired_card(code):
+    return {
+        "name": "qoder",
+        "title": "Qoder 每日领 100 Credits",
+        "brand": "#141414",
+        "brand2": "#4A4A4A",
+        "icon": "qd",
+        "checked": False,
+        "needs_auth": True,
+        "badge": "登录态过期",
+        "hide_auth_link": True,
+        "auth_url": QD_AUTH_URL,
+        "metric_label": "登录态",
+        "metric_value": "已过期",
+        "last_run": _qd_read_last(),
+        "rows": [
+            {"k": "原因", "v": "服务器侧 Qoder token 已失效（HTTP %s），非配置错误" % code},
+            {"k": "如何恢复", "v": "在电脑上双击 push_qoder.bat，自动取本机 Qoder 客户端的最新 token 推上来"},
+            {"k": "为什么自动刷新不行", "v": "刷新 token 会顶掉你本机客户端的登录态，所以服务端只读不刷新"},
+        ],
+        "error": None,
+    }
 
 
 # _qd_claimed_today() 已移除（历史）：早期曾用「本地记录即已领」假报，后改为「桌面端独占」
@@ -2080,12 +2248,9 @@ def set_qd_local_status(data):
 
 
 def _qd_find_daily(payload):
-    """从 campaigns 里挑出「今日」的「每日领 100 Credits」（actionType=CLAIM_BENEFIT）。
-
-    Qoder 每日活动每天 10:00(UTC+8) 刷新一轮，campaignKey 形如 act-YYYYMMDD-XXX，
-    其 startAt 落在当天。每天刷新前接口仍挂着「昨天」已签的那条（claimStatus=CLAIMED），
-    若只看 claimStatus 会把昨天的已签误判成「今日已领」。因此只认 campaignKey 含今日日期
-    （或 startAt 落在今日）的活动；今天的活动尚未开放时返回 None，由调用方显示「今日未开放」。
+    """⚠️ 已弃用（2026-09-27）：实测活动 campaignKey 固定不按天变（如 act-20260923-252），
+    「按今日日期匹配」的假设是错的——今日轮次是否可领以 claimStatus 为准（10:00 刷新），
+    重复领取由 claim 幂等兜底。现留存仅作历史参考，勿再调用。
     """
     items = (payload or {}).get("campaigns") or []
     # 用 UTC+8 日期判定「今天」，与官方「10:00(UTC+8) 刷新」一致
@@ -2151,12 +2316,17 @@ def _qd_window(camp):
 
 
 def _qd_card_from_local(local, exp):
-    """用本机守护（qoder_keeper）上报的数据渲染 Qoder 卡——真实领取结果，诚实映射。"""
+    """用今日领取记录渲染 Qoder 卡——本机守护或服务端代领的真实结果，诚实映射。"""
     checked = bool(local.get("checked"))
     balance = local.get("balance")
     ts = str(local.get("ts") or "")[5:16]
+    src = local.get("source") or "local_keeper"
+    if src == "server_claim":
+        how = "☁️ 服务端代领（指纹由本机守护 qoder_keeper 采集，跨机重放）"
+    else:
+        how = "🤖 本机守护自动领取（Cosy-Machine 设备指纹）"
     rows = [
-        {"k": "领取方式", "v": "🤖 本机守护自动领取（Cosy-Machine 设备指纹）"},
+        {"k": "领取方式", "v": how},
         {"k": "领取状态", "v": "✅ 今日已领" if checked else "⚠️ %s" % (local.get("message") or "未领取")},
     ]
     if balance is not None:
@@ -2217,82 +2387,88 @@ def get_qd_card():
         local = _qd_local_today()
         if local is not None and (local.get("checked") or local.get("token_expired")):
             return _qd_card_from_local(local, exp)
-        d = _qd_api(QD_CAMPAIGN_PATH)
-        camp = _qd_find_daily(d)
-        if not camp:
-            # 服务端令牌不带设备指纹（Cosy-Machine*），campaigns 看不到 CLAIM_BENEFIT 活动——
-            # 领取由本机 qoder_keeper 守护完成（指纹绑定本机硬件，服务端无法代领）。
-            # 卡片诚实显示「等守护上报」，绝不假报已领。
-            lr = _qd_read_last()
+        # ② 服务端视角：有守护推送的指纹 → 跨机重放查询活动（只读展示，领取动作在 run/补签线程）
+        utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+        after_refresh = (utc8.hour, utc8.minute) >= (10, 0)  # 每日活动 10:00(UTC+8) 刷新新轮次
+        fp = _qd_fp()
+        lr = _qd_read_last()
+        camps = []
+        if fp is not None:
+            try:
+                d = _qd_api_fp(QD_CAMPAIGN_PATH, _qd_fp_headers(tok, fp))
+            except urllib.error.HTTPError as e2:
+                if e2.code in (401, 403):
+                    return _qd_token_expired_card(e2.code)
+                raise
+            camps = [c for c in (d.get("campaigns") or [])
+                     if isinstance(c, dict) and c.get("actionType") == "CLAIM_BENEFIT"]
+        claimable = [c for c in camps if (c.get("claimStatus") or "").upper() == "CLAIMABLE"]
+
+        if camps and after_refresh:
+            # 10:00 后接口状态即今日轮次真实状态：CLAIMABLE=待领，CLAIMED=今日已领
+            # （守护/桌面端/服务端代领任一路径先到都算，claim 幂等绝不重复发）
+            camp = claimable[0] if claimable else camps[0]
+            checked = not claimable
+            amount = (camp.get("benefit") or {}).get("amount")
             rows = [
-                {"k": "每日福利", "v": "100 Credits"},
-                {"k": "领取方式", "v": "🤖 本机守护自动领取（qoder_keeper）"},
-                {
-                    "k": "当前状态",
-                    "v": "本机守护今日尚未上报" if not _qd_local_read()
-                         else "守护已上报但今日未领取（见下方详情）",
-                },
-                {
-                    "k": "说明",
-                    "v": "领取需 Cosy-Machine 设备指纹（由本机 Qoder 客户端 runtime-info.exe 生成），"
-                         "服务端无法代领。本机守护每 15 分钟自检，10:05 后自动领取并推送状态到这里。",
-                },
+                {"k": "今日福利", "v": _qd_benefit_text(camp)},
+                {"k": "领取状态", "v": "✅ 今日已领" if checked else "⏳ 待领取（今日轮次已开放）"},
+                {"k": "领取方式", "v": "🤖 本机守护 + ☁️ 服务端代领（指纹重放），先到先得、幂等不重复"},
+                {"k": "有效期限", "v": _qd_validity_text(camp)},
             ]
+            if not checked:
+                rows.append({"k": "怎么领", "v": "点卡片「一键签到」即可服务端代领；10:05 后守护/补签线程也会自动领"})
             if exp:
                 rows.append({"k": "登录态", "v": "有效期至 %s" % str(exp)[:10]})
-            stale_local = _qd_local_read()
-            if stale_local and stale_local.get("date") != (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d"):
-                rows.append({"k": "上次守护上报", "v": "%s %s" % (
-                    str(stale_local.get("ts"))[5:16], stale_local.get("message") or "")})
+            if lr:
+                rows.append({"k": "上次执行", "v": "%s %s" % (
+                    str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️")})
             return {
                 "name": "qoder",
                 "title": "Qoder 每日领 100 Credits",
                 "brand": "#141414",
                 "brand2": "#4A4A4A",
                 "icon": "qd",
-                "checked": False,
-                "badge": "待本机领取",
+                "checked": checked,
+                "badge": None if checked else "待领取",
                 "metric_label": "今日 Credits",
-                "metric_value": "待领取",
+                "metric_value": ("已领 %s" % amount) if checked else "待领取",
                 "last_run": lr,
                 "rows": rows,
                 "error": None,
             }
-        checked = camp.get("claimStatus") == "CLAIMED"
-        benefit = _qd_benefit_text(camp)
-        in_window, window_txt = _qd_window(camp)
-        lr = _qd_read_last()
+
+        # ③ 诚实兜底卡：无指纹 / 未到刷新时间 / 指纹查询无活动
+        if fp is None:
+            status_txt = ("服务端暂无设备指纹，待本机守护（qoder_keeper）上报" if after_refresh
+                          else "今日轮次 10:00(UTC+8) 刷新，尚未开放")
+        elif not camps:
+            status_txt = "指纹查询无 CLAIM_BENEFIT 活动（指纹可能已失效，待本机守护刷新指纹）"
+        else:
+            status_txt = "今日轮次 10:00(UTC+8) 刷新，尚未开放"
         rows = [
-            {"k": "今日福利", "v": benefit},
-            {
-                "k": "领取状态",
-                "v": "✅ 今日已领" if checked else window_txt,
-            },
-            {"k": "有效期限", "v": _qd_validity_text(camp)},
-            {"k": "领取窗口", "v": "每天 10:00(UTC+8)开放领取，至次日 10:00 前可领（以 Qoder 官方公告为准）"},
+            {"k": "每日福利", "v": "100 Credits"},
+            {"k": "领取方式", "v": "🤖 本机守护 + ☁️ 服务端代领（指纹重放），先到先得、幂等不重复"},
+            {"k": "当前状态", "v": status_txt},
+            {"k": "说明", "v": "本机守护每 15 分钟自检并保持指纹最新；10:05 后守护/服务端任一方先跑都能领取"
+                         "（claim 幂等，绝不重复发）。"},
         ]
         if exp:
             rows.append({"k": "登录态", "v": "有效期至 %s" % str(exp)[:10]})
-        if lr:
-            rows.append(
-                {
-                    "k": "上次执行",
-                    "v": "%s %s"
-                    % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️"),
-                }
-            )
-        amount = ((camp.get("benefit") or {}).get("amount"))
-        metric_value = ("已领 %s" % amount) if checked else str(amount)
+        stale_local = _qd_local_read()
+        if stale_local and stale_local.get("date") != utc8.strftime("%Y-%m-%d"):
+            rows.append({"k": "上次守护上报", "v": "%s %s" % (
+                str(stale_local.get("ts"))[5:16], stale_local.get("message") or "")})
         return {
             "name": "qoder",
             "title": "Qoder 每日领 100 Credits",
             "brand": "#141414",
             "brand2": "#4A4A4A",
             "icon": "qd",
-            "checked": checked,
-            "badge": None if (checked or in_window) else window_txt,
+            "checked": False,
+            "badge": "待领取",
             "metric_label": "今日 Credits",
-            "metric_value": metric_value,
+            "metric_value": "待领取",
             "last_run": lr,
             "rows": rows,
             "error": None,
@@ -2300,58 +2476,39 @@ def get_qd_card():
     except urllib.error.HTTPError as e:
         # 401/403 = Qoder 登录态（access token）过期，需要本机重新取一份，非配置错误
         if e.code in (401, 403):
-            return {
-                "name": "qoder",
-                "title": "Qoder 每日领 100 Credits",
-                "brand": "#141414",
-                "brand2": "#4A4A4A",
-                "icon": "qd",
-                "checked": False,
-                "needs_auth": True,
-                "badge": "登录态过期",
-                "hide_auth_link": True,
-                "auth_url": QD_AUTH_URL,
-                "metric_label": "登录态",
-                "metric_value": "已过期",
-                "last_run": _qd_read_last(),
-                "rows": [
-                    {
-                        "k": "原因",
-                        "v": "服务器侧 Qoder token 已失效（HTTP %s），非配置错误" % e.code,
-                    },
-                    {
-                        "k": "如何恢复",
-                        "v": "在电脑上双击 push_qoder.bat，自动取本机 Qoder 客户端的最新 token 推上来",
-                    },
-                    {
-                        "k": "为什么自动刷新不行",
-                        "v": "刷新 token 会顶掉你本机客户端的登录态，所以服务端只读不刷新",
-                    },
-                ],
-                "error": None,
-            }
+            return _qd_token_expired_card(e.code)
         return _card_error("qoder", "Qoder 每日领 100 Credits", "#141414", "#4A4A4A", "qd", e)
     except Exception as e:
         return _card_error("qoder", "Qoder 每日领 100 Credits", "#141414", "#4A4A4A", "qd", e)
 
 
 def run_qd_checkin():
-    """Qoder 每日 100 Credits：领取由本机守护 qoder_keeper 完成，服务端无法代领。
+    """Qoder 每日 100 Credits：三级领取链，先到先得、claim 幂等绝不重复发放。
 
-    2026-09-27 GitHub 摸路结论（推翻旧「桌面端独占」误判）：
-    - 领取走 Campaign 体系（GET /sash/api/v1/me/campaigns → POST .../{id}/claim），
-      真正卡点 = 设备指纹头 Cosy-Machine*，由本机 Qoder 客户端 runtime-info.exe 生成
-      （不带指纹 → campaigns 返回空数组；伪造指纹 → 503 风控）。
-    - 指纹绑定本机硬件，112 服务器无法代领 → 本机 qoder_keeper 守护每 15 分钟自检、
-      10:05 后自动领取并推送状态（HTTP /api/qoder/local-status 优先，SFTP 兜底）。
-    - 本端点只返回当前卡片（守护已上报则显示真实领取结果），绝不假报已领。
+    2026-09-27 架构升级（指纹跨机重放实验验证）：
+    ① 本机守护 qoder_keeper：10:05 后自领并推送状态（Cosy-Machine* 指纹由本机
+       runtime-info.exe 生成，不带指纹 campaigns 返回空、伪造指纹 503 风控）。
+    ② 服务端代领：守护每轮把指纹推到 qoder_local_status.json 的 fingerprint 字段，
+       服务端用同一套头重放即可查活动+领取（指纹不绑 IP 只认值）——即「网页版自动签到」。
+    ③ 都没跑成 → 卡片诚实显示待领取原因。
+    本函数（一键签到/每日定时轮触发）执行 ②；补签线程 _qoder_topup_loop 亦执行 ②。
     """
     tok, _ = _qd_token()
     if not tok:
         raise RuntimeError("未配置 Qoder 登录态（qoder_token.txt 或 QODER_TOKEN）")
     local = _qd_local_today()
-    if not (local and local.get("checked")):
-        _qd_record(False, "领取由本机守护完成；守护尚未上报今日领取结果")
+    if local and local.get("checked"):
+        return get_qd_card()  # 今日已领（守护先到或此前已代领）
+    utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    if (utc8.hour, utc8.minute) < (10, 5):
+        # 10:00 前接口挂着昨天轮次的 CLAIMED，不可当今日已领；10:05 后由守护/补签线程代领
+        _qd_record(False, "今日轮次 10:00(UTC+8) 刷新未到；10:05 后本机守护/服务端自动代领")
+        return get_qd_card()
+    if _qd_fp() is None:
+        _qd_record(False, "服务端暂无设备指纹（qoder_keeper 尚未上报），待本机守护领取")
+        return get_qd_card()
+    status, message, balance = _qd_try_server_claim()
+    _qd_record_server_claim(status, message, balance)
     return get_qd_card()
 
 
@@ -3413,7 +3570,7 @@ ADAPTERS = {
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
 # 注：qoder 不在 AUTO_PLATFORMS——领取由本机守护 qoder_keeper 完成（需设备指纹，服务端无法
 # 代领，详见 run_qd_checkin 注释），服务端卡片只展示守护推送的 qoder_local_status.json。
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "lingxi", "trae", "coze", "jimeng")
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "minimax", "qoder", "lingxi", "trae", "coze", "jimeng")
 # 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
 # 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
 AUTO_RUN = AUTO_PLATFORMS + ("travel",)
@@ -3624,8 +3781,10 @@ def get_detail(name):
                 "history": history,
             },
             "consumption": {
-                "note": ("本机守护领取，当前可用 %s Credits（守护上报于 %s）"
-                         % (local.get("balance"), str(local.get("ts"))[5:16])
+                "note": (("%s领取，当前可用 %s Credits（上报于 %s）"
+                          % ("服务端代领" if (local or {}).get("source") == "server_claim"
+                             else "本机守护",
+                             local.get("balance"), str(local.get("ts"))[5:16]))
                          if local and local.get("balance") is not None
                          else "Qoder Credits 余额以客户端用量面板为准"),
             },
@@ -5840,6 +5999,7 @@ def run_daily_all(scope=None):
         ("travel", "派猫猫旅行"),
         ("qianfan", "百度千帆"),
         ("minimax", "MiniMax Code"),
+        ("qoder", "Qoder"),
         ("linkai", "Link AI"),
         ("lingxi", "WPS 灵犀"),
         ("trae", "Trae Work"),

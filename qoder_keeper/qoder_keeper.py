@@ -260,6 +260,26 @@ def build_headers(tok, fp, cfg, machine_id=None):
     return h
 
 
+def fingerprint_payload(fp, machine_id=None, cfg=None):
+    """把设备指纹浓缩成可跨机重放的数据（随状态推给服务器，服务端代领用）。
+
+    2026-09-27 实验验证：Cosy-Machine* 指纹不绑 IP，本机生成的指纹在服务器上
+    重放同样能看到 CLAIM_BENEFIT 活动——服务端（网页版）代领因此可行。
+    """
+    if not fp:
+        return None
+    machine_os, machine_type_guess = guess_os_type()
+    return {
+        "machineToken": fp.get("machineToken") or "",
+        "machineType": fp.get("machineType") or machine_type_guess,
+        "machineCode": fp.get("machineCode") or "",
+        "machineOS": fp.get("machineOS") or machine_os,
+        "machineId": fp.get("machineId") or machine_id or fp.get("machineCode") or "",
+        "cosyVersion": read_client_version(cfg or {}),
+        "machine_id": machine_id or "",
+    }
+
+
 # ---------------- API ----------------
 
 def api_base(cfg):
@@ -400,18 +420,20 @@ def run_round(cfg, force=False):
     umid = find_umid(cfg)
     fp, fp_note = gen_fingerprint(umid) if umid else (None, "未找到 runtime-info.exe（先跑 probe）")
     machine_id = read_machine_id(cfg)
+    fp_dict = fingerprint_payload(fp, machine_id, cfg)  # 随状态推送，服务端代领靠它
     headers = build_headers(tok, fp, cfg, machine_id)
     base = api_base(cfg)
 
     code, d = qd_api(base, CAMPAIGNS_PATH, headers)
     if code in (401, 403):
         st.update({"date": today_str(), "checked": False, "token_expired": True,
+                   "fingerprint": fp_dict,
                    "message": "Qoder 登录态已过期(HTTP %s)，请更新 token" % code,
                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "source": "local_keeper"})
         save_state(st)
         return st
     if code != 200:
-        st.update({"date": today_str(), "checked": False,
+        st.update({"date": today_str(), "checked": False, "fingerprint": fp_dict,
                    "message": "campaigns 接口异常 HTTP %s" % code,
                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "source": "local_keeper"})
         save_state(st)
@@ -462,6 +484,7 @@ def run_round(cfg, force=False):
         "claimed_at": ((prev.get("claimed_at") or time.strftime("%Y-%m-%d %H:%M:%S"))
                        if checked else prev.get("claimed_at")),
         "token_expired": False,
+        "fingerprint": fp_dict,
         "machine": (fp.get("machineCode") or "")[:12] if fp else "",
         "fp_note": fp_note,
         "umid": umid or "",
@@ -472,6 +495,38 @@ def run_round(cfg, force=False):
     })
     save_state(st)
     return st
+
+
+def ensure_fingerprint_push(cfg):
+    """把最新设备指纹推给服务器（不依赖领取流程）——服务端代领就靠它。
+
+    在守护循环每轮开头调用：指纹没变化时不推送，避免每 15 分钟空转；
+    指纹变化（或服务器刚部署还没拿到指纹）时立刻推。这样即使本机 10:05 前
+    关机，服务端也早有指纹可用。
+    """
+    try:
+        st = load_state()
+        old = st.get("fingerprint") or {}
+        umid = find_umid(cfg)
+        if not umid:
+            return
+        fp, _ = gen_fingerprint(umid)
+        if not fp:
+            return
+        fp_dict = fingerprint_payload(fp, read_machine_id(cfg), cfg)
+        if not fp_dict:
+            return
+        if (old.get("machineToken") == fp_dict.get("machineToken")
+                and old.get("machineCode") == fp_dict.get("machineCode")
+                and st.get("fingerprint_pushed_at")):
+            return  # 指纹没变且推过，跳过
+        st["fingerprint"] = fp_dict
+        st["fingerprint_pushed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        save_state(st)
+        push_if_changed(st, cfg)
+        log("[fp] 已保持服务器侧指纹最新")
+    except Exception as e:
+        log("[fp] 指纹推送异常: %r" % e)
 
 
 def push_if_changed(st, cfg):
@@ -502,6 +557,7 @@ def cmd_loop(cfg):
     log("[loop] 守护启动，每 %d 秒自检一轮" % LOOP_SEC)
     while True:
         try:
+            ensure_fingerprint_push(cfg)  # 每轮先保持服务器侧指纹最新（服务端代领依赖）
             st = load_state()
             done_today = st.get("date") == today_str() and st.get("checked")
             now = utc8_now()

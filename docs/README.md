@@ -159,11 +159,12 @@ Trae 服务端**按设备记账**：`claim` 必须用与登录态一致的**你�
 
 > 这一步**不能省略、也不能用别人的 id**。文件已被 gitignore，只存在你本地/服务器。
 
-### 5. Qoder：每日 100 Credits 由本机守护自动领
-领取需 **Cosy-Machine 设备指纹**（由本机 Qoder 客户端自带的 `resources/umid/runtime-info.exe` 实时生成；不带指纹 → 活动接口返回空数组，伪造 → 503 风控），因此**服务器无法代领**，由装了 Qoder 客户端/CLI 的本机跑守护：
+### 5. Qoder：每日 100 Credits（本机守护 + 服务端代领，双保险）
+领取需 **Cosy-Machine 设备指纹**（由本机 Qoder 客户端自带的 `resources/umid/runtime-info.exe` 实时生成；不带指纹 → 活动接口返回空数组，伪造 → 503 风控）。2026-09-27 实验验证：**指纹不绑 IP、可跨机重放**——守护把指纹随状态推给服务器后，服务器即可代领：
 - 本机进入 `qoder_keeper/`：先跑 `probe` 确认 token / 指纹 / 活动可见性，再双击 `install_keeper.bat` 装开机自启（或手动 `run_keeper.bat`）；
-- 守护每 15 分钟自检，每天 10:05 后自动 `GET campaigns → POST claim`（服务端 `replayed` 幂等，不会重复发放），领取后把「已领 + 可用 Credits」推送服务器（HTTP `/api/qoder/local-status` 优先，SFTP 兜底）；
-- 服务器卡片只展示守护上报的真实结果：守护没上报就诚实显示「待本机领取」，绝不假报。
+- 守护每 15 分钟自检：保持服务器侧指纹最新 + 每天 10:05 后本机自领（`GET campaigns → POST claim`，服务端 `replayed` 幂等绝不重复发放），并推送「已领 + 可用 Credits」（HTTP `/api/qoder/local-status` 优先，SFTP 兜底）；
+- **服务端代领**：服务器每天 10:05~13:00 用守护推送的指纹重放自动领（`_qoder_topup_loop` 补签线程），「一键签到」按钮也可手动触发——**本机没开机也能领**；
+- 卡片诚实映射：领取方式区分「🤖 本机守护」/「☁️ 服务端代领」，没指纹/没登录态就显示真实原因，绝不假报。
 
 ### 6. 成长中心 / 每日任务：WorkBuddy 卡内弹窗
 WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，点击在**当前页面弹窗**打开（与「派猫猫旅行」同一套卡内弹窗，不跳页），可一键完成/领取。它们复用 WorkBuddy 登录态，随 WorkBuddy 开关联动。
@@ -333,7 +334,7 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 - 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
 - **🔑 2026-09-27 破局：真正卡点 = 设备指纹头 `Cosy-Machine*`**（`MachineToken/Type/Code/Id/OS`），由本机 Qoder 客户端/CLI 自带的 `resources/umid/runtime-info.exe` 实时生成（阿里 securityguard SDK，`echo {"account":""} | runtime-info.exe` → stdout JSON）。**不带指纹 → campaigns 返回空数组（看似「没活动」，即旧结论「服务端拿不到入口」的真实根因）；伪造指纹 → 503 RISK_DEPENDENCY_UNAVAILABLE**。实测带指纹后 CLAIM_BENEFIT 活动立即可见并 claim 成功（+100，余额 597）。
 - **架构**：指纹绑定本机硬件 → 服务端不可代领。本机 `qoder_keeper/qoder_keeper.py`（probe / run / --loop）负责真实领取，经 HTTP `/api/qoder/local-status?k=` 或 SFTP 把 `qoder_local_status.json` 推给服务器；`get_qd_card()` 优先渲染守护上报（`_qd_local_today`），无上报则诚实显示「待本机领取」。活动 key 不按天变（如 act-20260923-252）而轮次每日 10:00(UTC+8) 刷新，故领取逻辑为「领任何 CLAIMABLE 项」。
-- 历史：早期「本地记录即已领」误判 → 改「桌面端独占」诚实提示 → 2026-09-27 二次推翻为「本机守护自动领取」。`_qoder_topup_loop` 已停用。
+- 历史：早期「本地记录即已领」误判 → 改「桌面端独占」诚实提示 → 2026-09-27 发现**指纹可跨机重放**，升级为「本机守护 + 服务端代领」双路径（claim 幂等不重复发放），`_qoder_topup_loop` 已恢复为服务端代领线程。
 
 **Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`）：
 - 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。
