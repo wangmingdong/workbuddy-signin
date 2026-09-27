@@ -17,7 +17,7 @@
 | WorkBuddy | workbuddy.cn | 100 积分 | `token.info` | 打开一次客户端自动续期 |
 | 百度千帆 | qianfan.baidu.com | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
 | MiniMax Code | platform.minimax.io | 400 智点 | `mm_web_token.json` | 约 40 天，过期重新登录 |
-| Qoder | qoder.com | 100 Credits（桌面端手动领） | `qoder_token.txt` | 约 1 个月，失效重新取出 |
+| Qoder | qoder.com | 100 Credits（本机守护自动领） | `qoder_token.txt` | 约 1 个月，失效重新取出 |
 | Link AI | console.link-ai.tech | 需网页手动签到后卡片确认（接口强制图片验证码，服务端无法代签） | `linkai_token.txt` | 不定期 |
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
@@ -159,11 +159,11 @@ Trae 服务端**按设备记账**：`claim` 必须用与登录态一致的**你�
 
 > 这一步**不能省略、也不能用别人的 id**。文件已被 gitignore，只存在你本地/服务器。
 
-### 5. Qoder：每日 100 Credits 需桌面端手动领
-官方明文规定「领取渠道：仅限 Qoder 桌面端」。服务端令牌（哪怕从桌面导出的 PAT）调 `qcs/config/resolve` 返回空，拿不到领取入口，**服务端无法代领**。因此：
-- 卡片诚实标注「🔧 仅限 Qoder 桌面端领取」，不再谎报已领；
-- `qoder_token.txt` 仅用于展示状态/续期，**不作为领取凭据**；
-- 那 100 Credits 请每天在桌面 Qoder 客户端点一下「领取」。
+### 5. Qoder：每日 100 Credits 由本机守护自动领
+领取需 **Cosy-Machine 设备指纹**（由本机 Qoder 客户端自带的 `resources/umid/runtime-info.exe` 实时生成；不带指纹 → 活动接口返回空数组，伪造 → 503 风控），因此**服务器无法代领**，由装了 Qoder 客户端/CLI 的本机跑守护：
+- 本机进入 `qoder_keeper/`：先跑 `probe` 确认 token / 指纹 / 活动可见性，再双击 `install_keeper.bat` 装开机自启（或手动 `run_keeper.bat`）；
+- 守护每 15 分钟自检，每天 10:05 后自动 `GET campaigns → POST claim`（服务端 `replayed` 幂等，不会重复发放），领取后把「已领 + 可用 Credits」推送服务器（HTTP `/api/qoder/local-status` 优先，SFTP 兜底）；
+- 服务器卡片只展示守护上报的真实结果：守护没上报就诚实显示「待本机领取」，绝不假报。
 
 ### 6. 成长中心 / 每日任务：WorkBuddy 卡内弹窗
 WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，点击在**当前页面弹窗**打开（与「派猫猫旅行」同一套卡内弹窗，不跳页），可一键完成/领取。它们复用 WorkBuddy 登录态，随 WorkBuddy 开关联动。
@@ -328,12 +328,12 @@ python3 /opt/wb-checkin/web_server.py --daily   # 手动跑一次签到（前台
 - 接口：`POST https://platform.minimax.io/api/v1/credits/...`（每日 00:00 自动刷新 400 智点，积分跨 Agent/Code/API 通用——即 MiniMax Agent 与 MiniMax Code 是同一积分池，故不单独成卡）
 - 凭据：`mm_web_token.json`（JWT，约 40 天）
 
-**Qoder**（对应 `get_qd_card` / `run_qd_checkin`）：
-- 活动：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`
+**Qoder**（对应 `get_qd_card` / `run_qd_checkin` + 本机守护 `qoder_keeper/`）：
+- 活动：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`；领取：`POST .../campaigns/{id}/claim`（`replayed` 幂等）
 - 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
-- **🔧 每日 100 Credits 官方明文「仅限 Qoder 桌面端领取」**：服务端令牌（哪怕桌面导出的 PAT）调 `qcs/config/resolve`（`qodercli-feature-gates`）返回**空**，拿不到领取入口，故服务端脚本**无法代领**。卡片诚实标注「🔧 仅限 Qoder 桌面端领取」，不再谎报已领；Qoder 也已移出自动签到列表。
-- **处理方式**：那 100 Credits 需每天在桌面 Qoder 客户端手动点一下。`qoder_token.txt` 仅用于状态展示/续期，**不作为领取凭据**。
-- 早期曾误判「领完即查不到、以本地记录判已领 + 常驻补签线程」——已推翻，移除 `_qoder_topup_loop` 与「本地记录判已领」逻辑，改为诚实提示桌面端独占。
+- **🔑 2026-09-27 破局：真正卡点 = 设备指纹头 `Cosy-Machine*`**（`MachineToken/Type/Code/Id/OS`），由本机 Qoder 客户端/CLI 自带的 `resources/umid/runtime-info.exe` 实时生成（阿里 securityguard SDK，`echo {"account":""} | runtime-info.exe` → stdout JSON）。**不带指纹 → campaigns 返回空数组（看似「没活动」，即旧结论「服务端拿不到入口」的真实根因）；伪造指纹 → 503 RISK_DEPENDENCY_UNAVAILABLE**。实测带指纹后 CLAIM_BENEFIT 活动立即可见并 claim 成功（+100，余额 597）。
+- **架构**：指纹绑定本机硬件 → 服务端不可代领。本机 `qoder_keeper/qoder_keeper.py`（probe / run / --loop）负责真实领取，经 HTTP `/api/qoder/local-status?k=` 或 SFTP 把 `qoder_local_status.json` 推给服务器；`get_qd_card()` 优先渲染守护上报（`_qd_local_today`），无上报则诚实显示「待本机领取」。活动 key 不按天变（如 act-20260923-252）而轮次每日 10:00(UTC+8) 刷新，故领取逻辑为「领任何 CLAIMABLE 项」。
+- 历史：早期「本地记录即已领」误判 → 改「桌面端独占」诚实提示 → 2026-09-27 二次推翻为「本机守护自动领取」。`_qoder_topup_loop` 已停用。
 
 **Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`）：
 - 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。

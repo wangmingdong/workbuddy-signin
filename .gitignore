@@ -108,3 +108,11 @@ huawei/hw_autopush.out.log
 huawei/hw_pids.txt
 huawei/hw_index.js
 
+# Qoder 本机守护运行产物（token/配置/日志/状态，等同账号密码与本机凭据，禁止入库）
+qoder_keeper/qoder_token.txt
+qoder_keeper/config.json
+qoder_keeper/qoder_keeper.log
+qoder_keeper/qoder_keeper.out.log
+qoder_keeper/qoder_state.json
+qoder_local_status.json
+
