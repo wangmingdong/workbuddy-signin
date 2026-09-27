@@ -61,6 +61,7 @@ try:
         HW_SVG,
         QD_SVG,
         JIMENG_SVG,
+        OIICII_SVG,
     )
 except Exception:
     CENTER_SVG = ""
@@ -73,6 +74,7 @@ except Exception:
     HW_SVG = ""
     QD_SVG = ""
     JIMENG_SVG = ""
+    OIICII_SVG = ""
 
 # WorkBuddy 成长中心图标（紫色渐变火箭，对应成长中心品牌色 #7C5CFF）
 GROWTH_SVG = r"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="grGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#9D7BFF"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#grGrad)"/><path d="M32 10c6 5 7 14 4 23l-4 7h0l-4-7c-3-9-2-18 4-23z" fill="#fff"/><circle cx="32" cy="24" r="4.5" fill="#7C5CFF"/><path d="M24 33l-6 9 7-4z" fill="#fff"/><path d="M40 33l6 9-7-4z" fill="#fff"/><path d="M29 40l3 12 3-12z" fill="#FFE255"/><circle cx="47" cy="18" r="2.6" fill="#fff"/><circle cx="17" cy="21" r="1.8" fill="#fff"/><circle cx="44" cy="40" r="1.6" fill="#fff"/></svg>"""
@@ -1347,6 +1349,264 @@ if not LINKAI_TOKEN:
             LINKAI_TOKEN = _f.read().strip()
     except Exception:
         LINKAI_TOKEN = ""
+
+# ============================ OiiOii（oiioii.tv / oiioii.ai）每日签到适配器 ============================
+# 鉴权：Supabase 用户 JWT（Authorization: Bearer {access_token}）；账户体系跑在
+#   supabase 项目 ugvuzestypbmcfurrbd 上，iss=https://ugvuzestypbmcfurrbd.supabase.co/auth/v1
+# 状态查询：POST https://api.oiioii.tv/points/buckets/query
+#           → data.buckets[]；type=="sign_in" 且 created_at 日期==今天 ⇒ 今日已签
+#           → 可用积分 = Σ buckets[].available_amount
+# 签到领取：POST https://api.oiioii.tv/points/add  body {"type":"sign_in"}
+#   ⚠️ 该接口强制要求腾讯云人机验证（CAPTCHA_REQUIRED），服务端无法自动代签；
+#      故走「状态展示 + 去官网一键签到 + 我已在网页签到本地确认」的诚实模式，绝不伪造已签。
+# 凭据优先级：环境变量 OIICII_TOKEN > oiioii_token.txt（静态 access token）
+#   持久化：oiioii_session.json（access_token + refresh_token），到期前自动用 refresh_token 续期
+OIICII_API = "https://api.oiioii.tv"
+OIICII_SUPABASE_URL = "https://ugvuzestypbmcfurrbd.supabase.co"
+# Supabase anon key（公开，role=anon，仅用于 refresh_token 换发），非私密
+OIICII_SUPABASE_ANON = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVndnV6"
+                        "ZXN0eXlwYm1jZnVycmJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyMTU4NTEsImV4cCI6MjA3Njc5"
+                        "MTg1MX0.Z1qdxtK0PLF5NV1yXrI9s_W2Hurdxo143DBzuUuajh0")
+OIICII_STATE_FILE = os.path.join(BASE_DIR, "oiioii_last_run.json")
+OIICII_SESSION_FILE = os.path.join(BASE_DIR, "oiioii_session.json")
+OIICII_TOKEN = os.environ.get("OIICII_TOKEN", "")
+if not OIICII_TOKEN:
+    try:
+        with open(os.path.join(BASE_DIR, "oiioii_token.txt"), "r", encoding="utf-8") as _f:
+            OIICII_TOKEN = _f.read().strip()
+    except Exception:
+        OIICII_TOKEN = ""
+
+
+def _jwt_exp(token):
+    """从 JWT 的 payload 段取出 exp（秒级时间戳），失败返回 None。"""
+    try:
+        import base64, time
+        seg = token.split(".")[1]
+        seg += "=" * (-len(seg) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(seg))
+        return payload.get("exp")
+    except Exception:
+        return None
+
+
+def _oiioii_refresh(refresh_token):
+    """用 Supabase refresh_token 换发新的 access_token（+ 新 refresh_token）。"""
+    url = OIICII_SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token"
+    headers = {
+        "apikey": OIICII_SUPABASE_ANON,
+        "Authorization": "Bearer " + OIICII_SUPABASE_ANON,
+        "Content-Type": "application/json",
+    }
+    data = json.dumps({"refresh_token": refresh_token, "grant_type": "refresh_token"}).encode()
+    req = urllib.request.Request(url, data=data, method="POST", headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _oiioii_access_token():
+    """返回可用的 access token：优先 session.json（带 refresh_token 自动续期），兜底 oiioii_token.txt。"""
+    import time
+    try:
+        if os.path.exists(OIICII_SESSION_FILE):
+            with open(OIICII_SESSION_FILE, "r", encoding="utf-8") as f:
+                sess = json.load(f)
+            at = sess.get("access_token")
+            if at and _jwt_exp(at) and _jwt_exp(at) > time.time() + 120:
+                return at
+            rt = sess.get("refresh_token")
+            if rt:
+                try:
+                    new = _oiioii_refresh(rt)
+                    if new.get("access_token"):
+                        sess["access_token"] = new["access_token"]
+                        if new.get("refresh_token"):
+                            sess["refresh_token"] = new["refresh_token"]
+                        with open(OIICII_SESSION_FILE, "w", encoding="utf-8") as f:
+                            json.dump(sess, f)
+                        return new["access_token"]
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return OIICII_TOKEN
+
+
+def _oiioii_api(path, method="GET", body=None, token=None):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if token:
+        headers["Authorization"] = "Bearer %s" % token
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(OIICII_API + path, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        txt = e.read().decode("utf-8", "replace")
+        try:
+            return json.loads(txt)
+        except Exception:
+            return {"code": "HTTP_%s" % e.code, "error": txt[:200]}
+    except Exception as e:
+        return {"code": "ERR", "error": str(e)}
+
+
+def _oiioii_buckets(token):
+    d = _oiioii_api("/points/buckets/query", "POST", {}, token)
+    if (d or {}).get("code") != "SUCCESS":
+        raise RuntimeError("查询积分桶失败：" + str((d or {}).get("error") or d))
+    return ((d.get("data") or {}).get("buckets") or [])
+
+
+def _oiioii_add(token):
+    return _oiioii_api("/points/add", "POST", {"type": "sign_in"}, token)
+
+
+def _oiioii_record(ok, msg):
+    _append_rec(
+        OIICII_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": ok,
+            "message": msg,
+            "source": "auto",
+        },
+        30,
+    )
+
+
+def _oiioii_manual_signed_today():
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    for rec in _load_json_records(OIICII_STATE_FILE, 30):
+        if isinstance(rec, dict) and rec.get("manual_signed") and rec.get("date") == today:
+            return True
+    return False
+
+
+def set_oiioii_manual_signed():
+    if not _oiioii_access_token():
+        raise RuntimeError("未配置 OiiOii 登录令牌（oiioii_token.txt 或 OIICII_TOKEN）")
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    _append_rec(
+        OIICII_STATE_FILE,
+        {
+            "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ok": True,
+            "manual_signed": True,
+            "date": today,
+            "message": "用户在网页手动签到后确认（服务端无法自动代签）",
+            "source": "manual",
+        },
+        30,
+    )
+    return get_oiioii_card()
+
+
+def get_oiioii_card():
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    token = _oiioii_access_token()
+    if not token:
+        return _auth_fail_card(
+            "oiioii", "OiiOii AI 每日签到", "#FF6B9D", "#8B5CF6", "oiioii",
+            RuntimeError("未配置 OiiOii 登录令牌"),
+            [("如何配置",
+              "把 OiiOii 的登录 JWT（浏览器 F12→Network 里签到请求头 Authorization: Bearer 后那段）"
+              "写入服务器 oiioii_token.txt，或在设置页粘贴；JWT 约 7 天有效，想长期自动可再提供 Supabase session.json 做续期")],
+        )
+    try:
+        buckets = _oiioii_buckets(token)
+        signed_today = any(
+            b.get("type") == "sign_in" and str(b.get("created_at", ""))[:10] == today
+            for b in buckets
+        )
+        total_available = round(sum(float(b.get("available_amount") or 0) for b in buckets), 2)
+        manual = _oiioii_manual_signed_today()
+        checked = bool(signed_today or manual)
+        # 最近的签到桶日期（用于展示）
+        sign_dates = sorted(
+            str(b.get("created_at", ""))[:10]
+            for b in buckets if b.get("type") == "sign_in" and b.get("created_at")
+        )
+        last_sign = sign_dates[-1] if sign_dates else "—"
+        lr = _oiioii_read_last()
+        rows = [
+            {
+                "k": "签到状态",
+                "v": ("✅ 今日已签" if signed_today
+                      else ("✅ 今日已签（网页手动确认）" if manual
+                            else "需网页手动签到（人机验证）")),
+            },
+            {"k": "可用积分", "v": "%s 分" % total_available},
+            {"k": "最近签到", "v": last_sign},
+        ]
+        if manual:
+            rows.append(
+                {
+                    "k": "说明",
+                    "v": "你已在网页完成签到并确认；服务器无法自动代签，此状态为本地记录，每日重置",
+                }
+            )
+        return {
+            "name": "oiioii",
+            "title": "OiiOii AI 每日签到",
+            "brand": "#FF6B9D",
+            "brand2": "#8B5CF6",
+            "icon": "oiioii",
+            "checked": checked,
+            "needs_auth": False,
+            "manual_signed_today": manual,
+            "manual_cta_url": "https://oiioii.ai",
+            "manual_cta_label": "🌐 去官网签到",
+            "badge": (None if checked else "需手动"),
+            "metric_label": "可用积分",
+            "metric_value": total_available,
+            "credit": {"balance": total_available, "unit": "积分", "expiring": None},
+            "last_run": lr,
+            "rows": rows,
+            "error": (None if checked else "需网页手动签到（腾讯人机验证，服务端无法自动代签）"),
+        }
+    except Exception as e:
+        return _auth_fail_card(
+            "oiioii", "OiiOii AI 每日签到", "#FF6B9D", "#8B5CF6", "oiioii", e,
+            [("如何恢复",
+              "OiiOii 登录令牌可能已失效：重新从浏览器复制 Authorization: Bearer 后的 JWT，"
+              "更新服务器上的 oiioii_token.txt 或在设置页粘贴，再点「重新检查」")],
+        )
+
+
+def _oiioii_read_last():
+    try:
+        with open(OIICII_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list) and data:
+            return data[-1]
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return None
+
+
+def run_oiioii_checkin():
+    """OiiOii 签到：best-effort 尝试自动领取，遇人机验证则诚实返回「需网页手动签到」，绝不伪造成功。"""
+    token = _oiioii_access_token()
+    if not token:
+        raise RuntimeError("未配置 OiiOii 登录令牌（oiioii_token.txt 或 OIICII_TOKEN）")
+    r = _oiioii_add(token)
+    code = (r or {}).get("code")
+    if code == "SUCCESS":
+        _oiioii_record(True, "签到成功（接口返回 SUCCESS）")
+    elif code == "CAPTCHA_REQUIRED":
+        _oiioii_record(False, "需完成腾讯人机验证，服务端无法自动代签（请网页手动签到）")
+        return get_oiioii_card()  # 诚实返回：不谎报成功
+    else:
+        _oiioii_record(False, "签到返回异常：" + str(r)[:200])
+        raise RuntimeError("OiiOii 签到失败：" + str((r or {}).get("error") or code))
+    return get_oiioii_card()
 
 
 # ============================ 华为码道（DevCloud）签到适配器 ============================
@@ -3076,6 +3336,7 @@ ADAPTERS = {
     "huawei": get_hw_card,
     "coze": get_coze_card,
     "jimeng": get_jimeng_card,
+    "oiioii": get_oiioii_card,
 }
 
 # 卡片分组标签（与上面顺序一致）：auto = 全自动；其余 = 需偶尔维护凭据
@@ -3475,6 +3736,7 @@ OFFICIAL_SITES = {
     "trae":      ("https://www.trae.cn/events/code-fission/J237PUTE7HES?utm_source=copy_link&utm_medium=code_fission", "Trae 官网"),
     "coze":      ("https://www.coze.cn/", "扣子 Coze 官网"),
     "jimeng":    ("https://jimeng.jianying.com/", "即梦 AI 官网"),
+    "oiioii":    ("https://oiioii.ai", "OiiOii AI 创作端"),
 }
 
 
@@ -3564,6 +3826,8 @@ def run_checkin_for(name):
         return run_coze_checkin()
     if name == "jimeng":
         return run_jimeng_checkin()
+    if name == "oiioii":
+        return run_oiioii_checkin()
     if name == "lingxi":
         return run_lx_checkin()
     if name == "linkai":
@@ -3938,6 +4202,7 @@ function esc(s){ s=String(s==null?"":s); return s.replace(/&/g,"&amp;").replace(
 
 var ICON_WB = `__WB_SVG__`;
 var ICON_JIMENG = `__JIMENG_SVG__`;
+var ICON_OIICII = `__OIICII_SVG__`;
 var ICON_QF = `__QF_SVG__`;
 var ICON_MM = `__MM_SVG__`;
 var ICON_TRAE = `__TRAE_SVG__`;
@@ -3958,6 +4223,7 @@ function iconFor(it){
   if(it.icon==="qd") return ICON_QD;
   if(it.icon==="coze") return '<img class="cilogo" src="data:image/png;base64,__COZE_LOGO_B64__">';
   if(it.icon==="jimeng") return ICON_JIMENG;
+  if(it.icon==="oiioii") return ICON_OIICII;
   if(it.icon==="growth") return ICON_GROWTH;
   if(it.icon==="daily") return ICON_DAILY;
   if(it.icon==="travel") return '<div style="font-size:20px">🧳</div>';
@@ -4724,7 +4990,7 @@ function showMain(){
   var el=$('focus'); if(el){ el.style.display='none'; el.innerHTML=''; }
   load();
 }
-var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",jimeng:"即梦 AI",};
+var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",jimeng:"即梦 AI",oiioii:"OiiOii AI",};
 function focusSettings(){
   var el=$('focus');
   el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
@@ -4926,10 +5192,11 @@ function recheck(name, btn){
 }
 // Link AI 等手动平台：用户在网页签到后确认，本地记录今日已签（服务器无法自动代签）
 function markManualSigned(name, btn){
-  if(!confirm("确认你已在网页（link-ai.tech/console/account）完成今日签到？\\n确认后本卡片将标记为「今日已签」（服务器无法自动代签，仅本地记录）。")) return;
+  var label = (window.PLATFORMS && PLATFORMS[name]) ? PLATFORMS[name] : name;
+  if(!confirm("确认你已在「"+label+"」对应网页完成今日签到？\\n确认后本卡片将标记为「今日已签」（服务器无法自动代签，仅本地记录）。")) return;
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>记录中…'; }
-  api("api/linkai/manual-signed",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})}).then(function(r){
-    if(r&&r.ok){ load(function(){ showMsg("✅ 已记录：今日 Link AI 网页签到完成","ok"); }); }
+  api("api/"+name+"/manual-signed",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})}).then(function(r){
+    if(r&&r.ok){ load(function(){ showMsg("✅ 已记录：今日 "+label+" 网页签到完成","ok"); }); }
     else { if(btn){btn.disabled=false; btn.textContent='重试';} load(function(){ showMsg("记录失败："+((r&&r.error)||"未知错误"),"err"); }); }
   }).catch(function(e){ if(btn){btn.disabled=false; btn.textContent='重试';} load(function(){ showMsg("网络错误："+((e&&e.message)||e),"err"); }); });
 }
@@ -5016,6 +5283,7 @@ PAGE = PAGE.replace("__LX_SVG__", LX_SVG)
 PAGE = PAGE.replace("__HW_SVG__", HW_SVG)
 PAGE = PAGE.replace("__QD_SVG__", QD_SVG)
 PAGE = PAGE.replace("__JIMENG_SVG__", JIMENG_SVG)
+PAGE = PAGE.replace("__OIICII_SVG__", OIICII_SVG)
 PAGE = PAGE.replace("__GROWTH_SVG__", GROWTH_SVG)
 PAGE = PAGE.replace("__DAILY_SVG__", DAILY_SVG)
 PAGE = PAGE.replace("__COZE_LOGO_B64__", COZE_LOGO_B64)
@@ -5410,6 +5678,18 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
+        if u.path == "/api/oiioii/manual-signed":
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                card = set_oiioii_manual_signed()
+                self._json(200, {"ok": True, "card": card,
+                                 "message": "✅ 已记录：今日 OiiOii 网页签到完成"})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         self._send(404, "not found", "text/plain; charset=utf-8")
 
     def log_message(self, fmt, *args):
@@ -5476,6 +5756,7 @@ def run_daily_all(scope=None):
         ("trae", "Trae Work"),
         ("coze", "Coze 扣子"),
         ("jimeng", "即梦 AI"),
+        ("oiioii", "OiiOii AI"),
         ("huawei", "华为码道"),
     ]
     if scope == "auto":

@@ -67,6 +67,9 @@ trae_device_id.txt
 trae_cookie.txt
 trae_cookie.json
 linkai_token.txt
+# OiiOii 登录态（Supabase access token / session，等同账号密码，禁止入库）
+oiioii_token.txt
+oiioii_session.json
 lx_cookie.txt
 coze_cookie.txt
 jimeng_cookie.txt

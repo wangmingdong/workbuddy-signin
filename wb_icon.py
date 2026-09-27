@@ -21,3 +21,6 @@ QD_SVG = r"""<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect x
 
 # 即梦 AI（Dreamina / 剪映）每日积分自动领取
 JIMENG_SVG = r"""<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="jmGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B6CFF"/><stop offset="1" stop-color="#7B5CFF"/></linearGradient></defs><rect x="0.5" y="0.5" width="63" height="63" rx="14" fill="url(#jmGrad)"/><text x="32" y="43" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="34" font-weight="700" fill="#ffffff" text-anchor="middle">即</text></svg>"""
+
+# OiiOii（oiioii.tv / oiioii.ai，AI 动画 Agent 平台）每日签到
+OIICII_SVG = r"""<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="oiGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF6B9D"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient></defs><rect x="0.5" y="0.5" width="63" height="63" rx="14" fill="url(#oiGrad)"/><text x="32" y="43" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="28" font-weight="700" fill="#ffffff" text-anchor="middle">Oi</text></svg>"""
