@@ -1,8 +1,7 @@
 @echo off
-chcp 936 >nul
 setlocal
 cd /d "%~dp0"
-title 安装 Qoder 签到守护（开机自启）
+title Install auto-start for Qoder keeper
 
 echo ================================================================
 echo    Install auto-start for Qoder daily 100 Credits keeper
@@ -33,7 +32,7 @@ echo   * Every day after 10:05 it claims Qoder 100 Credits and
 echo     pushes the result to the checkin center card.
 echo   * To cancel: delete WbQoderKeeper.vbs in the Startup folder above.
 echo.
-echo NOTE: 前置条件（首次先跑一次 probe 确认）:
+echo NOTE: first run "probe" once to verify:
 echo       D:\Dev\python.exe -X utf8 qoder_keeper.py probe
 echo.
 pause
