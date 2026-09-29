@@ -1962,6 +1962,27 @@ QD_AUTH_URL = "https://qoder.com/account/profile"
 # 早于刷新时间。故起一个常驻线程：10:05~13:00 每 30 分钟用守护推送的指纹尝试「服务端代领」
 # 一次，直到当日已领（本机守护/服务端任一路径先到都行，claim 幂等）或窗口结束。
 _qoder_wake = threading.Event()
+# qoder 代领成功的通知去重（按 UTC+8 日期，避免每 30 分钟补签轮重复推送）
+_qoder_notified = {"date": None}
+
+
+def _qoder_notify_claimed(balance):
+    """qoder 服务端代领成功后，单独推一条通知（标题即 qoder，不和主签到 summary 混）。"""
+    url = SETTINGS.get("notify_webhook", "")
+    if not url or not SETTINGS.get("notify_on"):
+        return
+    note = "服务端代领成功 +100 Credits"
+    if balance is not None:
+        note += "（可用 %s）" % balance
+    payload = {
+        "title": "Qoder 每日 100 Credits 已领取",
+        "results": [{"label": "Qoder 每日 100 Credits", "s": "ok", "note": note}],
+        "ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    try:
+        _send_webhook(url, payload)
+    except Exception as e:
+        print("[notify] qoder 推送失败: %s" % e)
 
 
 def _qoder_topup_loop():
@@ -1977,9 +1998,14 @@ def _qoder_topup_loop():
                 tok, _ = _qd_token()
                 if tok and _qd_fp() is not None:
                     status, message, balance = _qd_try_server_claim()
-                    if status in ("claimed", "token_expired"):
-                        _qd_record_server_claim(status, message, balance)
-                    print("[qoder-topup] %s: %s" % (status, message))
+                if status in ("claimed", "token_expired"):
+                    _qd_record_server_claim(status, message, balance)
+                    if status == "claimed":
+                        today = utc8.strftime("%Y-%m-%d")
+                        if _qoder_notified.get("date") != today:
+                            _qoder_notify_claimed(balance)
+                            _qoder_notified["date"] = today
+                print("[qoder-topup] %s: %s" % (status, message))
         except Exception as e:
             print("[qoder-topup] 异常: %r" % e)
         time.sleep(1800)
