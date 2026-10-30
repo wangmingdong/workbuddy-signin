@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import time
+import datetime
 import hashlib
 import urllib.request
 import urllib.error
@@ -488,6 +489,64 @@ def get_streak(sess):
     return _get(sess, GROWTH_BASE + "/streak")
 
 
+def get_heatmap(sess):
+    """活跃日历：cells[{date, score}] + today{date, score}（服务端时区，避免本机时钟误差）。"""
+    return _get(sess, GROWTH_BASE + "/heatmap")
+
+
+def get_travel_status(sess):
+    """Buddy 旅行状态：state=idle/traveling/arrived + daily_limit_reached。
+
+    开 Buddy 盲盒会覆盖旅行记录，所以开盒前必须先确认 state 为 idle。
+    """
+    return _get(sess, GROWTH_BASE + "/buddy/travel/status")
+
+
+MAKEUP_MAX_PER_RUN = 1
+
+
+def _makeup_candidates(streak_body, heatmap_body):
+    """返回当月真正断登、且尚未补登的日期（最近的优先）。
+
+    ⚠️ /streak 的 makeup_dates 是**已补登**记录，不能当待办清单；断点要靠
+    /heatmap 里 score == 0 的日期反推（补登日 score 为 10 的基准分）。
+    任何结构异常都返回 []——宁可不动补登卡，也不靠猜消耗卡。
+    """
+    try:
+        today = datetime.date.fromisoformat((heatmap_body.get("today") or {}).get("date") or "")
+        launch = datetime.date.fromisoformat(streak_body.get("launch_date") or "")
+        made_up = {datetime.date.fromisoformat(x)
+                   for x in ((streak_body.get("streak") or {}).get("makeup_dates") or [])}
+        # 官方规则：仅当月、今天之前、活动上线之后可补
+        start = max(today.replace(day=1), launch, datetime.date(2026, 6, 17))
+        scores = {}
+        for cell in heatmap_body.get("cells") or []:
+            if not isinstance(cell, dict):
+                return []
+            day = datetime.date.fromisoformat(cell.get("date") or "")
+            score = cell.get("score")
+            if isinstance(score, bool) or not isinstance(score, (int, float)) or score < 0:
+                return []
+            if day in scores and scores[day] != score:
+                return []
+            scores[day] = score
+        return sorted((d.isoformat() for d, score in scores.items()
+                       if start <= d < today and score == 0 and d not in made_up), reverse=True)
+    except Exception:
+        return []
+
+
+def makeup_cards_balance(streak_body):
+    """补登卡余额：兼容 {"makeup_cards":{"balance":n}} 与 {"makeup_cards":n} 两种形状。"""
+    obj = streak_body.get("makeup_cards")
+    if isinstance(obj, dict):
+        obj = obj.get("balance")
+    try:
+        return int(obj or 0)
+    except Exception:
+        return 0
+
+
 def get_energy(sess):
     return _get(sess, GROWTH_BASE + "/energy")
 
@@ -530,6 +589,8 @@ def get_daily_card(sess):
         st = get_streak(sess)
         streak = st.get("streak") or {}
         mk = st.get("makeup_cards") or {}
+        if not isinstance(mk, dict):
+            mk = {"balance": mk}  # 兼容 {"makeup_cards": 2} 的数字形状
         rs = st.get("redemption_status") or {}
         en = get_energy(sess)
         lo = get_lottery(sess)
@@ -571,17 +632,30 @@ def get_daily_card(sess):
             if can:
                 todo += 1
 
-        # 3) 补登卡
-        md = streak.get("makeup_dates") or []
+        # 3) 补登卡：makeup_dates 是已补登记录，断点要从热力日历 score==0 反推
+        cards = makeup_cards_balance(st)
+        gaps = []
+        gap_err = None
+        try:
+            gaps = _makeup_candidates(st, get_heatmap(sess))
+        except Exception as e:
+            gap_err = str(e)[:80]
+        if gap_err:
+            status, note = "done", "活跃日历读取失败，本轮跳过补登判定"
+        elif gaps and cards > 0:
+            status, note = "todo", "待补 %s 天：%s" % (len(gaps), "、".join(x[5:] for x in gaps[:5]))
+            todo += 1
+        elif gaps:
+            status, note = "done", "有 %s 天断登，但补登卡不足" % len(gaps)
+        else:
+            status, note = "done", "本月无断登"
         rows.append({
             "code": "makeup", "title": "补登卡补断登",
             "reward": "保住连登天数",
-            "detail": "持有 %s / %s 张" % (mk.get("balance") or 0, mk.get("max") or 4),
-            "status": "todo" if md else "done",
-            "note": ("待补 %s 天：%s" % (len(md), "、".join(str(x)[5:] for x in md[:5]))) if md else "本月无断登",
+            "detail": "持有 %s / %s 张" % (cards, mk.get("max") or 4),
+            "status": status,
+            "note": note,
         })
-        if md:
-            todo += 1
 
         # 4) 抽奖轮盘
         ch = int(lo.get("chances") or 0)
@@ -677,18 +751,38 @@ def run_daily(sess):
     except Exception as e:
         add("redeem", False, repr(e))
 
-    # 3) 补登断登
+    # 3) 补登断登（makeup_dates 是已补登记录；断点从热力日历 score==0 反推，每轮最多 1 张）
     try:
         st2 = get_streak(sess)
-        md = (st2.get("streak") or {}).get("makeup_dates") or []
-        if not md:
+        cards = makeup_cards_balance(st2)
+        try:
+            gaps = _makeup_candidates(st2, get_heatmap(sess))
+        except Exception as e:
+            add("makeup", False, "活跃日历读取失败，跳过补登：%s" % e)
+            gaps = None
+        if gaps == []:
             add("makeup", True, "本月无断登，无需补", skipped=True)
-        else:
-            for d in md:
-                s, b = makeup_use(sess, d)
-                add("makeup_%s" % d, s == 200,
-                    ("补登 %s 成功" % d) if s == 200 else "补登 %s 失败 http=%s %s" % (d, s, _brief(b)))
-                time.sleep(0.4)
+        elif gaps:
+            if cards <= 0:
+                add("makeup", True, "有 %s 天断登，但补登卡不足" % len(gaps), skipped=True)
+            else:
+                made = 0
+                for d in gaps[:MAKEUP_MAX_PER_RUN]:
+                    s, b = makeup_use(sess, d)
+                    msg = str((b.get("msg") or "") if isinstance(b, dict) else "")
+                    if s == 200:
+                        made += 1
+                        add("makeup_%s" % d, True, "补登 %s 成功" % d)
+                    elif s == 400 and "no makeup needed" in msg.lower():
+                        # 查询后被别的路径补上，属正常竞争，不再当失败
+                        add("makeup_%s" % d, True, "%s 已活跃/已补登" % d, skipped=True)
+                        made += 1
+                    else:
+                        add("makeup_%s" % d, False, "补登 %s 失败 http=%s %s" % (d, s, msg[:120]))
+                        break
+                    time.sleep(0.4)
+                if len(gaps) > made:
+                    add("makeup_pending", True, "另有 %s 天可补，下次继续" % (len(gaps) - made), skipped=True)
     except Exception as e:
         add("makeup", False, repr(e))
 
@@ -714,16 +808,26 @@ def run_daily(sess):
     except Exception as e:
         add("lottery", False, repr(e))
 
-    # 5) 开盲盒（能量够几次开几次，上限 5）
+    # 5) 开盲盒（能量够几次开几次，上限 5；开盒会覆盖旅行记录，先确认旅行 idle）
     try:
-        bq = get_buddy_quota(sess)
-        n = min(int(bq.get("affordable") or 0), 5)
-        if n <= 0:
-            add("buddy", True, "能量不足（需 %s，现有 %s）" % (bq.get("cost_per_open") or 10, bq.get("balance") or 0),
+        travel_state = None
+        try:
+            travel_state = (get_travel_status(sess) or {}).get("state")
+        except Exception:
+            travel_state = None
+        if travel_state != "idle":
+            # 状态未知也不开：宁可少开一盒，也不能把待领的旅行礼物覆盖掉
+            add("buddy", True, "Buddy 旅行中/礼物待领（state=%s），跳过开盒" % (travel_state or "unknown"),
                 skipped=True)
         else:
-            s, b = buddy_open(sess, n)
-            add("buddy", s == 200, ("开盒 %s 次成功" % n) if s == 200 else "开盒失败 http=%s %s" % (s, _brief(b)))
+            bq = get_buddy_quota(sess)
+            n = min(int(bq.get("affordable") or 0), 5)
+            if n <= 0:
+                add("buddy", True, "能量不足（需 %s，现有 %s）" % (bq.get("cost_per_open") or 10, bq.get("balance") or 0),
+                    skipped=True)
+            else:
+                s, b = buddy_open(sess, n)
+                add("buddy", s == 200, ("开盒 %s 次成功" % n) if s == 200 else "开盒失败 http=%s %s" % (s, _brief(b)))
     except Exception as e:
         add("buddy", False, repr(e))
 

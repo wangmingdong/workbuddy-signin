@@ -17,6 +17,7 @@ WorkBuddy 每日积分签到（纯代码层，无需打开应用、无需点击�
 import json
 import os
 import sys
+import time
 import base64
 import datetime
 import urllib.request
@@ -121,18 +122,50 @@ def post(base, path, token, uid, domain, body, use_proxy):
     with opener.open(req, timeout=20) as r:
         return r.status, r.read().decode("utf-8", "replace")
 
+# 早高峰网关常见 429/5xx；退避重试，避免一次抖动让当天整轮签到失败
+RETRY_CODES = (429, 500, 502, 503, 504)
+MAX_ATTEMPTS = 3
+
+
+def _retry_delay(exc, attempt):
+    """429 优先用服务端 Retry-After，其余指数退避（2s、4s）。"""
+    try:
+        if isinstance(exc, urllib.error.HTTPError):
+            ra = (exc.headers or {}).get("Retry-After")
+            if ra:
+                return max(1.0, min(float(ra), 30.0))
+    except Exception:
+        pass
+    return min(2.0 * (2 ** attempt), 20.0)
+
+
+def _post_once(base, path, sess, body, use_proxy):
+    return post(base, path, sess["access_token"], sess["uid"], sess["domain"], body, use_proxy)
+
+
 def call(base, path, sess, body=None, allow_direct=True):
     last_err = None
-    # 先按环境代理（与 WorkBuddy 一致），失败再直连
-    try:
-        return post(base, path, sess["access_token"], sess["uid"], sess["domain"], body, use_proxy=True)
-    except (urllib.error.URLError, OSError) as e:
-        last_err = e
-    if allow_direct:
+    for attempt in range(MAX_ATTEMPTS):
+        retryable = True
         try:
-            return post(base, path, sess["access_token"], sess["uid"], sess["domain"], body, use_proxy=False)
+            return _post_once(base, path, sess, body, use_proxy=True)
+        except urllib.error.HTTPError as e:
+            last_err = e
+            retryable = e.code in RETRY_CODES
         except (urllib.error.URLError, OSError) as e:
             last_err = e
+        if allow_direct:
+            try:
+                return _post_once(base, path, sess, body, use_proxy=False)
+            except urllib.error.HTTPError as e:
+                last_err = e
+                retryable = retryable and e.code in RETRY_CODES
+            except (urllib.error.URLError, OSError) as e:
+                last_err = e
+        if not retryable:
+            break  # 鉴权/业务错误：重试无意义
+        if attempt < MAX_ATTEMPTS - 1:
+            time.sleep(_retry_delay(last_err, attempt))
     raise last_err
 
 def write_state(ok, message, data):

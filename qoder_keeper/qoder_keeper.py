@@ -452,18 +452,23 @@ def run_round(cfg, force=False):
     elif claimable:
         # ⚠️ 不按「今天的日期 key」筛选：实测活动 key 固定（act-20260923-252）而轮次每天 10:00 刷新，
         # 只要出现 CLAIMABLE 就可领；重复领取由服务端 replayed 幂等兜底，不会重复发放。
-        camp = claimable[0]
-        cid = camp.get("campaignId") or ""
-        ccode, cres = qd_api(base, "%s/%s/claim" % (CAMPAIGNS_PATH, cid),
-                             headers, method="POST", body={})
-        if ccode == 200 and (cres.get("status") or "").upper() == "CLAIMED":
-            checked = True
-            if cres.get("replayed"):
-                message = "今日已领取（幂等重放）"
+        # 同一天可能有多个可领活动（每日 + 邀请等），逐条领取，不能只领第一个。
+        done, failed, notes = 0, [], []
+        for camp in claimable:
+            cid = camp.get("campaignId") or ""
+            ccode, cres = qd_api(base, "%s/%s/claim" % (CAMPAIGNS_PATH, cid),
+                                 headers, method="POST", body={})
+            if ccode == 200 and (cres.get("status") or "").upper() == "CLAIMED":
+                done += 1
+                key = camp.get("campaignKey") or cid
+                notes.append(key + ("（幂等重放）" if cres.get("replayed") else ""))
             else:
-                message = "领取成功 +100 Credits（%s）" % (camp.get("campaignKey") or cid)
+                failed.append("%s HTTP %s" % (camp.get("campaignKey") or cid, ccode))
+        checked = done > 0
+        if failed:
+            message = "领取 %d/%d 成功；失败：%s" % (done, len(claimable), "；".join(failed))
         else:
-            message = "claim 失败 HTTP %s %s" % (ccode, json.dumps(cres, ensure_ascii=False)[:200])
+            message = "领取成功 %d 项（%s）" % (done, "、".join(notes))
     else:
         # 有 CLAIM_BENEFIT 但全部 CLAIMED → 本轮已领（每日 10:00 刷新下一轮）
         checked = True

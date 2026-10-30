@@ -2162,19 +2162,30 @@ def _qd_try_server_claim():
 
     claimable = [c for c in camps if (c.get("claimStatus") or "").upper() == "CLAIMABLE"]
     if claimable:
-        camp = claimable[0]
-        cid = camp.get("campaignId") or ""
-        try:
-            cres = api("%s/%s/claim" % (path, cid), method="POST", body={})
-        except urllib.error.HTTPError as e:
-            return "error", "claim 失败 HTTP %s" % e.code, None
-        except Exception as e:
-            return "error", "claim 请求失败: %s" % e, None
-        if (cres.get("status") or "").upper() == "CLAIMED":
-            msg = ("今日已领取（幂等重放）" if cres.get("replayed")
-                   else "服务端代领成功 +100 Credits（%s）" % (camp.get("campaignKey") or cid))
+        # 同一天可能有多个可领活动，逐条领取；服务端 replayed 幂等，重复领取不会多发
+        done, failed, notes = 0, [], []
+        for camp in claimable:
+            cid = camp.get("campaignId") or ""
+            key = camp.get("campaignKey") or cid
+            try:
+                cres = api("%s/%s/claim" % (path, cid), method="POST", body={})
+            except urllib.error.HTTPError as e:
+                failed.append("%s HTTP %s" % (key, e.code))
+                continue
+            except Exception as e:
+                failed.append("%s %s" % (key, e))
+                continue
+            if (cres.get("status") or "").upper() == "CLAIMED":
+                done += 1
+                notes.append(key + ("（幂等重放）" if cres.get("replayed") else ""))
+            else:
+                failed.append("%s 返回异常 %s" % (key, json.dumps(cres, ensure_ascii=False)[:100]))
+        if done:
+            msg = "服务端代领成功 %d 项（%s）" % (done, "、".join(notes))
+            if failed:
+                msg += "；失败：%s" % "；".join(failed)
             return "claimed", msg, _balance()
-        return "error", "claim 返回异常: %s" % json.dumps(cres, ensure_ascii=False)[:160], None
+        return "error", "claim 全部失败：%s" % "；".join(failed), None
     if camps:
         # 全部 CLAIMED：今日轮次已被领过（本机守护/桌面端/上一轮代领任一路径都算）
         return "claimed", "今日已领取（活动状态 CLAIMED）", _balance()
