@@ -43,6 +43,10 @@ const RELAY_KEY = (function () {
 const PROFILE    = 'E:/workspace/workbuddy-signin/doubao_profile';
 const COOKIE_TXT = 'E:/workspace/workbuddy-signin/doubao_cookie.txt';
 const PORT       = 8791;
+// 签到优先走豆包电脑版客户端（需带 --remote-debugging-port=9222 启动，已写入 HKCU Run）：
+// 在客户端页面里点「立即签到」。注意 2026-10-31 起服务端对该账号 checkin 一律返回 710010702，
+// 官方客户端手点同样失败，故这不是脚本/签名问题，失败时由保活继续重试。
+const CDP_URL    = 'http://127.0.0.1:9222';
 const ORIGIN     = 'https://bjzjsf.asia';
 const SCENE      = 'pc_incentive_task_mvp_v3';
 const QP = 'version_code=20800&language=zh&device_platform=pc&doubao_device_platform=pc&aid=497858&real_aid=497858&pkg_type=release_version&samantha_web=0&web_platform=pc&runtime=pc';
@@ -115,9 +119,83 @@ async function uploadCookiesToServer() {
   }
 }
 
+async function cdpAvailable() {
+  try {
+    const r = await fetch(CDP_URL + '/json/version', { signal: AbortSignal.timeout(2500) });
+    return r.ok;
+  } catch (e) { return false; }
+}
+
+// 在豆包电脑版客户端里打开活动页，点击「立即签到」。
+// 客户端页面与活动 UI 才是官方认可入口；浏览器 fetch 会被服务端以 710010702 拒绝。
+async function clientSign() {
+  const browser = await chromium.connectOverCDP(CDP_URL, { timeout: 10000 });
+  let checkinResp = null;
+  try {
+    const ctx = browser.contexts()[0];
+    const page = await ctx.newPage();
+    page.on('response', async (r) => {
+      if (!r.url().includes('/alice/ug/campaign/landing/checkin')) return;
+      try { checkinResp = await r.json(); } catch (e) { checkinResp = { code: -1, msg: '签到响应解析失败' }; }
+    });
+    try {
+      await page.goto('https://www.doubao.com/pc/agent-explore', { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+      // 先看是否已签（页面重开时可能已经签过）
+      const readDaily = () => page.evaluate(async () => {
+        const base = 'https://www.doubao.com';
+        const QP = 'version_code=20800&language=zh&device_platform=pc&doubao_device_platform=pc&aid=497858&real_aid=497858&pkg_type=release_version&samantha_web=0&web_platform=pc&runtime=pc';
+        const resp = await fetch(base + '/alice/ug/campaign/v3/detail/?' + QP, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Referer': base + '/pc/agent-explore', 'Origin': base },
+          body: JSON.stringify({ campaign_group_code: 'pc_incentive_task_mvp_v3', AgwCommonParam: {} }),
+        });
+        const j = await resp.json();
+        const t = ((j.data || {}).tasks || []).find((x) => x.campaign_code === 'daily_signin');
+        return t && t.daily_checkin;
+      });
+
+      const btn = page.getByText('立即签到', { exact: true }).first();
+      await btn.waitFor({ state: 'visible', timeout: 25000 });
+      const before = await readDaily().catch(() => null);
+      if (before && before.checked_in_today) return { ok: true, result: { source: 'client', checkin: { code: 0, msg: '今日已签到' }, daily: before } };
+
+      await btn.click();
+      for (let i = 0; i < 30 && !checkinResp; i++) await page.waitForTimeout(500);
+      const daily = await readDaily().catch(() => null);
+      if ((!checkinResp || checkinResp.code !== 0) && daily && daily.checked_in_today) {
+        checkinResp = { code: 0, msg: '签到成功' };
+      }
+      return { ok: true, result: { source: 'client', checkin: checkinResp || { code: -1, msg: '未捕获到签到响应' }, daily } };
+    } finally {
+      await page.close().catch(() => {});
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
 async function doSign() {
   if (_signing) return { ok: false, error: '已有签到任务进行中' };
   _signing = true;
+  try {
+    if (await cdpAvailable()) {
+      try {
+        const r = await clientSign();
+        const chk = r && r.result && r.result.checkin;
+        if (chk && chk.code === 0) markSignedToday();
+        return r;
+      } catch (e) {
+        dlog('[client] 客户端签到失败，回退浏览器: ' + String(e).slice(0, 200));
+      }
+    }
+    return await browserSign();
+  } finally {
+    _signing = false;
+  }
+}
+
+async function browserSign() {
   let ctx;
   try {
     ctx = await getBrowser();
@@ -162,8 +240,6 @@ async function doSign() {
     return { ok: true, result };
   } catch (e) {
     return { ok: false, error: String(e) };
-  } finally {
-    _signing = false;
   }
 }
 
@@ -488,7 +564,7 @@ async function ensureSignedToday() {
     // 以签到接口真实返回为准（doSign 内部已标记，这里再兜底一次），失败则下次保活继续重试
     const chk = r && r.result && r.result.checkin;
     if (r && r.ok && chk && chk.code === 0) markSignedToday();
-    dlog('[doubao-sign] 保活补签结果: ' + JSON.stringify(r && r.result ? r.result : r).slice(0, 200));
+    dlog('[doubao-sign] 保活补签结果: ' + JSON.stringify(r && r.result ? r.result : r).slice(0, 800));
   } catch (e) { dlog('[doubao-sign] 保活补签出错: ' + e); }
 }
 // 启动后 15s 补签一次（覆盖「刚启动服务、今天还没签」场景）；之后每 20 分钟保活
