@@ -5148,10 +5148,32 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
 .msg.show{display:block;}
 .msg.ok{background:rgba(0,194,154,.12);color:#00614D;}
 .msg.err{background:rgba(240,68,56,.1);color:#912018;}
-.keybox{display:none;margin-top:14px;}
-.keybox.show{display:block;}
-.keybox input{width:100%;padding:13px;border-radius:12px;border:1px solid #dfe3ec;font-size:16px;}
-.keybox input:focus{outline:none;border-color:var(--wb-brand-8);box-shadow:0 0 0 3px rgba(0,194,154,.15);}
+/* ===== 访问口令锁屏 ===== */
+body.locked{overflow:hidden;}
+body.locked .wrap{display:none;}
+.keybox{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;
+  padding:24px 18px;background:linear-gradient(160deg,#f1fbf8,#ffffff 55%,#eef7ff);overflow-y:auto;}
+.keybox.show{display:flex;}
+.kg-card{width:100%;max-width:360px;background:#fff;border-radius:22px;padding:28px 22px 22px;text-align:center;
+  border:1px solid rgba(15,23,42,.06);box-shadow:0 26px 60px -30px rgba(15,23,42,.5);}
+.kg-icon{width:56px;height:56px;margin:0 auto 14px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--wb-brand-8),#00c885);box-shadow:0 10px 22px -12px rgba(0,194,154,.9);}
+.kg-icon svg{width:28px;height:28px;}
+.kg-card h2{margin:0;font-size:19px;color:var(--ink);letter-spacing:.2px;}
+.kg-sub{margin:8px 0 0;font-size:13px;color:var(--sub);line-height:1.5;}
+.kg-field{position:relative;margin-top:18px;}
+.kg-field input{width:100%;box-sizing:border-box;padding:13px 66px 13px 14px;border-radius:13px;border:1px solid #dfe3ec;
+  font-size:16px;color:var(--ink);background:#fbfdfd;letter-spacing:.5px;}
+.kg-field input:focus{outline:none;border-color:var(--wb-brand-8);box-shadow:0 0 0 3px rgba(0,194,154,.15);background:#fff;}
+.kg-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);border:0;background:transparent;
+  padding:8px 10px;font-size:12.5px;font-weight:700;color:var(--wb-brand-8);cursor:pointer;border-radius:8px;}
+.kg-err{min-height:20px;margin-top:8px;font-size:12.5px;color:#c0392b;line-height:1.4;}
+.kg-go{width:100%;margin-top:6px;padding:14px;border:0;border-radius:13px;font-size:15px;font-weight:800;color:#fff;
+  background:linear-gradient(135deg,var(--wb-brand-8),#00c885);cursor:pointer;
+  box-shadow:0 12px 24px -14px rgba(0,194,154,.95);}
+.kg-go:active{transform:scale(.985);}
+.kg-go[disabled]{opacity:.72;}
+.kg-note{margin-top:14px;font-size:11.5px;color:var(--sub);opacity:.85;}
 .hint{text-align:center;font-size:12px;color:var(--sub);margin-top:16px;line-height:1.6;}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
   border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:7px;}
@@ -5310,12 +5332,24 @@ button.entry:hover{background:#eef7f4;}
   </div>
 
   <div id="msg" class="msg"></div>
-  <div id="keybox" class="keybox">
-    <input id="key" type="password" inputmode="numeric" placeholder="输入访问口令后回车">
-  </div>
 
   <div class="hint" id="pgHint">所有平台均为全自动：每天到点（设置里的时间）自动签到，也可随时点「立即全部签到」手动触发一次。<br>所有签到均在服务端执行，数据来自各平台官方接口</div>
-  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20260922-1</div>
+  <div class="vtag" id="vtag" style="margin-top:14px;font-size:12px;color:var(--sub);text-align:center;opacity:.8">v20261103-1</div>
+</div>
+
+<div id="keybox" class="keybox">
+  <div class="kg-card" role="dialog" aria-modal="true" aria-labelledby="kgTitle">
+    <div class="kg-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4.5" y="10.4" width="15" height="10.1" rx="3" fill="#fff"/><path d="M8 10.4V7.9a4 4 0 1 1 8 0v2.5" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="15.4" r="1.4" fill="#00B98F"/></svg></div>
+    <h2 id="kgTitle">需要访问口令</h2>
+    <p class="kg-sub">输入访问口令，进入签到中心</p>
+    <div class="kg-field">
+      <input id="key" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="请输入访问口令" aria-label="访问口令">
+      <button class="kg-eye" id="keyEye" type="button" aria-pressed="false">显示</button>
+    </div>
+    <div class="kg-err" id="keyErr" role="alert"></div>
+    <button class="kg-go" id="keyGo" type="button">进入签到中心</button>
+    <div class="kg-note">口令只保存在本机浏览器，下次自动进入</div>
+  </div>
 </div>
 
 <script>
@@ -5590,8 +5624,8 @@ function travelModalAction(act, btn){
     loadTravelModal();
   }).catch(function(e){
     if(e && e.needKey){
-      $('keybox').className = 'keybox show';
-      TRAVEL_MSG = {msg:'需要访问口令，请在下方输入后回车重试', ok:false};
+      showKeyGate();
+      TRAVEL_MSG = {msg:'需要访问口令，请重新输入后重试', ok:false};
     } else {
       TRAVEL_MSG = {msg:'网络错误：'+((e&&e.message)||e), ok:false};
     }
@@ -5700,7 +5734,7 @@ function runQfDaily(btn){
     showMsg(tip,"ok");
     pollQfDaily();
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    if(e&&e.needKey){ showKeyGate(); }
     else showMsg("网络错误："+(e&&e.message),"err");
     if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成今日任务"; }
   });
@@ -5719,7 +5753,7 @@ function drawQfDaily(btn){
     showMsg(msg,"ok");
     renderQfDailyFocus({ok:true, card:(d.card||{})});
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    if(e&&e.needKey){ showKeyGate(); }
     else showMsg("网络错误："+(e&&e.message),"err");
     pollQfDaily();
   });
@@ -5785,7 +5819,7 @@ function openHwLogin(name){
         saveBtn.disabled = false; saveBtn.textContent = "💾 保存并验证";
       }
     }).catch(function(e){
-      if(e && e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+      if(e && e.needKey){ showKeyGate(); }
       else { showMsg("网络错误："+((e&&e.message)||e),"err"); }
       saveBtn.disabled = false; saveBtn.textContent = "💾 保存并验证";
     });
@@ -5953,7 +5987,7 @@ function loadDetail(name){
 // ===== 成长中心独立页（?view=growth）=====
 function focusBody(){ return $('fbody') || $('focus'); }
 function focusErr(e){
-  if(e&&e.needKey){ var kb=$("keybox"); if(kb) kb.className="keybox show"; return '<div class="fnote" style="color:#912018">需要访问口令，请在下方输入后回车</div>'; }
+  if(e&&e.needKey){ showKeyGate(); return ''; }
   return '<div class="fnote" style="color:#912018">⚠️ '+esc((e&&e.message)||e||'加载失败')+'</div>';
 }
 function taskRow(t, right){
@@ -6022,7 +6056,7 @@ function runGrowth(btn){
     if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; } return; }
     pollGrowth();
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    if(e&&e.needKey){ showKeyGate(); }
     else showMsg("网络错误："+(e&&e.message),"err");
     if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; }
   });
@@ -6043,7 +6077,7 @@ function claimTask(code, btn){
     if(d.ok) showMsg(d.msg||"领取成功 ✅","ok"); else showMsg(d.msg||d.error||"领取失败","err");
     refreshGrowth();
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    if(e&&e.needKey){ showKeyGate(); }
     else showMsg("网络错误："+(e&&e.message),"err");
     if(btn){ btn.disabled=false; }
   });
@@ -6106,7 +6140,7 @@ function runDaily(btn){
     if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🎯 一键做完每日任务"; } return; }
     pollDaily();
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
+    if(e&&e.needKey){ showKeyGate(); }
     else showMsg("网络错误："+(e&&e.message),"err");
     if(btn){ btn.disabled=false; btn.innerHTML="🎯 一键做完每日任务"; }
   });
@@ -6227,6 +6261,13 @@ function api(path,opts){
   var k=getKey();
   var url=path+(k?(path.indexOf("?")>=0?"&":"?")+"k="+encodeURIComponent(k):"");
   return fetch(url,opts||{}).then(function(r){ if(r.status===401){var e=new Error("need key");e.needKey=true;throw e;} return r.json(); });
+}
+function netMsg(e,prefix){
+  var raw=(e&&e.message)||String(e||"");
+  if(/Failed to fetch|NetworkError|Load failed|network error/i.test(raw)){
+    return (prefix||"连接失败")+"：连不上服务器，请确认手机与电脑在同一 Wi-Fi，且服务已启动";
+  }
+  return (prefix||"连接失败")+"："+raw;
 }
 var LAST_CENTER = null;
 var TAB = (function(){ try { return localStorage.getItem('wb_tab') || 'auto'; } catch(e){ return 'auto'; } })();
@@ -6442,7 +6483,7 @@ function recheck(name, btn){
   api("api/center/checkin?name="+encodeURIComponent(name)+"&mode=refresh",{method:"POST"}).then(function(d){
     load(function(){ showMsg((d.card&&d.card.title?d.card.title:"")+" 状态已刷新 ✅","ok"); });
   }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); if(btn){btn.disabled=false;btn.textContent="重试";} return; }
+    if(e&&e.needKey){ showKeyGate(); if(btn){btn.disabled=false;btn.textContent="重试";} return; }
     var msg="网络错误："+((e&&e.message)||e); load(function(){ showMsg(msg,"err"); });
   });
 }
@@ -6476,8 +6517,8 @@ function load(cb){
   hideMsg();
   $("cards").innerHTML = '<div class="loading"><span class="spin"></span><span class="ld">加载中…</span></div>';
   api("api/center").then(function(d){ renderCenter(d); if(cb) cb(); }).catch(function(e){
-    if(e&&e.needKey){ $("keybox").className="keybox show"; showMsg("请输入访问口令后回车","err"); }
-    else { showMsg("连接失败："+(e&&e.message),"err"); }
+    if(e&&e.needKey){ showKeyGate(); }
+    else { showMsg(netMsg(e),"err"); }
   });
 }
 // 在卡片内部留一条持久错误提示（不随 load 刷新消失，方便回看失败原因）
@@ -6664,8 +6705,7 @@ function doCheckin(name,btn){
     load(function(){ showMsg(msg, ok?"ok":"err"); if(!ok) markCardErr(name,msg); });
   }).catch(function(e){
     if(e&&e.needKey){
-      $("keybox").className="keybox show";
-      showMsg("请输入访问口令后回车","err");
+      showKeyGate();
       if(btn){ btn.disabled=false; btn.textContent="重试"; }
       return;
     }
@@ -6676,9 +6716,59 @@ function doCheckin(name,btn){
 // （原 travelAction 已废弃：旅行动作改在弹窗内由 travelModalAction 处理）
 var VIEW = null;
 try { VIEW = new URLSearchParams(location.search).get("view"); } catch(e){}
-$("key").addEventListener("change", function(e){
-  try { localStorage.setItem(KEY_STORE, e.target.value.trim()); } catch(err){}
-  if(VIEW==="growth") focusGrowth(); else if(VIEW==="daily") focusDaily(); else load();
+function showKeyGate(msg){
+  hideMsg();
+  var kb=$("keybox"); if(!kb) return;
+  document.body.classList.add("locked");
+  kb.classList.add("show");
+  var err=$("keyErr"); if(err) err.textContent=msg||"";
+  var go=$("keyGo"); if(go && !KEY_BUSY){ go.disabled=false; go.textContent="进入签到中心"; }
+  var i=$("key"); if(i && !KEY_BUSY){ try{ i.focus(); }catch(e){} }
+}
+function hideKeyGate(){
+  document.body.classList.remove("locked");
+  var kb=$("keybox"); if(kb) kb.classList.remove("show");
+}
+function keyError(msg){
+  var err=$("keyErr"); if(err) err.textContent=msg;
+  var go=$("keyGo"); if(go){ go.disabled=false; go.textContent="进入签到中心"; }
+}
+var KEY_BUSY=false;
+function applyKey(v){
+  if(KEY_BUSY) return;
+  v=(v||"").trim();
+  if(!v){ keyError("请输入访问口令"); var i0=$("key"); if(i0) i0.focus(); return; }
+  try { localStorage.setItem(KEY_STORE, v); } catch(err){}
+  KEY_BUSY=true;
+  var err=$("keyErr"); if(err) err.textContent="";
+  var go=$("keyGo"); if(go){ go.disabled=true; go.innerHTML='<span class="spin"></span>验证中…'; }
+  var i=$("key"); if(i && i.type==="password") i.blur();
+  api("api/center").then(function(){
+    KEY_BUSY=false;
+    hideKeyGate();
+    if(VIEW==="growth" || VIEW==="daily" || VIEW==="settings") showFocus(VIEW); else load();
+  }).catch(function(e){
+    KEY_BUSY=false;
+    if(e && e.needKey){
+      try { localStorage.removeItem(KEY_STORE); } catch(err){}
+      keyError("口令不正确，请重试");
+      var inp=$("key"); if(inp){ inp.value=""; inp.focus(); }
+      return;
+    }
+    keyError(netMsg(e));
+  });
+}
+$("key").addEventListener("input", function(){ var err=$("keyErr"); if(err) err.textContent=""; });
+$("key").addEventListener("keydown", function(e){
+  if(e.key==="Enter" || e.keyCode===13){ e.preventDefault(); applyKey(e.target.value); }
+});
+$("keyGo").addEventListener("click", function(){ applyKey($("key").value); });
+$("keyEye").addEventListener("click", function(){
+  var i=$("key"); var show=(i.type==="password");
+  i.type = show ? "text" : "password";
+  this.textContent = show ? "隐藏" : "显示";
+  this.setAttribute("aria-pressed", show ? "true" : "false");
+  try{ i.focus(); }catch(e){}
 });
 (function bindModal(){
   var m = $('modal'); if(!m) return;
