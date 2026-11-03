@@ -29,7 +29,7 @@
  *
  * 用法：
  *   set ELECTRON_RUN_AS_NODE=1
- *   "D:\WorkBuddyAI\WorkBuddy.exe" wb_token_dump.js [选项]
+ *   "<WorkBuddy 安装目录>\WorkBuddy.exe" wb_token_dump.js [选项]
  *
  * 选项：
  *   --out <path>       明文输出路径（默认：脚本同目录 token.info）
@@ -228,7 +228,7 @@ function main() {
   } catch (e) {
     console.error('[失败] 无法读取主密钥载荷:', e && e.message);
     console.error('       必须用 WorkBuddy 自带二进制运行本脚本：');
-    console.error('       set ELECTRON_RUN_AS_NODE=1 && "D:\\WorkBuddyAI\\WorkBuddy.exe" wb_token_dump.js');
+    console.error('       set ELECTRON_RUN_AS_NODE=1 && "<WorkBuddy 安装目录>\\WorkBuddy.exe" wb_token_dump.js');
     return 2;
   }
   const secret = payload && payload.atRestSecretKey;

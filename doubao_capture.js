@@ -19,17 +19,18 @@
 // 注意：这是独立 Profile，跟你自己日常用的 Edge 登录态不共享，
 //       所以第一次要在弹出的窗口里登录一次；之后 cookie 过期再来一次。
 
-const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
+const { chromium } = require('./runtime_env').loadPlaywright();
 const fs = require('fs');
+const path = require('path');
 const { execFile } = require('child_process');
 
-const PROFILE    = 'E:/workspace/workbuddy-signin/doubao_profile';
-const COOKIE_TXT = 'E:/workspace/workbuddy-signin/doubao_cookie.txt';
-const COOKIE_JSON= 'E:/workspace/workbuddy-signin/doubao_cookie.json';
-const TRIGGER    = 'E:/workspace/workbuddy-signin/doubao_deploy.trigger';
-const PY         = 'C:/Users/54004/.workbuddy/binaries/python/versions/3.13.12/python.exe';
+const PROFILE    = path.join(__dirname, 'doubao_profile');
+const COOKIE_TXT = path.join(__dirname, 'doubao_cookie.txt');
+const COOKIE_JSON= path.join(__dirname, 'doubao_cookie.json');
+const TRIGGER    = path.join(__dirname, 'doubao_deploy.trigger');
+const PY         = require('./runtime_env').resolvePython();
 const TARGET     = 'https://www.doubao.com/';
-const CWD        = 'E:/workspace/workbuddy-signin';
+const CWD        = __dirname;
 
 // 只收 doubao.com 相关域（含 .doubao.com / www.doubao.com / doubao.com）
 const isDoubao = (d) => (d || '').endsWith('doubao.com') || (d || '').includes('.doubao.com');

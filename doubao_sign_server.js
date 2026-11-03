@@ -1,7 +1,7 @@
 // doubao_sign_server.js —— 豆包「浏览器实时签名」常驻服务（运行在 112 服务器，Linux）
 //
-// 方案二：把 a_bogus 签名代理从王少本机搬到 112 服务器，使其能独立代签豆包，
-// 王少电脑关机也能每日自动签。
+// 方案二：把 a_bogus 签名代理从本机搬到服务器，使其能独立代签豆包，
+// 本机电脑关机也能每日自动签。
 //
 // 原理与本地版一致：豆包写接口强制 a_bogus 动态签名，必须真浏览器在页面内 fetch 才带签。
 // 此处用服务器上的 headless Chromium（Playwright 自带）打开豆包页面，复用【从本机同步来的
@@ -311,7 +311,7 @@ server.listen(PORT, '127.0.0.1', () => {
   dlog('[doubao-sign-server] 启动, cookie 文件=' + COOKIE_FILE);
 });
 
-// ---- 每日定时：自动签到 + 自动领积分（服务器独立跑，不依赖王少电脑）----
+// ---- 每日定时：自动签到 + 自动领积分（服务器独立跑，不依赖本机电脑）----
 function scheduleAt(hh, mm, fn, label) {
   const now = new Date();
   let next = new Date(now);

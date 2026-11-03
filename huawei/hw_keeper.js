@@ -3,7 +3,7 @@
 // 每隔 N 分钟访问一次码头：服务端会自动签发新的 devcloud 会话。
 // 每次访问后 dump 全部 cookie 到 hw_cookies.json，由 hw_autopush.py 校验并推送。
 // 心跳文件 hw_keeper.heartbeat 供 autopush 看护；未登录则尝试 SSO 静默重登。
-const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
+const { chromium } = require('../runtime_env').loadPlaywright();
 const fs = require('fs');
 
 const BASE = __dirname;

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =====================================================================
 # 112 服务器：部署「豆包服务端签名器」(方案二)
-# 作用：把 a_bogus 签名代理搬到 112，使其能独立代签豆包，王少电脑关机也能签。
+# 作用：把 a_bogus 签名代理搬到服务器，使其能独立代签豆包，本机电脑关机也能签。
 #
 # 用法（在 112 上，项目目录 /opt/wb-checkin 下执行）：
 #   bash setup_doubao_server.sh
@@ -87,6 +87,6 @@ else
 fi
 
 echo "[5/5] 完成。接下来需要把豆包登录态(cookie)推到 112："
-echo "  在王少本机：确保 doubao_sign.js 正在运行，浏览器打开 http://127.0.0.1:8791/sync-cookie 一次即可推送；"
+echo "  在本机：确保 doubao_sign.js 正在运行，浏览器打开 http://127.0.0.1:8791/sync-cookie 一次即可推送；"
 echo "  之后本机会每 30 分钟自动续传，服务器据此独立代签。"
 echo "  校验：curl -s 'http://127.0.0.1:8791/health' 应返回 ok:true 且 hasCookie:true"

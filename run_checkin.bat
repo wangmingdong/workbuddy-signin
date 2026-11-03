@@ -9,11 +9,20 @@ set "PYTHONIOENCODING=utf-8"
 
 REM Pick an available Python interpreter (prefer WorkBuddy bundled, then system)
 set "PYC="
-if exist "C:\Users\54004\.workbuddy\binaries\python\versions\3.13.12\python.exe" (
-    set "PYC=C:\Users\54004\.workbuddy\binaries\python\versions\3.13.12\python.exe"
+if exist "%USERPROFILE%\.workbuddy\binaries\python\versions\3.13.12\python.exe" (
+    set "PYC=%USERPROFILE%\.workbuddy\binaries\python\versions\3.13.12\python.exe"
 )
-if not defined PYC if exist "D:\Dev\python.exe" set "PYC=D:\Dev\python.exe"
+if not defined PYC if exist "%USERPROFILE%\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe" (
+    set "PYC=%USERPROFILE%\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
+)
 if not defined PYC set "PYC=python"
+if /i "%PYC%"=="python" (
+    where python >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Python not found. Install Python 3 or set PYC in this script.
+        exit /b 1
+    )
+)
 
 REM NOTE: keep this file ASCII-only. %DATE% would inject localized bytes (e.g. GBK)
 REM and corrupt the UTF-8 log written by Python. Python already prints the full timestamp.
@@ -26,12 +35,15 @@ REM The refresh also pushes token.info to 112, which needs paramiko - so probe
 REM for an interpreter that has it and fall back to the check-in one.
 set "PYCS="
 for %%P in (
-    "D:\Dev\python.exe"
-    "C:\Users\54004\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
+    "%USERPROFILE%\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
+    "%USERPROFILE%\.workbuddy\binaries\python\versions\3.13.12\python.exe"
 ) do (
     if not defined PYCS if exist %%P (
         %%P -c "import paramiko" >nul 2>&1 && set "PYCS=%%P"
     )
+)
+if not defined PYCS (
+    python -c "import paramiko" >nul 2>&1 && set "PYCS=python"
 )
 if not defined PYCS set "PYCS=%PYC%"
 

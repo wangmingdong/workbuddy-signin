@@ -18,17 +18,18 @@
 // 注意：这是独立 Profile，跟你自己日常用的 Edge 登录态不共享，
 //       所以第一次要在弹出的窗口里登录一次；之后 cookie 过期再来一次。
 
-const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
+const { chromium } = require('./runtime_env').loadPlaywright();
 const fs = require('fs');
+const path = require('path');
 const { execFile } = require('child_process');
 
-const PROFILE    = 'E:/workspace/workbuddy-signin/trae_profile';
-const COOKIE_TXT = 'E:/workspace/workbuddy-signin/trae_cookie.txt';
-const COOKIE_JSON= 'E:/workspace/workbuddy-signin/trae_cookie.json';
-const TRIGGER    = 'E:/workspace/workbuddy-signin/trae_deploy.trigger';
-const PY         = 'C:/Users/54004/.workbuddy/binaries/python/versions/3.13.12/python.exe';
+const PROFILE    = path.join(__dirname, 'trae_profile');
+const COOKIE_TXT = path.join(__dirname, 'trae_cookie.txt');
+const COOKIE_JSON= path.join(__dirname, 'trae_cookie.json');
+const TRIGGER    = path.join(__dirname, 'trae_deploy.trigger');
+const PY         = require('./runtime_env').resolvePython();
 const TARGET     = 'https://work.trae.cn/?mode=mtc';
-const CWD        = 'E:/workspace/workbuddy-signin';
+const CWD        = __dirname;
 
 // 只收 trae.cn 相关域（含 .trae.cn / work.trae.cn / api.trae.cn）
 const isTrae = (d) => (d || '').endsWith('trae.cn') || (d || '').includes('.trae.cn');

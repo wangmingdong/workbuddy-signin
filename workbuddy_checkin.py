@@ -59,7 +59,6 @@ def find_token_file():
     local = os.environ.get("LOCALAPPDATA")
     if local:
         candidates.append(os.path.join(local, "CodeBuddyExtension", "Data", "Public", "auth", "workbuddy-desktop.info"))
-    candidates.append(r"C:\Users\54004\AppData\Local\CodeBuddyExtension\Data\Public\auth\workbuddy-desktop.info")
     # 3) 兜底：脚本同目录的明文 token.info（新版客户端把本地会话文件加密后，
     #    这里维护的明文副本仍可直接使用；由人工/部署流程更新）
     candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "token.info"))

@@ -19,16 +19,15 @@ set "PYTHONIOENCODING=utf-8"
 REM Prefer an interpreter that has paramiko (needed for the SFTP upload step).
 set "PYC="
 for %%P in (
-    "D:\Dev\python.exe"
-    "C:\Users\54004\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
+    "%USERPROFILE%\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
+    "%USERPROFILE%\.workbuddy\binaries\python\versions\3.13.12\python.exe"
 ) do (
     if not defined PYC if exist %%P (
         %%P -c "import paramiko" >nul 2>&1 && set "PYC=%%P"
     )
 )
-REM Fall back to the WorkBuddy bundled interpreter (local refresh still works).
-if not defined PYC if exist "C:\Users\54004\.workbuddy\binaries\python\versions\3.13.12\python.exe" (
-    set "PYC=C:\Users\54004\.workbuddy\binaries\python\versions\3.13.12\python.exe"
+if not defined PYC (
+    python -c "import paramiko" >nul 2>&1 && set "PYC=python"
 )
 if not defined PYC set "PYC=python"
 

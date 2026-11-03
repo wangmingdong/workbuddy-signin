@@ -15,7 +15,7 @@
 //       http://127.0.0.1:8791/doubao/sign 即可触发（已开 CORS）。
 // 启动： node doubao_sign.js   或   doubao_signer.bat
 
-const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
+const { chromium } = require('./runtime_env').loadPlaywright();
 const http = require('http');
 const fs = require('fs');
 
@@ -40,8 +40,8 @@ const RELAY_KEY = (function () {
   }
 })();
 
-const PROFILE    = 'E:/workspace/workbuddy-signin/doubao_profile';
-const COOKIE_TXT = 'E:/workspace/workbuddy-signin/doubao_cookie.txt';
+const PROFILE    = path.join(__dirname, 'doubao_profile');
+const COOKIE_TXT = path.join(__dirname, 'doubao_cookie.txt');
 const PORT       = 8791;
 // 签到优先走豆包电脑版客户端（需带 --remote-debugging-port=9222 启动，已写入 HKCU Run）：
 // 在客户端页面里点「立即签到」。注意 2026-10-31 起服务端对该账号 checkin 一律返回 710010702，
@@ -50,7 +50,7 @@ const CDP_URL    = 'http://127.0.0.1:9222';
 const ORIGIN     = 'https://bjzjsf.asia';
 const SCENE      = 'pc_incentive_task_mvp_v3';
 const QP = 'version_code=20800&language=zh&device_platform=pc&doubao_device_platform=pc&aid=497858&real_aid=497858&pkg_type=release_version&samantha_web=0&web_platform=pc&runtime=pc';
-const LOG = 'E:/workspace/workbuddy-signin/doubao_sign.log';
+const LOG = path.join(__dirname, 'doubao_sign.log');
 function dlog(s){ try { fs.appendFileSync(LOG, '[' + new Date().toISOString() + '] ' + s + '\n'); } catch (e) {} }
 
 function loadCookieHeader() {
@@ -572,7 +572,7 @@ setTimeout(() => ensureSignedToday(), 15000);
 setInterval(() => ensureSignedToday(), 20 * 60 * 1000);
 
 // 方案二：每 30 分钟把本机 cookie 推送到 112（若浏览器已预热），保证服务器侧登录态常新。
-// 王少电脑开机期间会自动续 cookie；关机后服务器用最后一次同步的 cookie 继续代签。
+// 本机开机期间会自动续 cookie；关机后服务器用最后一次同步的 cookie 继续代签。
 setInterval(() => uploadCookiesToServer(), 30 * 60 * 1000);
 
 process.on('SIGINT', async () => {

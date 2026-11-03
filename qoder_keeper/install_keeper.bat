@@ -33,7 +33,7 @@ echo     pushes the result to the checkin center card.
 echo   * To cancel: delete WbQoderKeeper.vbs in the Startup folder above.
 echo.
 echo NOTE: first run "probe" once to verify:
-echo       D:\Dev\python.exe -X utf8 qoder_keeper.py probe
+echo       python -X utf8 qoder_keeper.py probe
 echo.
 pause
 exit /b 0

@@ -28,7 +28,7 @@ token 一过期签到就断。
 ----
   python wb_token_sync.py                 # 刷新 + 上传到 112
   python wb_token_sync.py --no-upload     # 只刷新本地 token.info
-  python wb_token_sync.py --exe "D:\\WorkBuddyAI\\WorkBuddy.exe"
+  python wb_token_sync.py --exe "<WorkBuddy 安装目录>\\WorkBuddy.exe"
   python wb_token_sync.py --file "<某个会话文件>"
   python wb_token_sync.py --print         # 额外打印令牌前 40 字符（排障用）
 
@@ -85,13 +85,45 @@ _load_dotenv()
 TOKEN_INFO = os.path.join(BASE_DIR, "token.info")
 LOG_FILE = os.path.join(BASE_DIR, "token_sync.log")
 
-# 优先国内版（签到活动在 www.workbuddy.cn），其次国际版
-EXE_CANDIDATES = (
-    r"D:\WorkBuddyAI\WorkBuddy.exe",
-    r"C:\Program Files\WorkBuddy\WorkBuddy.exe",
-    r"D:\WorkBuddyAI_guoji\WorkBuddyAI.exe",
-    r"C:\Program Files\WorkBuddyAI\WorkBuddyAI.exe",
-)
+# 优先国内版（签到活动在 www.workbuddy.cn），其次国际版。
+# 可用 WORKBUDDY_EXE 环境变量显式指定；否则在常见安装根与盘符根下自动发现。
+def _find_workbuddy():
+    explicit = os.environ.get("WORKBUDDY_EXE", "").strip()
+    if explicit and os.path.isfile(explicit):
+        return explicit
+
+    roots = []
+    for env in ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)"):
+        v = os.environ.get(env)
+        if v and os.path.isdir(v):
+            roots.append(v)
+    for drive in "CDEFGH":
+        root = drive + ":\\"
+        if os.path.isdir(root):
+            roots.append(root)
+
+    seen = set()
+    for base in roots:
+        try:
+            names = os.listdir(base)
+        except Exception:
+            continue
+        for name in names:
+            if "workbuddy" not in name.lower():
+                continue
+            root = os.path.join(base, name)
+            if root in seen or not os.path.isdir(root):
+                continue
+            seen.add(root)
+            for dirpath, dirnames, filenames in os.walk(root):
+                rel = os.path.relpath(dirpath, root)
+                if rel.count(os.sep) >= 4:
+                    dirnames[:] = []
+                    continue
+                for exe in ("WorkBuddy.exe", "WorkBuddyAI.exe"):
+                    if exe in filenames:
+                        return os.path.join(dirpath, exe)
+    return ""
 
 # 远端凭据一律从环境变量读取（真实值放本机 .env，模板见 .env.example）。
 # 早先这里硬编码了服务器 root 密码，会随仓库外泄——已移除，切勿再写回源码。
@@ -122,10 +154,7 @@ def log(msg, also_print=True):
 def find_exe(explicit=None):
     if explicit:
         return explicit if os.path.isfile(explicit) else None
-    for p in EXE_CANDIDATES:
-        if os.path.isfile(p):
-            return p
-    return None
+    return _find_workbuddy() or None
 
 
 def run_dump(exe, session_file=None, config_dir=None):

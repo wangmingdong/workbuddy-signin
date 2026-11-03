@@ -4,8 +4,10 @@ setlocal
 cd /d "%~dp0"
 title 华为码道签到 - 重新授权
 
-set "NODE=C:\Users\54004\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"
-set "PY=D:\Dev\python.exe"
+set "NODE=%USERPROFILE%\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"
+if not exist "%NODE%" for /f "delims=" %%N in ('where node 2^>nul') do set "NODE=%%N"
+set "PY=%USERPROFILE%\.workbuddy\binaries\python\versions\3.13.12\python.exe"
+if not exist "%PY%" for /f "delims=" %%P in ('where python 2^>nul') do set "PY=%%P"
 set "WIN=%SystemRoot%\System32"
 rem 本目录是 huawei/，而公共配置 envconf.py 在上一级根目录 —— 显式加进模块搜索路径，
 rem 否则 hw_watch_login.py 会 ModuleNotFoundError 秒退（表现为"没检测到有效登录"）

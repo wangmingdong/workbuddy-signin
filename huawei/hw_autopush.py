@@ -11,6 +11,7 @@
 """
 import json
 import os
+import shutil
 import ssl
 import subprocess
 import sys
@@ -29,7 +30,17 @@ OUT = os.path.join(BASE, "hw_cookie.txt")
 LOG = os.path.join(BASE, "hw_autopush.log")
 HEARTBEAT = os.path.join(BASE, "hw_keeper.heartbeat")
 KEEPER_JS = os.path.join(BASE, "hw_keeper.js")
-NODE = r"C:\Users\54004\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"
+NODE = os.environ.get("NODE_EXE", "")
+if not NODE:
+    for _p in (
+        os.path.join(os.environ.get("USERPROFILE", ""), ".workbuddy", "binaries", "node", "versions", "22.22.2-3", "node.exe"),
+        os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "nodejs", "node.exe"),
+    ):
+        if os.path.isfile(_p):
+            NODE = _p
+            break
+if not NODE:
+    NODE = shutil.which("node") or "node"
 
 KEEPER_STALE_SEC = 15 * 60
 INTERVAL_SEC = 300

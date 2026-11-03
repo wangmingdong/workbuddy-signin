@@ -72,7 +72,7 @@ workbuddy-signin/
 │                            把加密的 workbuddy-desktop.info 还原成明文（零依赖）
 ├─ wb_token_sync.py       ← 令牌刷新编排：解密 → 原子写 token.info → 推送到 112（SFTP 优先，HTTP 兜底）
 ├─ run_token_sync.bat     ← 手动刷新令牌（run_checkin.bat 每次也会自动先跑一遍）
-├─ deploy_ui.py           ← 最小化 UI 部署：传 web_server.py + 凭据、重启 wb-checkin（不碰口令）
+├─ deploy_ui.py           ← 最小化 UI 部署：传 web_server.py + 凭据、重启 wb-checkin（本地私有脚本，未入库）
 ├─ envconf.py             ← 本地运维脚本统一从 .env 读 ECS/ACCESS_KEY
 ├─ config.example.json    ← 各平台凭据文件/环境变量说明模板（不进仓库）
 ├─ start_web.bat          ← 启动网页服务并打印手机访问地址
@@ -323,7 +323,7 @@ curl -s 127.0.0.1:8791/health     # 应返回 {"ok":true,"hasCookie":false}
 ### 1. 手动跑一次（先看效果）
 双击 `run_checkin.bat`，或命令行：
 ```
-cd E:\workspace\workbuddy-signin
+cd /d "D:\path\to\workbuddy-signin"
 run_checkin.bat
 ```
 看 `checkin.log` 里的结果即可。
@@ -378,7 +378,7 @@ python wb_token_sync.py --print    # 附带打印令牌片段，排障用
      服务端收下后同样**原子落盘**到 `WB_TOKEN_FILE`。服务端会做两道校验——访问口令 + 可选的来源 IP 白名单
      （`WB_UPLOAD_ALLOW_IPS`，逗号分隔；不设则只校验口令）。**走这条通道不需要 paramiko。**
 - `run_token_sync.bat` / `run_checkin.bat` 会自动挑选带 `paramiko` 的解释器
-  （`D:\Dev\python.exe` 优先，其次 `%USERPROFILE%\.workbuddy-ai\binaries\...`），
+  （依次尝试 `%USERPROFILE%\.workbuddy` / `%USERPROFILE%\.workbuddy-ai` 自带解释器、系统 `python`），
   都没有时走 HTTP 兜底，仍然能推到服务器。
 - 令牌剩余有效期不足 3 天会在日志里告警——打开一次 WorkBuddy 让它自动续期即可。
 - **落盘后不需要重启服务**：`_session()` 每次调用现读盘，没有内存缓存，下一次签到就用新令牌。
@@ -387,7 +387,7 @@ python wb_token_sync.py --print    # 附带打印令牌片段，排障用
 ### 2. 设置每天自动跑（本机，一次设置长期有效）
 以**管理员身份**打开 PowerShell：
 ```powershell
-cd E:\workspace\workbuddy-signin
+Set-Location "D:\path\to\workbuddy-signin"
 .\setup_task.ps1
 ```
 之后每天 09:10 自动签到，结果记录在 `checkin.log`。立即验证：
@@ -413,7 +413,7 @@ schtasks /run /tn WorkBuddyDailyCheckin
 | 网页服务 | systemd `wb-checkin`，监听 `127.0.0.1:8790` |
 | nginx | `location /checkin/` 反代；全站已下发安全头，并已阻断 `/.git`、`*.bak` 等敏感路径 |
 | 服务端目录 | `/opt/wb-checkin`（含 web_server.py / wb_icon.py / workbuddy_checkin.py / wb_growth.py / token.info / 各 *_last_run.json / 各平台凭据文件 / settings.json）|
-| 本地部署 | `python deploy_ui.py`（上传代码 + 凭据 + 重启服务，最小化不碰口令）|
+| 本地部署 | `python deploy_ui.py`（上传代码 + 凭据 + 重启服务，最小化不碰口令）；该脚本为本地私有、未入库，新用户可用 `scp`/`rsync` 按上表目录结构手动部署 |
 
 > 原理：签到由服务器自己读本地凭证、调官方接口完成，**完全不经过你的电脑**，电脑关机也无所谓。
 

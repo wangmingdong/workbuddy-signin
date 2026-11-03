@@ -1,4 +1,4 @@
-const { chromium } = require('C:/Users/54004/.workbuddy/binaries/node/workspace/node_modules/playwright-core');
+const { chromium } = require('../runtime_env').loadPlaywright();
 const fs = require('fs');
 
 const BASE = __dirname;
