@@ -19,6 +19,7 @@ import socket
 import hashlib
 import time
 import datetime
+import random
 import uuid
 import urllib.request
 import urllib.error
@@ -89,6 +90,8 @@ ACCESS_KEY = os.environ.get(
 
 # 最近一次签到结果（由 workbuddy_checkin.py 写入；自动定时与手动点击都会记）
 STATE_FILE = os.environ.get("WB_STATE_FILE", os.path.join(BASE_DIR, "last_run.json"))
+# 当天的随机签到计划（落盘后重启不重抽，保证一天只触发一次）
+SCHEDULE_PLAN_FILE = os.environ.get("WB_SCHEDULE_PLAN", os.path.join(BASE_DIR, "schedule_plan.json"))
 
 # ============================ 千帆签到适配器配置 ============================
 # 千帆签到接口基址。本服务在服务端直接调用它的 API（带 token，避开浏览器跨域），不搬动千帆代码。
@@ -128,6 +131,7 @@ def _default_settings():
     return {
         "schedule_enabled": True,
         "schedule_time": "08:35",
+        "schedule_jitter_min": 0,  # 在基础上随机延后的最大分钟数；0=固定时间
         "access_key": "",          # 留空=沿用环境变量 WB_ACCESS_KEY；填写则覆盖
         "platforms": {k: True for k in PLATFORM_TITLES},
         "notify_webhook": "",
@@ -161,6 +165,11 @@ def save_settings(d):
         elif k == "notify_webhook":
             # 前端未提供该字段 -> 保留原值；提供空串 -> 显式清除
             out[k] = (d.get(k) or "").strip() if (k in d) else SETTINGS.get(k, base[k])
+        elif k == "schedule_jitter_min":
+            try:
+                out[k] = max(0, min(240, int(d.get(k, base[k]) or 0)))
+            except Exception:
+                out[k] = 0
         else:
             out[k] = d.get(k, base[k])
     with open(SETTINGS_FILE, "w", encoding="utf-8") as _f:
@@ -310,32 +319,123 @@ def notify_summary(results):
         print("[notify] 推送失败: %s" % e)
 
 
+def _sched_jitter_min():
+    try:
+        return max(0, min(240, int(SETTINGS.get("schedule_jitter_min", 0) or 0)))
+    except Exception:
+        return 0
+
+
+def _sched_plan_read():
+    try:
+        with open(SCHEDULE_PLAN_FILE, "r", encoding="utf-8") as f:
+            d = json.loads(f.read() or "{}")
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _sched_plan_write(plan):
+    try:
+        with open(SCHEDULE_PLAN_FILE, "w", encoding="utf-8") as f:
+            f.write(json.dumps(plan, ensure_ascii=False, indent=2))
+    except Exception as e:
+        print("[scheduler] 计划保存失败: %s" % e)
+
+
+def _sched_draw(now, base):
+    """抽执行时间：基础时间 + 0~jitter 分钟。
+    今天的窗口已过则顺延到明天，避免部署/重启后白天补跑一次（旧逻辑也是顺延到次日）。"""
+    bh, bm = base
+    jitter = _sched_jitter_min()
+    offset = random.randint(0, jitter) if jitter > 0 else 0
+    day = now.date()
+    target = datetime.datetime.combine(day, datetime.time(bh, bm)) + datetime.timedelta(minutes=offset)
+    if target <= now:
+        day = day + datetime.timedelta(days=1)
+        offset = random.randint(0, jitter) if jitter > 0 else 0
+        target = datetime.datetime.combine(day, datetime.time(bh, bm)) + datetime.timedelta(minutes=offset)
+    end = datetime.datetime.combine(day, datetime.time(23, 59))
+    if target > end:
+        target = end
+    return {
+        "date": day.isoformat(),
+        "base": "%02d:%02d" % (bh, bm),
+        "jitter": jitter,
+        "target": target.isoformat(timespec="seconds"),
+        "done": False,
+    }
+
+
+def _sched_next_hint():
+    """概览条显示的下次时间：今日已跑显示「明日」，否则显示今日抽中的时刻。"""
+    if not SETTINGS.get("schedule_enabled"):
+        return ""
+    plan = _sched_plan_read()
+    try:
+        target = datetime.datetime.fromisoformat(plan.get("target", ""))
+    except Exception:
+        return SETTINGS.get("schedule_time", "08:35")
+    if plan.get("done") or target.date() > datetime.date.today():
+        return "明日"
+    return target.strftime("%H:%M")
+
+
 def _scheduler_loop():
-    """内置定时调度器：按 settings.schedule_time 每日自动跑 run_daily_all。
+    """内置定时调度器：基础时间 + 每日随机浮动；抽中的时间落盘，重启不重抽。
     被 reschedule() 唤醒时可热更新时间，无需重启进程。"""
     while True:
         try:
             if SETTINGS.get("schedule_enabled") and SETTINGS.get("schedule_time"):
                 try:
                     hh, mm = (SETTINGS["schedule_time"].split(":"))[:2]
-                    now = datetime.datetime.now()
-                    target = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
-                    if target <= now:
-                        target = target + datetime.timedelta(days=1)
-                    wait = (target - now).total_seconds()
+                    base = (int(hh), int(mm))
+                    base_s = "%02d:%02d" % base
                 except Exception:
                     time.sleep(60)
                     continue
-                print("[scheduler] 下次自动签到: %s（约 %.0f 秒后）" % (
-                    target.strftime("%Y-%m-%d %H:%M"), wait))
-                if _sched_wake.wait(wait):
-                    _sched_wake.clear()
+                now = datetime.datetime.now()
+                today = now.date().isoformat()
+                jitter = _sched_jitter_min()
+                plan = _sched_plan_read()
+                same_day = plan.get("date") == today
+                if same_day and plan.get("done"):
+                    # 今天已经跑过；即使设置变更也不重复执行
+                    target = datetime.datetime.combine(
+                        now.date() + datetime.timedelta(days=1), datetime.time(0, 0, 10))
+                    print("[scheduler] 今日已完成，明日重新抽取执行时间")
+                    if _sched_wake.wait(max(1, (target - now).total_seconds())):
+                        _sched_wake.clear()
                     continue
-                print("[scheduler] 触发定时签到")
+                fresh = (same_day
+                         and plan.get("base") == base_s
+                         and plan.get("jitter") == jitter)
+                if not fresh:
+                    plan = _sched_draw(now, base)
+                    _sched_plan_write(plan)
+                    print("[scheduler] 本次执行时间抽签: %s（基础 %s + 随机 0~%d 分）" % (
+                        plan["target"][5:16].replace("T", " "), base_s, jitter))
+                try:
+                    target = datetime.datetime.fromisoformat(plan["target"])
+                except Exception:
+                    plan = _sched_draw(now, base)
+                    _sched_plan_write(plan)
+                    target = datetime.datetime.fromisoformat(plan["target"])
+                wait = (target - now).total_seconds()
+                if wait > 0:
+                    print("[scheduler] 下次自动签到: %s（约 %.0f 秒后）" % (
+                        target.strftime("%Y-%m-%d %H:%M"), wait))
+                    if _sched_wake.wait(wait):
+                        _sched_wake.clear()
+                        continue
+                print("[scheduler] 触发定时签到（计划 %s）" % target.strftime("%H:%M"))
                 try:
                     run_daily_all()
                 except Exception as e:
                     print("[scheduler] 定时签到异常: %s" % e)
+                plan["done"] = True
+                plan["ran_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+                _sched_plan_write(plan)
                 continue
             else:
                 _sched_wake.wait(60)
@@ -4889,6 +4989,9 @@ def get_center():
         # 概览条要用的调度信息（前端不用再单独打一次 /api/settings）
         "schedule_enabled": bool(SETTINGS.get("schedule_enabled", True)),
         "schedule_time": SETTINGS.get("schedule_time", "08:35"),
+        "schedule_jitter_min": _sched_jitter_min(),
+        # 下次执行时刻：今日已跑显示「明日」，否则是今天抽中的时刻
+        "next_run": _sched_next_hint(),
         # 凭据到期预警：[{name,title,level,label,days}]；没有就空数组
         "cred_alerts": cred_alerts,
         "items": items,
@@ -5258,8 +5361,10 @@ button.entry:hover{background:#eef7f4;}
 .settings .fgroup h4{display:flex;align-items:center;gap:6px;}
 .fld{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
 .fld.col{flex-direction:column;align-items:stretch;}
-.fld > span{font-size:14px;font-weight:600;}
-.fld input[type=time],.fld input[type=text],.fld input[type=password]{margin-top:8px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;font-size:14px;width:100%;box-sizing:border-box;background:#fbfdfc;}
+.fld > span{font-size:14px;font-weight:600;white-space:nowrap;flex:0 0 auto;}
+.fld > input[type=time],.fld > input[type=text],.fld > input[type=password],.fld > select{min-width:0;}
+.fld input[type=time],.fld input[type=text],.fld input[type=password],.fld select{margin-top:8px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;font-size:14px;width:100%;box-sizing:border-box;background:#fbfdfc;color:var(--ink);}
+.fld select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--sub) 50%),linear-gradient(135deg,var(--sub) 50%,transparent 50%);background-position:calc(100% - 17px) calc(50% + 2px),calc(100% - 12px) calc(50% + 2px);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:32px;}
 .fld input[type=checkbox]{width:20px;height:20px;accent-color:var(--c,#00C29A);}
 .fval{font-size:13px;color:var(--sub);}
 .ftip{font-size:12px;color:var(--sub);line-height:1.6;margin:10px 0 2px;}
@@ -6205,7 +6310,10 @@ function renderSettings(){
       +'<div class="fgroup"><h4>⏰ 定时签到</h4>'
       +'<label class="fld"><span>启用自动签到</span><input type="checkbox" id="schedOn" '+((s.schedule_enabled===false)?'':'checked')+'></label>'
       +'<label class="fld"><span>每日签到时间</span><input type="time" id="schedTime" value="'+esc(s.schedule_time||"08:35")+'"></label>'
-      +'<p class="ftip">到点后自动跑全部已启用平台。若服务器另有 systemd 定时任务未关闭，会再跑一次，结果幂等无副作用。</p>'
+      +'<label class="fld"><span>随机浮动</span><select id="schedJitter">'
+      +[0,15,30,60,120].map(function(m){ return '<option value="'+m+'" '+((s.schedule_jitter_min||0)===m?'selected':'')+'>'+(m?('基准后 0~'+m+' 分钟'):'不浮动（固定时刻）')+'</option>'; }).join('')
+      +'</select></label>'
+      +'<p class="ftip">到点后自动跑全部已启用平台。开启随机浮动后，每天在基准时间后的区间内随机抽一个时刻（当天抽签结果落盘，重启不重抽），避免每天同一秒发起签到。</p>'
       +'</div>'
       +'<div class="fgroup"><h4>🔑 中心访问口令</h4>'
       +'<label class="fld"><span>当前状态</span><span class="fval">'+(s.key_set?'页面已单独设置':'沿用服务器环境变量')+'</span></label>'
@@ -6232,6 +6340,7 @@ function saveSettings(){
   var body={
     schedule_enabled: $('schedOn').checked,
     schedule_time: $('schedTime').value || '08:35',
+    schedule_jitter_min: parseInt($('schedJitter').value, 10) || 0,
     access_key: $('newKey').value || '',
     platforms: plat,
     notify_on: $('notifyOn').checked,
@@ -6375,7 +6484,7 @@ function renderStats(d, items){
     if(!isNaN(n)){ gained += n; hasGain = true; }
   });
   var next = (d.schedule_enabled!==false)
-    ? (d.schedule_time || '08:35')
+    ? (d.next_run || d.schedule_time || '08:35')
     : null;
   var cells = [
     {l:'平台',        v:live.length,                 s:''},
@@ -6954,6 +7063,8 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "schedule_enabled": bool(SETTINGS.get("schedule_enabled", True)),
                 "schedule_time": SETTINGS.get("schedule_time", "08:35"),
+                "schedule_jitter_min": _sched_jitter_min(),
+                "next_run": _sched_next_hint(),
                 "key_set": bool(SETTINGS.get("access_key")),
                 "platforms": SETTINGS.get("platforms", {}),
                 "notify_on": bool(SETTINGS.get("notify_on", False)),

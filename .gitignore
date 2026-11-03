@@ -99,6 +99,8 @@ qf_token.txt
 
 # 各平台签到运行时状态（非交付物）
 *_last_run.json
+# 定时签到的当日随机计划（运行态，重启后沿用当次抽签结果）
+schedule_plan.json
 # 华为「当日已签」本地标记（短效会话优化用，运行态）
 hw_today_done.json
 # 派猫猫旅行：浏览器 Cookie（HttpOnly，等同账号密码）与运行时状态，禁止入库
