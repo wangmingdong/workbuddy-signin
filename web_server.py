@@ -7553,8 +7553,8 @@ def main():
     print("  电脑本机测试:  http://127.0.0.1:%d" % PORT)
     if HOST == "0.0.0.0":
         print("  手机访问地址:  http://%s:%d   (需连同一 WiFi)" % (ip, PORT))
-    if ACCESS_KEY:
-        print("  访问口令:      %s" % ACCESS_KEY)
+    # 不打印口令明文：systemd 会把 stdout 写进 journal，等同把口令落到日志里
+    print("  访问口令:      %s" % ("已设置（不显示明文）" if ACCESS_KEY else "未设置"))
     print("  停止服务: 按 Ctrl+C")
     print(line)
     sys.stdout.flush()
