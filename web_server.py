@@ -2800,7 +2800,7 @@ def get_lk_card():
             "linkai", "Link AI 每日签到", "#3B82F6", "#2563EB", "lk", e,
             [("如何恢复",
               "Link AI 令牌已失效：登录 link-ai.tech/console/account 复制新的 API Token，"
-              "更新服务器上的 linkai_token.txt；或在设置页更新 LINKAI_TOKEN，再点「重新检查」")],
+              "更新服务器上的 linkai_token.txt 后点「重新检查」")],
         )
 
 
@@ -4900,7 +4900,16 @@ def _decorate_cred_expiry(items):
                 rows = []
                 it["rows"] = rows
             mark = {"expired": "🔴", "urgent": "🔴", "soon": "🟡", "ok": "🟢"}.get(info["level"], "")
-            rows.append({"k": "凭据有效期", "v": "%s %s" % (mark, info["label"])})
+            if it.get("needs_auth") and info["level"] == "ok":
+                # 鉴权已被服务端拒绝时，JWT 自报的 exp 不能当作「凭证可用」：
+                # 令牌可能被注销/轮换，或凭据本身被风控。避免卡片同时出现
+                # 「Token verification failed」和绿色「还剩 N 天」而误导用户。
+                rows.append({
+                    "k": "凭据有效期",
+                    "v": "⚠️ 自报有效至 %s（服务端已拒绝，以此卡状态为准）" % info["at"],
+                })
+            else:
+                rows.append({"k": "凭据有效期", "v": "%s %s" % (mark, info["label"])})
             if info["level"] in ("expired", "urgent", "soon"):
                 alerts.append({
                     "name": name,
