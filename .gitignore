@@ -81,6 +81,7 @@ oiioii_token.txt
 oiioii_session.json
 lx_cookie.txt
 coze_cookie.txt
+# 即梦 AI 已下线（2026-11-05 移除平台与卡片）；规则保留，防止 _removed_jimeng/ 里归档的旧凭据被误入库
 jimeng_cookie.txt
 # 扣子官方 logo（已 base64 内联进 web_server.py，独立 png 仅本地留档，不入库）
 coze_logo.png

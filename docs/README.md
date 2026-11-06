@@ -8,9 +8,9 @@
 
 ## 它能签到哪些平台
 
-卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 11 张卡**。
+卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 10 张卡**。
 
-> **2026-10-16 起，11 张卡全部属于「🤖 自动签到」分组，不再有「✋ 手动签到」分组**
+> **2026-10-16 起，10 张卡全部属于「🤖 自动签到」分组，不再有「✋ 手动签到」分组**
 > （手动分组为空时，该 tab 会自动隐藏）。改动记录：
 > - **Link AI** 原为手动卡（接口强制图片验证码、服务端无法代签）；
 >   现已在 `lk_captcha_solver.py` 里实现**滑块验证码自动破解**，
@@ -23,7 +23,7 @@
 > （由本机守护完成，不在服务端自动签到列表）。
 > **豆包为「浏览器签名代理」架构**——详见下方「第 9 步 · 豆包」。
 
-> 所有卡片底部统一显示「可用积分」（4 家真实有余额：即梦 / 千帆 / WorkBuddy / Link AI；其余接口不提供余额则诚实显示「—」）；即梦额外显示「88 积分将于 x月x日 过期」提示。
+> 所有卡片底部统一显示「可用积分」（3 家真实有余额：千帆 / WorkBuddy / Link AI；其余接口不提供余额则诚实显示「—」）。
 
 | 平台 | 官网 | 每日奖励 | 凭据文件（根目录） | 维护频率 |
 |------|------|---------|------------------|----------|
@@ -35,7 +35,6 @@
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
 | **Coze 扣子** | coze.cn | 1500 活动分（登录自动发） | `coze_cookie.txt` | 约 60 天，过期重新导出 Cookie |
-| 即梦 AI | jimeng.jianying.com | 每日登录发放免费额度（实测 88 赠送积分） | `jimeng_cookie.txt` | 字节风控强，Cookie 周期失效需重捕 |
 | 华为码道（手动卡） | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步；亦支持网页「🔑 配置会话 Cookie」粘贴登录） | 会话失效后双击 `huawei/relogin_huawei.bat` |
 | **豆包 Doubao** | doubao.com / 豆包 PC 客户端 | 每日签到 + 积分任务领奖 | 浏览器实时算签代持（详见下方「第 9 步 · 豆包」） | 随会话（约 30 天，靠本机续传） |
 
@@ -47,7 +46,7 @@
 
 ### 🟣 豆包 Doubao（第 3 张卡 · 浏览器签名代理架构）
 
-豆包是这 11 家里**唯一不能纯靠静态 token/cookie 在服务端直接签**的平台，因为它在签到/领积分的写接口上强制一道 **`a_bogus` 动态签名**：这串签名由豆包网页 JS 在你**真浏览器发请求的那一刻**临时算出来（把请求参数 + 时间戳 + 浏览器指纹搅一起哈希），算签函数锁死在网页闭包里，服务器根本拿不到。服务器光持你的 cookie 裸调接口，会被 `710010702` 直接拒绝。
+豆包是这 10 家里**唯一不能纯靠静态 token/cookie 在服务端直接签**的平台，因为它在签到/领积分的写接口上强制一道 **`a_bogus` 动态签名**：这串签名由豆包网页 JS 在你**真浏览器发请求的那一刻**临时算出来（把请求参数 + 时间戳 + 浏览器指纹搅一起哈希），算签函数锁死在网页闭包里，服务器根本拿不到。服务器光持你的 cookie 裸调接口，会被 `710010702` 直接拒绝。
 
 > **白话结论**：别的平台「钥匙」是静态 token/cookie，服务器存着就能自己签；豆包的「钥匙」是「浏览器当场算签名的能力」，只活在你本机登录着的浏览器里。所以必须借你本机（或服务器上的无头浏览器）当「签名代理」。
 
@@ -92,7 +91,7 @@ workbuddy-signin/
 │
 ├─ ★ 凭据 & 状态文件（平铺根目录，服务端平铺读取）★
 │   token.info  qf_token.txt  mm_token.json  mm_web_token.json  qoder_token.txt
-│   linkai_token.txt  lx_cookie.txt  trae_cookie.txt  coze_cookie.txt  jimeng_cookie.txt
+│   linkai_token.txt  lx_cookie.txt  trae_cookie.txt  coze_cookie.txt
 │   hw_cookie.txt（注：实际由 huawei/ 工具链产生并推送）
 │   settings.json  *_last_run.json（各平台签到历史） travel_state.json
 │
@@ -119,7 +118,7 @@ workbuddy-signin/
 
 | 文件 | 作用 |
 |------|------|
-| `web_server.py` | 手机网页版服务：11 个平台签到适配器 + 单页 UI（含统一「可用积分」显示、即梦过期提示、华为网页登录、Link AI 自动过滑块、**凭据到期预警**）；`--daily` 模式供服务器定时跑全部平台 |
+| `web_server.py` | 手机网页版服务：10 个平台签到适配器 + 单页 UI（含统一「可用积分」显示、华为网页登录、Link AI 自动过滑块、**凭据到期预警**）；`--daily` 模式供服务器定时跑全部平台 |
 | `wb_icon.py` | 各平台官方图标（64×64 圆角内联 SVG/PNG，含 Coze 官方 logo 已 base64 内联） |
 | `wb_travel.py` | 派猫猫旅行（WorkBuddy 卡内弹窗）逻辑，共用 WorkBuddy 登录态 |
 | `wb_growth.py` | WorkBuddy 成长中心 / 每日任务 一键完成（纯标准库） |
@@ -195,7 +194,6 @@ workbuddy-signin/
 | WPS 灵犀 | `lx_cookie.txt` | `LX_COOKIE` | 浏览器 DevTools → Application → Cookies 全复制 |
 | **Trae Work** | `trae_cookie.txt` + `trae_device_id.txt` | `TRAE_COOKIE`/`TRAE_JWT` + `TRAE_DEVICE_ID` | Cookie 见 config.example；**设备 id 见第 4 步** |
 | Coze 扣子 | `coze_cookie.txt` | `COZE_COOKIE` | 浏览器登录 coze.cn 后复制全部 Cookie |
-| 即梦 AI | `jimeng_cookie.txt` | `JIMENG_COOKIE` | 浏览器登录 jimeng.jianying.com 后复制全部 Cookie（sessionid 即凭证） |
 | 华为码道 | `hw_cookie.txt` | `HW_COOKIE` | 由本机 `huawei/` 工具链自动同步；亦可在网页「🔑 配置会话 Cookie」粘贴登录态 |
 | **豆包 Doubao** | `doubao_cookie.txt`（本机浏览器导出） | `DOUBAO_COOKIE` | 见下方「第 9 步 · 豆包」（特殊架构，不能直接填 cookie 服务端签） |
 
@@ -301,7 +299,7 @@ curl -s 127.0.0.1:8791/health     # 应返回 {"ok":true,"hasCookie":false}
 > 设置后本机需用新口令访问（页面把口令存 `localStorage['wb_center_key']`，**不放在 URL**）。
 
 ### 3. 🎚 平台开关
-按 `PLATFORM_TITLES` 列出每个平台一个开关（WorkBuddy / 百度千帆 / MiniMax Code / 即梦 AI / Qoder / Link AI / WPS 灵犀 / Trae Work / 华为码道）：
+按 `PLATFORM_TITLES` 列出每个平台一个开关（WorkBuddy / 百度千帆 / MiniMax Code / Qoder / Link AI / WPS 灵犀 / Trae Work / 华为码道）：
 - 关掉的平台在 `get_center` 标 `disabled`、灰显「已停用」，并在 `run_daily_all` 中跳过；
 - **派猫猫旅行**不在此列——它跟随 WorkBuddy（关 WorkBuddy 即关 travel）。
 
@@ -472,7 +470,6 @@ nginx 侧现状与已做加固，记录备查：
 - **Coze 卡片显示「未配置」**：`coze_cookie.txt` 缺失或 Cookie 过期（约 60 天）。浏览器登录 coze.cn 后从 DevTools → Application → Cookies 复制全部 cookie 存为 `coze_cookie.txt`，再 `deploy_ui.py` 推 112。
 - **华为卡显示「登录态过期」**：本机双击 `huawei/relogin_huawei.bat` 重新登录一次；之后 `hw_keeper.js` + `hw_autopush.py` 会自动维持并推送（本机需常驻运行）。
 - **华为卡想从网页直接登录**：卡片 / 详情页点「🔑 配置会话 Cookie」，从浏览器 DevTools 复制登录后的华为 Cookie 粘贴保存即可（因 `J_SESSION_ID` 是 HttpOnly，JS 读不到，无法做「输账号密码自动登录」；粘贴方案是最诚实可行的网页登录方式）。保存后寿命仍仅 30~60 分，够当下立即签到一次。
-- **即梦卡显示「Cookie 可能已失效」**：字节风控强，`jimeng_cookie.txt` 会周期失效。重捕 Cookie 后重部署即可——经 `deploy_ui.py` 上传新 `jimeng_cookie.txt`（覆盖线上）后重启服务，`get_jimeng_card()` 即恢复。
 - **Link AI 卡显示「登录态过期」**：`linkai_token.txt` 的 JWT 失效。登录 `link-ai.tech/console/account` 复制新的 API Token 覆盖该文件，经 `deploy_ui.py` 推到 112 后**重启服务**即可（该文件历史上是启动时读一次，现已改为现读盘，但仍建议重启一次确保干净）。
 - **Link AI 的图片验证码怎么解决的**：已用纯代码自动绕过，**不再需要手动签到**。原理：
   - Link AI 用的是开源 **AJ-Captcha** 的 `blockPuzzle`（滑块）模式；签到按钮点击链是 `ja()` → `za("blockPuzzle")` → 拿 `captchaVerification` 提交。
@@ -527,14 +524,6 @@ nginx 侧现状与已做加固，记录备查：
 **Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`）：
 - 每日登录自动发放 1500 活动分，**无独立 claim 接口**；卡为状态卡，Cookie 有效即「已配置」，并显示当日福利确认历史。
 - 凭据：`coze_cookie.txt`（Cookie 串，含 `sessionid`/`sid_guard`，约 60 天）
-
-**即梦 AI Jimeng**（对应 `get_jimeng_card` / `run_jimeng_checkin`，自动卡）：
-- 端点前缀 `https://jimeng.jianying.com`，`aid=513695` / `PLATFORM_CODE=7` / `VERSION_CODE=8.4.0`。
-- **sessionid 即凭证**：`acquireToken()` 直接返回 sessionid，无需换 token；Cookie 存 `jimeng_cookie.txt`（已 gitignored）。
-- 余额：`POST /commerce/v1/benefits/user_credit`（读 `credit.gift_credit`）；领取：`POST /commerce/v1/benefits/credit_receive`（body `{"time_zone":"Asia/Shanghai"}`）。
-- **签名**：`Sign = MD5("9e2c|{uri末7位}|7|8.4.0|{deviceTime}||11ac")`，需带 `Device-Time` / `Sign-Ver:1` / `Appid` 头。
-- **幂等**：当日已领返回 `is_first_receive:false`、不再加积分 → 每日定时跑安全不重复。
-- 卡片底部统一显示「可用积分」，并额外展示「88 积分将于 x月x日 过期」（取自 `expiring_credits[].expire_time`）。字节风控强，`jimeng_cookie.txt` 会周期失效，届时卡片诚实标「Cookie 可能已失效」，需重捕经 `deploy_ui.py` 部署。
 
 **华为码道 DevCloud**（对应 `get_hw_card` / `run_hw_checkin`，**自动卡**）：
 - 端点前缀 `https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService/v1/ops/`，每日签到需带浏览器同款头（`cftk` CSRF）否则回 SPA HTML。
