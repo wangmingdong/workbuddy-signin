@@ -1363,15 +1363,23 @@ def _run_trae_checkin_locked():
 #            返回 data（task_key/trade_no/total_claimed_credits），已签幂等（重复返回 200）
 #   鉴权      需登录 Cookie（*.wps.cn，核心会话为 HttpOnly）；每日任务 +100 智点
 # 凭据优先级：环境变量 LX_COOKIE > 同目录 lx_cookie.txt
-LX_COOKIE = os.environ.get("LX_COOKIE", "")
-if not LX_COOKIE:
-    try:
-        with open(os.path.join(BASE_DIR, "lx_cookie.txt"), "r", encoding="utf-8") as _f:
-            LX_COOKIE = _f.read().strip()
-    except Exception:
-        LX_COOKIE = ""
+# ⚠️ 必须「每次用之前现读盘」：早期模块级缓存导致换新 Cookie 后常驻进程仍用旧值
+#    （与 Link AI 同款坑），非得 systemctl restart 才生效。2026-11-09 改为现读，
+#    一键工具推送新 Cookie 后立即生效，无需重启。
+LX_COOKIE_FILE = os.path.join(BASE_DIR, "lx_cookie.txt")
 LX_STATE_FILE = os.path.join(BASE_DIR, "lx_last_run.json")
 LX_TASK_API = "https://lingxi.wps.cn/api/public/v1/tasks"
+
+
+def _lx_cookie():
+    env = (os.environ.get("LX_COOKIE") or "").strip()
+    if env:
+        return env
+    try:
+        with open(LX_COOKIE_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
 
 
 def _lx_api(path, method="GET", body=None):
@@ -1379,8 +1387,9 @@ def _lx_api(path, method="GET", body=None):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Referer": "https://lingxi.wps.cn/",
     }
-    if LX_COOKIE:
-        headers["Cookie"] = LX_COOKIE
+    ck = _lx_cookie()
+    if ck:
+        headers["Cookie"] = ck
     if body is not None:
         headers["Content-Type"] = "application/json"
     data = json.dumps(body).encode() if body is not None else None
@@ -1415,7 +1424,7 @@ def _lx_read_last():
 
 
 def get_lx_card():
-    if not LX_COOKIE:
+    if not _lx_cookie():
         return {
             "name": "lingxi",
             "title": "WPS 灵犀每日签到",
@@ -1434,7 +1443,8 @@ def get_lx_card():
         }
     try:
         today = datetime.date.today().isoformat()
-        d = _lx_api("/?date=%s" % today)
+        # 注意：tasks 后面别加尾斜杠，官方会 301 跳回无斜杠地址
+        d = _lx_api("?date=%s" % today)
         lr = _lx_read_last()
         data = d.get("data") or {}
         tasks = data.get("tasks") or []
@@ -1477,17 +1487,51 @@ def get_lx_card():
             "error": None,
         }
     except Exception as e:
+        # ⚠️ 不能因为「任务面板查询失败」就把整张卡判成「登录态过期 / 暂无记录」：
+        # 2026-11-09 实测 08:48 自动领取 +200 成功、11:00 后 tasks 接口 401，
+        # 旧逻辑会误报成「今天没签到 + 需更新凭据」，害用户白补签。今天有成功记录
+        # 就如实显示「已签到」，同时把「明天会失败、需换 Cookie」写清楚。
+        lr = _lx_read_last()
+        today = datetime.date.today().isoformat()
+        if lr and lr.get("ok") and str(lr.get("ts") or "")[:10] == today:
+            s = str(e)
+            rows = [
+                {"k": "今日签到", "v": str(lr.get("message") or "✅ 已成功")},
+                {"k": "执行时间", "v": str(lr.get("ts"))[:16]},
+                {"k": "⚠️ 待办",
+                 "v": "任务面板接口返回 401，登录态已失效：今天不用补签，但明天自动签到会失败。"
+                      "请在本机双击 refresh_lingxi.bat → 在弹出的 Edge 里登录 lingxi.wps.cn，"
+                      "脚本会自动抓新 Cookie 推到服务器（无需重启）。"},
+                {"k": "查询失败原因", "v": (s[:120] + "…") if len(s) > 120 else s},
+            ]
+            return {
+                "name": "lingxi",
+                "title": "WPS 灵犀每日签到",
+                "brand": "#10B981",
+                "brand2": "#059669",
+                "icon": "lx",
+                "checked": True,
+                "needs_auth": False,
+                "badge": "已签到·凭据待更新",
+                "hide_auth_link": True,
+                "metric_label": "今日状态",
+                "metric_value": "已签到",
+                "last_run": lr,
+                "rows": rows,
+                "error": None,
+            }
         return _auth_fail_card(
             "lingxi", "WPS 灵犀每日签到", "#10B981", "#059669", "lx", e,
             [("如何恢复",
-              "WPS 灵犀登录 Cookie 已失效：在浏览器登录 lingxi.wps.cn 后用抓 Cookie 脚本导出 "
-              "lx_cookie.txt 部署到服务器，或在设置页更新 LX_COOKIE，再点「重新检查」")],
+              "WPS 灵犀登录 Cookie 已失效（接口 401）：在本机双击 refresh_lingxi.bat，"
+              "于弹出的 Edge 窗口登录 lingxi.wps.cn，脚本会验证 Cookie 并自动推送到服务器"
+              "（现读盘，无需重启），再点「重新检查」。设置页没有 LX_COOKIE 输入框，别在那找。")],
         )
 
 
 def run_lx_checkin():
     """执行 WPS 灵犀每日签到（幂等：已签重复领取仍返回 200）。"""
-    if not LX_COOKIE:
+    if not _lx_cookie():
         raise RuntimeError("未配置灵犀登录 Cookie（lx_cookie.txt 或 LX_COOKIE）")
     today = datetime.date.today().isoformat()
     d = _lx_api("/daily_check_in/claim?date=%s" % today, method="POST", body={})
@@ -4100,7 +4144,8 @@ def get_detail(name):
     if name == "lingxi":
         history = _load_json_records(LX_STATE_FILE, 30)
         today = datetime.date.today().isoformat()
-        d = _lx_api("/?date=%s" % today)
+        # 注意：tasks 后面别加尾斜杠，官方会 301 跳回无斜杠地址
+        d = _lx_api("?date=%s" % today)
         data = d.get("data") or {}
         tasks = data.get("tasks") or []
         daily = next((t for t in tasks if t.get("task_key") == "daily_check_in"), {})
@@ -4340,11 +4385,11 @@ def _manual_guide(name, it):
     if name == "lingxi":
         return {
             "title": "登录 Cookie 已失效",
-            "note": "WPS 灵犀用的是浏览器 Cookie，过期后需要重新导出。",
+            "note": "WPS 灵犀用的是浏览器 Cookie（约一个月一轮），过期后需本机重新登录一次；服务器无法自行续期。",
             "steps": [
-                "在浏览器登录 lingxi.wps.cn",
-                "重新导出 lx_cookie.txt 并部署到服务器",
-                "回来点「重新检查签到状态」同步最新结果",
+                "在电脑上双击 refresh_lingxi.bat",
+                "弹出的 Edge 窗口里登录 lingxi.wps.cn（一次性）",
+                "脚本自动验证并推送新 Cookie 到服务器（无需重启），回来点「重新检查签到状态」",
             ],
             "cta_label": None,
             "cta_url": None,
@@ -5045,10 +5090,20 @@ button.cta.ghost .spin{width:12px;height:12px;margin-right:5px;border-color:rgba
 .dloading .spin{margin-right:8px;border-color:rgba(0,0,0,.15);border-top-color:var(--c,#00C29A);}
 .loading{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--sub);padding:40px 0;font-size:14px;width:100%;grid-column:1 / -1;}
 .loading .spin{margin-right:0;border-color:rgba(0,0,0,.12);border-top-color:var(--wb-brand-8);}
-.msg{margin-top:14px;padding:11px 14px;border-radius:12px;font-size:14px;display:none;}
+/* 全局提示改为顶部悬浮：弹窗(#modal z=1000)打开时也能看见反馈 */
+.msg{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:1300;max-width:min(92vw,520px);
+     margin:0;padding:11px 14px;border-radius:12px;font-size:14px;line-height:1.55;display:none;
+     box-shadow:0 8px 26px rgba(15,23,42,.18);}
 .msg.show{display:block;}
-.msg.ok{background:rgba(0,194,154,.12);color:#00614D;}
-.msg.err{background:rgba(240,68,56,.1);color:#912018;}
+.msg.ok{background:#e7faf3;color:#00614D;}
+.msg.err{background:#fdecea;color:#912018;}
+/* 弹窗内持久状态区：不随 load() 的 hideMsg() 消失 */
+.fstatus{display:none;margin:10px 0 2px;padding:11px 13px;border-radius:12px;font-size:13px;line-height:1.65;
+         border:1px solid transparent;}
+.fstatus.show{display:block;}
+.fstatus.ok{background:#f0ecff;border-color:#d9ccff;color:#3b2b8c;}
+.fstatus.warn{background:#fff5e6;border-color:#ffdfae;color:#8a5300;}
+.fstatus.err{background:#fdecea;border-color:#f7c9c4;color:#912018;}
 /* ===== 访问口令锁屏 ===== */
 body.locked{overflow:hidden;}
 body.locked .wrap{display:none;}
@@ -5919,6 +5974,7 @@ function renderGrowthFocus(d){
     + '</div>'
     + (d.running ? '<div class="fnote" style="text-align:center">⏳ 正在后台执行，完成后自动刷新…</div>' : '')
     + '<button class="btn-mini growth-run" style="width:100%;padding:14px;font-size:15px;--c:#7C5CFF;--c2:#9D7BFF">🚀 一键完成 / 领取</button>'
+    + '<div id="growth-status" class="fstatus"></div>'
     + '<div class="fnote">「一键」会自动尝试上报进度并领取<b>已完成</b>任务的奖励；但服务端会校验真实操作，'
     + '<b>标 🔒 / 💡 的任务必须在 WorkBuddy 客户端真实操作</b>（召唤专家、打开应用、用模板、夜间访问等）后才会记功，接口上报不会推进进度。</div>';
   if(claim.length){
@@ -5944,37 +6000,80 @@ function renderGrowthFocus(d){
   }
   el.innerHTML = html;
   bindFocusButtons(el);
+  applyGrowthStatus();
+}
+// 弹窗内持久反馈（不随 load()/hideMsg() 消失，且不会被 #modal 遮住）
+var GROWTH_MSG = null;
+function setGrowthStatus(txt,kind){
+  GROWTH_MSG = {txt:txt, kind:kind||"ok"};
+  applyGrowthStatus();
+}
+function applyGrowthStatus(){
+  var el = document.getElementById("growth-status");
+  if(!el || !GROWTH_MSG) return;
+  el.className = "fstatus show " + GROWTH_MSG.kind;
+  el.textContent = GROWTH_MSG.txt;
 }
 function runGrowth(btn){
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>执行中…'; }
+  setGrowthStatus("⏳ 已提交后台执行，正在逐项尝试上报并领取…（约需 30-60 秒）","ok");
   showMsg("成长中心任务正在后台执行，请稍候…","ok");
   api("api/growth/run",{method:"POST"}).then(function(d){
-    if(!d.ok){ showMsg(d.error||"启动失败","err"); if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; } return; }
-    pollGrowth();
+    if(!d.ok){
+      setGrowthStatus("⚠️ 启动失败："+(d.error||"未知错误"),"err");
+      showMsg(d.error||"启动失败","err");
+      if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; }
+      return;
+    }
+    pollGrowth(0);
   }).catch(function(e){
     if(e&&e.needKey){ showKeyGate(); }
-    else showMsg("网络错误："+(e&&e.message),"err");
+    else { setGrowthStatus("⚠️ 网络错误："+(e&&e.message),"err"); showMsg("网络错误："+(e&&e.message),"err"); }
     if(btn){ btn.disabled=false; btn.innerHTML="🚀 一键完成 / 领取"; }
   });
 }
-function pollGrowth(){
+function pollGrowth(n){
+  n = n || 0;
   api("api/growth").then(function(d){
-    if(d.running){ setTimeout(pollGrowth, 2500); return; }
-    var ok=0, tot=(d.results||[]).length;
-    (d.results||[]).forEach(function(r){ if(r.ok) ok++; });
-    if(tot) showMsg("成长中心：成功 "+ok+" / "+tot+" 项 ✅","ok");
+    if(d.running){
+      setGrowthStatus("⏳ 后台执行中…（已等待约 "+Math.round(n*2.5)+" 秒，逐项请求中，请勿关闭弹窗）","ok");
+      setTimeout(function(){ pollGrowth(n+1); }, 2500);
+      return;
+    }
+    var rs = d.results||[], ok=0, unknown=0, blocked=0, other=0;
+    rs.forEach(function(r){
+      if(r.ok){ ok++; return; }
+      var m = String(r.msg||"");
+      if(/未知任务|未实现驱动/.test(m)) unknown++;
+      else if(/进度未满|真实使用|暂未达标/.test(m)) blocked++;
+      else other++;
+    });
+    var msg = "✅ 执行完毕："+ok+" / "+rs.length+" 项已领或已处理";
+    var tips = [];
+    if(blocked) tips.push(blocked+" 项进度未满，需在 WorkBuddy 客户端真实使用对应功能");
+    if(unknown) tips.push(unknown+" 项是新增「体验专家」任务，脚本未适配且官方校验真实交互");
+    if(other) tips.push(other+" 项上报/领奖失败");
+    if(tips.length) msg += "；剩余 "+tips.length+" 类任务接口无法代做，所以列表不会变化：" + tips.join("；") + "。";
+    if(d.run_error) msg = "⚠️ 执行出错："+d.run_error;
+    setGrowthStatus(msg, (tips.length || d.run_error) ? "warn" : "ok");
+    if(rs.length) showMsg("成长中心：成功 "+ok+" / "+rs.length+" 项 ✅","ok");
     else if(d.run_error) showMsg("执行出错："+d.run_error,"err");
     renderGrowthFocus(d);
-  }).catch(function(e){ showMsg("刷新失败："+(e&&e.message),"err"); });
+  }).catch(function(e){
+    setGrowthStatus("⚠️ 刷新失败："+(e&&e.message),"err");
+    showMsg("刷新失败："+(e&&e.message),"err");
+  });
 }
 function claimTask(code, btn){
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; }
   api("api/growth/claim?code="+encodeURIComponent(code),{method:"POST"}).then(function(d){
-    if(d.ok) showMsg(d.msg||"领取成功 ✅","ok"); else showMsg(d.msg||d.error||"领取失败","err");
+    var t = d.ok ? (d.msg||"领取成功 ✅") : (d.msg||d.error||"领取失败");
+    setGrowthStatus((d.ok?"✅ ":"⚠️ ")+t, d.ok?"ok":"err");
+    showMsg(t, d.ok?"ok":"err");
     refreshGrowth();
   }).catch(function(e){
     if(e&&e.needKey){ showKeyGate(); }
-    else showMsg("网络错误："+(e&&e.message),"err");
+    else { setGrowthStatus("⚠️ 网络错误："+(e&&e.message),"err"); showMsg("网络错误："+(e&&e.message),"err"); }
     if(btn){ btn.disabled=false; }
   });
 }

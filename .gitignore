@@ -37,6 +37,7 @@ hw_profile/
 trae_profile/
 hw_probe_profile/
 doubao_profile/
+lx_profile/
 
 # 抓取/调试产物
 hw_capture.log
@@ -80,6 +81,7 @@ cred_backup/
 oiioii_token.txt
 oiioii_session.json
 lx_cookie.txt
+lx_cookie.json
 coze_cookie.txt
 # 即梦 AI 已下线（2026-11-05 移除平台与卡片）；规则保留，防止 _removed_jimeng/ 里归档的旧凭据被误入库
 jimeng_cookie.txt

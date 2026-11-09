@@ -344,7 +344,7 @@ def run_task(sess, code):
                 return False, "black_cat 仅在 23:00-08:00 夜间窗口可完成"
             report_desktop(sess, [_chat_event(sess, cid)])
         else:
-            return False, "未知任务 %s，未实现驱动" % code
+            return False, "新增任务 %s 未实现驱动：需在 WorkBuddy 客户端真实体验对应功能，接口上报不推进进度" % code
 
         # 领奖（进度达标才发奖；重复领 already_claimed 安全）
         time.sleep(2)

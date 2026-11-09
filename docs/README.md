@@ -191,7 +191,7 @@ workbuddy-signin/
 | MiniMax Code | `mm_web_token.json` | `MM_WEB_TOKEN` | agent.minimax.cn 网页端 localStorage._token |
 | Qoder | `qoder_token.txt` | `QODER_TOKEN` | 桌面客户端取出（仅状态展示，领取见第 5 步） |
 | Link AI | `linkai_token.txt` | `LINKAI_TOKEN` | 平台生成的 API token |
-| WPS 灵犀 | `lx_cookie.txt` | `LX_COOKIE` | 浏览器 DevTools → Application → Cookies 全复制 |
+| WPS 灵犀 | `lx_cookie.txt` | `LX_COOKIE` | **推荐**：双击 `refresh_lingxi.bat` → 弹出的 Edge 登录 lingxi.wps.cn → 自动校验并推服务器（现读盘，无需重启）；亦可用浏览器 DevTools → Application → Cookies 全复制 |
 | **Trae Work** | `trae_cookie.txt` + `trae_device_id.txt` | `TRAE_COOKIE`/`TRAE_JWT` + `TRAE_DEVICE_ID` | Cookie 见 config.example；**设备 id 见第 4 步** |
 | Coze 扣子 | `coze_cookie.txt` | `COZE_COOKIE` | 浏览器登录 coze.cn 后复制全部 Cookie |
 | 华为码道 | `hw_cookie.txt` | `HW_COOKIE` | 由本机 `huawei/` 工具链自动同步；亦可在网页「🔑 配置会话 Cookie」粘贴登录态 |

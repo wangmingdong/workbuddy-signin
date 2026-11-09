@@ -18,6 +18,7 @@
 const { chromium } = require('./runtime_env').loadPlaywright();
 const http = require('http');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // ============================================================================
 // 【必填】网页签到中心访问口令（对应服务器 WB_ACCESS_KEY）
@@ -43,10 +44,16 @@ const RELAY_KEY = (function () {
 const PROFILE    = path.join(__dirname, 'doubao_profile');
 const COOKIE_TXT = path.join(__dirname, 'doubao_cookie.txt');
 const PORT       = 8791;
-// 签到优先走豆包电脑版客户端（需带 --remote-debugging-port=9222 启动，已写入 HKCU Run）：
-// 在客户端页面里点「立即签到」。注意 2026-10-31 起服务端对该账号 checkin 一律返回 710010702，
-// 官方客户端手点同样失败，故这不是脚本/签名问题，失败时由保活继续重试。
+// 签到必须走豆包电脑版客户端（需带 --remote-debugging-port=9222 启动，已写入 HKCU Run）：
+// 在客户端页面里点「立即签到」。2026-10-31 起脚本化 checkin 一律 710010702，
+// 只有官方客户端 UI 点击能成功。客户端没开时由 ensureDoubaoClient() 自动拉起。
 const CDP_URL    = 'http://127.0.0.1:9222';
+const DOUBAO_EXE_CANDIDATES = [
+  'D:\\Doubao\\Doubao.exe',
+  path.join(process.env.LOCALAPPDATA || '', 'Doubao', 'Doubao.exe'),
+  path.join(process.env.ProgramFiles || '', 'Doubao', 'Doubao.exe'),
+];
+let _clientStartAt = 0;
 const ORIGIN     = 'https://bjzjsf.asia';
 const SCENE      = 'pc_incentive_task_mvp_v3';
 const QP = 'version_code=20800&language=zh&device_platform=pc&doubao_device_platform=pc&aid=497858&real_aid=497858&pkg_type=release_version&samantha_web=0&web_platform=pc&runtime=pc';
@@ -126,6 +133,31 @@ async function cdpAvailable() {
   } catch (e) { return false; }
 }
 
+// 客户端没开 / 没带 9222 时自动拉起，避免签到降级到必失败的脚本接口。
+// 2 分钟内不重复拉起，防止客户端反复崩溃导致刷屏。
+async function ensureDoubaoClient() {
+  if (await cdpAvailable()) return true;
+  const now = Date.now();
+  if (now - _clientStartAt < 120000) return false;
+  _clientStartAt = now;
+  const exe = DOUBAO_EXE_CANDIDATES.find((p) => { try { return fs.existsSync(p); } catch (e) { return false; } });
+  if (!exe) { dlog('[client] 自动拉起失败：未找到豆包客户端 exe'); return false; }
+  try {
+    const child = spawn(exe, ['--remote-debugging-port=9222'], { detached: true, stdio: 'ignore' });
+    child.unref();
+    dlog('[client] 已自动拉起豆包客户端(9222) pid=' + child.pid);
+  } catch (e) {
+    dlog('[client] 自动拉起失败: ' + String(e).slice(0, 200));
+    return false;
+  }
+  for (let i = 0; i < 25; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    if (await cdpAvailable()) return true;
+  }
+  dlog('[client] 自动拉起后 25s 内 9222 仍不可用');
+  return false;
+}
+
 // 在豆包电脑版客户端里打开活动页，点击「立即签到」。
 // 客户端页面与活动 UI 才是官方认可入口；浏览器 fetch 会被服务端以 710010702 拒绝。
 async function clientSign() {
@@ -156,10 +188,16 @@ async function clientSign() {
       });
 
       const btn = page.getByText('立即签到', { exact: true }).first();
-      await btn.waitFor({ state: 'visible', timeout: 25000 });
-      const before = await readDaily().catch(() => null);
+      // 先查状态：今天已签过则按钮不存在，直接返回成功，避免白等 25s 再降级到失败的脚本接口
+      let before = null;
+      for (let i = 0; i < 5 && !(before && before.checked_in_today); i++) {
+        before = await readDaily().catch(() => null);
+        if (before && before.checked_in_today) break;
+        await page.waitForTimeout(1000);
+      }
       if (before && before.checked_in_today) return { ok: true, result: { source: 'client', checkin: { code: 0, msg: '今日已签到' }, daily: before } };
 
+      await btn.waitFor({ state: 'visible', timeout: 25000 });
       await btn.click();
       for (let i = 0; i < 30 && !checkinResp; i++) await page.waitForTimeout(500);
       const daily = await readDaily().catch(() => null);
@@ -179,6 +217,7 @@ async function doSign() {
   if (_signing) return { ok: false, error: '已有签到任务进行中' };
   _signing = true;
   try {
+    await ensureDoubaoClient();
     if (await cdpAvailable()) {
       try {
         const r = await clientSign();
