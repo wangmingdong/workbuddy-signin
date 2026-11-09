@@ -2356,7 +2356,8 @@ def _qd_web_csrf():
                 tok = m.group(1)
     except Exception:
         tok = ""
-    _QD_CSRF_CACHE.update({"ts": now, "token": tok})
+    # 失败不缓存：cookie 刚换新时，下一次请求就要能立刻取到 csrf，不能等半小时
+    _QD_CSRF_CACHE.update({"ts": now if tok else 0, "token": tok})
     return tok
 
 
@@ -2447,8 +2448,12 @@ def _qd_usage_expiring():
     网页 /api/v2/me/usages/big_model_credits 才有。cookie 失效时返回 None。
     """
     now = time.time()
-    if now - float(_QD_USAGE_CACHE.get("ts") or 0) < 300:
-        return _QD_USAGE_CACHE.get("data")
+    cached = _QD_USAGE_CACHE.get("data")
+    ts = float(_QD_USAGE_CACHE.get("ts") or 0)
+    if cached is not None and now - ts < 300:
+        return cached
+    if cached is None and now - ts < 60:
+        return None  # 失败短缓存：避免每次刷新都打两次上游，又不至于换 cookie 后干等 5 分钟
     data = None
     try:
         if _qd_cookie():
@@ -2466,6 +2471,7 @@ def _qd_usage_expiring():
                 data = _qd_parse_pack_expiry(json.loads(r.read().decode("utf-8", "replace")))
     except Exception:
         data = None
+    # 失败只做 60 秒短缓存（见上方判断）；成功缓存 5 分钟
     _QD_USAGE_CACHE.update({"ts": now, "data": data})
     return data
 

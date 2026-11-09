@@ -91,6 +91,8 @@ coze_logo.png
 # Qoder 登录态（本机从客户端取出的 access token，禁止入库）
 qoder_token.txt
 qoder_cookie.txt
+qoder_cookie.json
+qoder_profile/
 _qd_auth.json
 _qd_campaigns_dump.json
 # 凭据备份的另一种命名（形如 qoder_token.txt.bak_20261022_090211）

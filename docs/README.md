@@ -80,6 +80,9 @@ workbuddy-signin/
 ├─ setup_task.ps1         ← 注册 Windows 计划任务（本机每日自动跑）
 ├─ install_autostart.bat  ← 网页服务开机后台自启（无需管理员）
 ├─ trae_capture.js        ← Trae Cookie 抓取脚本（本机从浏览器导出）
+├─ qoder_capture.js       ← Qoder 网页会话抓取（Edge 登录一次 → 校验后推 112）
+├─ refresh_qoder_cookie.bat ← Qoder「将过期积分」一键刷新入口
+├─ push_qoder_cookie.py   ← 推送 qoder_cookie.txt 到 112 并实测逐包到期接口
 │
 ├─ ★ 豆包签名代理（Doubao）★
 ├─ doubao_sign.js          ← 本机签名代理：Playwright 驱动 Edge 算 a_bogus 真签；每 30 分把 cookie 推给 112（方案二）
@@ -190,7 +193,7 @@ workbuddy-signin/
 | WorkBuddy | `token.info` | `WB_TOKEN_FILE` | 打开一次客户端，token 自动写入本地 |
 | 千帆 | `qf_token.txt` | `QF_ACCESS_TOKEN` / `QF_BASE_URL` | 千帆官网登录后取 token |
 | MiniMax Code | `mm_web_token.json` | `MM_WEB_TOKEN` | agent.minimax.cn 网页端 localStorage._token |
-| Qoder | `qoder_token.txt` | `QODER_TOKEN` | 桌面客户端取出（仅状态展示，领取见第 5 步） |
+| Qoder | `qoder_token.txt`（+ `qoder_cookie.txt`） | `QODER_TOKEN` / `QODER_COOKIE` | token 由桌面客户端取出；要显示「将过期积分」需网页会话：**双击 `refresh_qoder_cookie.bat` → 弹出的 Edge 登录 qoder.com → 自动校验并推服务器**（现读盘，无需重启） |
 | Link AI | `linkai_token.txt` | `LINKAI_TOKEN` | 平台生成的 API token |
 | WPS 灵犀 | `lx_cookie.txt` | `LX_COOKIE` | **推荐**：双击 `refresh_lingxi.bat` → 弹出的 Edge 登录 lingxi.wps.cn → 自动校验并推服务器（现读盘，无需重启）；亦可用浏览器 DevTools → Application → Cookies 全复制 |
 | **Trae Work** | `trae_cookie.txt` + `trae_device_id.txt` | `TRAE_COOKIE`/`TRAE_JWT` + `TRAE_DEVICE_ID` | Cookie 见 config.example；**设备 id 见第 4 步** |
@@ -215,6 +218,7 @@ Trae 服务端**按设备记账**：`claim` 必须用与登录态一致的**你�
 - 守护每 15 分钟自检：保持服务器侧指纹最新 + 每天 10:05 后本机自领（`GET campaigns → POST claim`，服务端 `replayed` 幂等绝不重复发放），并推送「已领 + 可用 Credits」（HTTP `/api/qoder/local-status` 优先，SFTP 兜底）；
 - **服务端代领**：服务器每天 10:05~13:00 用守护推送的指纹重放自动领（`_qoder_topup_loop` 补签线程），「一键签到」按钮也可手动触发——**本机没开机也能领**；
 - 卡片诚实映射：领取方式区分「🤖 本机守护」/「☁️ 服务端代领」，没指纹/没登录态就显示真实原因，绝不假报。
+- **将过期积分（需要网页会话）**：token 只能拿到 `addOnQuota` 汇总余额；逐包到期日只在网页接口 `/api/v2/me/usages/big_model_credits` 里。双击 `refresh_qoder_cookie.bat` → 弹出的 Edge 登录 qoder.com → 脚本校验通过后自动推送 `qoder_cookie.txt` 到 112（备份旧文件、失败不覆盖），手机端下次刷新即显示「⏳ X Credits 将于 MM-DD 过期」与 7/30 天合计。cookie 失效时只显示余额，不猜日期。
 
 ### 6. 成长中心 / 每日任务：WorkBuddy 卡内弹窗
 WorkBuddy 卡片底部的「🌱 成长中心」「🎯 每日任务」入口，点击在**当前页面弹窗**打开（与「派猫猫旅行」同一套卡内弹窗，不跳页），可一键完成/领取。它们复用 WorkBuddy 登录态，随 WorkBuddy 开关联动。
