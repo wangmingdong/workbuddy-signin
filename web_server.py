@@ -2822,7 +2822,6 @@ def _qd_window(camp):
 def _qd_card_from_local(local, exp, cookie=False):
     """用今日领取记录渲染 Qoder 卡——本机守护或服务端代领的真实结果，诚实映射。"""
     checked = bool(local.get("checked"))
-    balance = local.get("balance")
     ts = str(local.get("ts") or "")[5:16]
     src = local.get("source") or "local_keeper"
     if src == "server_claim":
@@ -2833,8 +2832,6 @@ def _qd_card_from_local(local, exp, cookie=False):
         {"k": "领取方式", "v": how},
         {"k": "领取状态", "v": "✅ 今日已领" if checked else "⚠️ %s" % (local.get("message") or "未领取")},
     ]
-    if balance is not None:
-        rows.append({"k": "可用 Credits", "v": str(balance)})
     if local.get("claimed_at"):
         rows.append({"k": "领取时间", "v": str(local["claimed_at"])[5:16]})
     if local.get("message") and checked:
@@ -3482,12 +3479,6 @@ def get_wb_card():
             {
                 "k": "今日已得",
                 "v": ("+%s 分" % st["today"]) if st.get("today") is not None else "--",
-            },
-            {
-                "k": "可用积分",
-                "v": ("%s 分" % st["remaining"])
-                if st.get("remaining") is not None
-                else "--",
             },
             {
                 # 资源包总量含本周期已消耗，仅作参考（官方客户端「可用积分」用的是本期口径）
@@ -5514,8 +5505,8 @@ body.locked .wrap{display:none;}
 @media (min-width:600px){
   .wrap{max-width:680px;}
   #cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
-  /* 折叠后最高的卡约 572px；统一下限让多列时每张卡等高（按钮仍贴底） */
-  #cards .card{min-height:575px;}
+  /* 折叠后最高的卡约 483px；统一下限让多列时每张卡等高（按钮仍贴底） */
+  #cards .card{min-height:480px;}
 }
 @media (min-width:920px){
   .wrap{max-width:1040px;}
@@ -5761,18 +5752,16 @@ function rowHTML(r){
   return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';
 }
 function rowsHTML(rows){
-  // 明细默认只露前 3 行：长卡片（豆包/MiniMax 等）折起来，各卡高度才接近
-  var VISIBLE = 3;
-  var head = rows.slice(0, VISIBLE), tail = rows.slice(VISIBLE);
+  // 卡面默认只留「凭据有效期 / 上次执行（签到）时间」，其余明细折起来，避免与上方区块重复
+  var KEEP = /有效期|登录态|上次执行|上次签到|上次检查|签到时间|领取时间/;
+  var head = rows.filter(function(r){ return KEEP.test(String(r.k||'')); });
+  var tail = rows.filter(function(r){ return !KEEP.test(String(r.k||'')); });
   var h = head.map(rowHTML).join("");
-  if(tail.length >= 2){
+  if(tail.length){
     h += '<div class="fold-body rows-more" hidden>'+tail.map(rowHTML).join("")+'</div>';
     h += '<button class="rows-toggle" type="button" aria-expanded="false"'
        + ' data-more="展开其余 '+tail.length+' 项" data-less="收起明细">'
        + '<span class="rt-txt">展开其余 '+tail.length+' 项</span><span class="rt-arrow">▾</span></button>';
-  } else {
-    // 只多 1 行时不值得再折一次，直接显示
-    h += tail.map(rowHTML).join("");
   }
   return h;
 }
