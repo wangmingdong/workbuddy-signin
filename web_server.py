@@ -2415,7 +2415,9 @@ def _qd_parse_pack_expiry(obj):
     if not packs:
         return None
     now_ms = time.time() * 1000
+    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).date()
     buckets = {}
+    empty_days = []
     seen = set()
     for it in packs:
         if not isinstance(it, dict):
@@ -2435,8 +2437,6 @@ def _qd_parse_pack_expiry(obj):
                         if it.get("remainingValue") is not None
                         else it.get("remaining_value") or 0)
         except Exception:
-            continue
-        if rem <= 0:
             continue
         exp = it.get("expiresAt")
         if exp is None:
@@ -2458,19 +2458,31 @@ def _qd_parse_pack_expiry(obj):
             continue
         utc8 = datetime.datetime.utcfromtimestamp(exp / 1000) + datetime.timedelta(hours=8)
         day = utc8.date()
+        if rem <= 0:
+            # 已用完的包：Qoder 网页照样标「即将到期」（≤5 天），
+            # 卡片要能解释「为什么页面写着明天到期、卡里却没有」
+            if 0 <= (day - today).days <= 5:
+                empty_days.append(day)
+            continue
         buckets[day] = buckets.get(day, 0.0) + rem
     if not buckets:
         return None
     first = min(buckets)
-    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).date()
 
     def _within(max_days):
         return sum(v for d, v in buckets.items() if (d - today).days <= max_days)
+
+    empty = None
+    if empty_days:
+        first_empty = min(empty_days)
+        if first_empty < first:
+            empty = {"count": len(empty_days), "date": first_empty.strftime("%m-%d")}
 
     return {
         "next": {"amount": _qd_num(buckets[first]), "date": first.strftime("%m-%d")},
         "d7": _qd_num(_within(7)),
         "d30": _qd_num(_within(30)),
+        "empty": empty,
     }
 
 
@@ -2527,6 +2539,7 @@ def _qd_credit_info():
             "date": ex["next"]["date"],
             "d7": ex.get("d7"),
             "d30": ex.get("d30"),
+            "empty": ex.get("empty"),
         }
     return credit
 
@@ -5396,6 +5409,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   padding:6px 10px;border-radius:9px;line-height:1.45;}
 .credit-exp.sub{margin-top:4px;background:transparent;border:0;padding:0 2px;color:#9a6b16;font-size:11.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.credit-exp.sub.gone{color:#94a3b8;}
 .last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
 button.cta{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;color:#fff;
   background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
@@ -5716,6 +5730,9 @@ function creditHTML(it){
     if(c.expiring.d7!=null) sub.push('7 天内 '+esc(c.expiring.d7));
     if(c.expiring.d30!=null) sub.push('30 天内 '+esc(c.expiring.d30));
     if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+'将过期</div>';
+    if(c.expiring.empty && c.expiring.empty.date){
+      h += '<div class="credit-exp sub gone">另有 '+esc(c.expiring.empty.count)+' 个资源包 '+esc(c.expiring.empty.date)+' 起到期（已用完）</div>';
+    }
   }
   return h;
 }
