@@ -2362,40 +2362,73 @@ def _qd_web_csrf():
 
 
 def _qd_parse_pack_expiry(obj):
-    """从 big_model_credits 返回里找资源包列表，按到期日汇总剩余 Credits。"""
-    lists = []
+    """从 big_model_credits 返回里找资源包列表，按到期日汇总剩余 Credits。
 
-    def _collect(d):
-        if not isinstance(d, dict):
-            return
-        for k in ("details", "packages", "quotas", "resource_packages",
-                  "resourcePackages", "items"):
-            v = d.get(k)
-            if isinstance(v, list):
-                lists.append(v)
-        inner = d.get("data")
-        if isinstance(inner, dict):
-            _collect(inner)
+    真实结构（2026-11-09 实测）：
+      resource_package_quota.quota_detail[]  赠送/签到包，含 expires_at（毫秒）
+      dedicated_resource_package_quota.quota_detail[]  专用包
+      total_quota.quota_detail[]  全部（含 PLAN，expires_at=0 表示不过期）
+    """
 
-    _collect(obj)
-    packs = None
-    for lst in lists:
-        if any(isinstance(x, dict) and (
-                x.get("remainingValue") is not None
-                or x.get("remaining_value") is not None) for x in lst):
-            packs = lst
-            break
+    def _detail_list(container):
+        if not isinstance(container, dict):
+            return []
+        lst = container.get("quota_detail")
+        if lst is None:
+            lst = container.get("quotaDetail")
+        return lst if isinstance(lst, list) else []
+
+    packs = []
+    if isinstance(obj, dict):
+        for k in ("resource_package_quota", "resourcePackageQuota",
+                  "dedicated_resource_package_quota", "dedicatedResourcePackageQuota"):
+            packs.extend(_detail_list(obj.get(k)))
+        if not packs:
+            for k in ("total_quota", "totalQuota", "plan_quota", "planQuota"):
+                lst = _detail_list(obj.get(k))
+                if lst:
+                    packs.extend(lst)
+                    break
+    if not packs:
+        # 兼容其它/旧结构：details / packages / quotas / ... 列表
+        lists = []
+
+        def _collect(d):
+            if not isinstance(d, dict):
+                return
+            for k in ("details", "packages", "quotas", "resource_packages",
+                      "resourcePackages", "items"):
+                v = d.get(k)
+                if isinstance(v, list):
+                    lists.append(v)
+            inner = d.get("data")
+            if isinstance(inner, dict):
+                _collect(inner)
+
+        _collect(obj)
+        for lst in lists:
+            if any(isinstance(x, dict) and (
+                    x.get("remainingValue") is not None
+                    or x.get("remaining_value") is not None) for x in lst):
+                packs = lst
+                break
     if not packs:
         return None
     now_ms = time.time() * 1000
     buckets = {}
+    seen = set()
     for it in packs:
         if not isinstance(it, dict):
             continue
+        pid = it.get("id")
+        if pid:
+            if pid in seen:
+                continue
+            seen.add(pid)
         status = str(it.get("status") or "").upper()
         if status in ("EXPIRED", "SUSPENDED", "REFUNDED", "EXHAUSTED"):
             continue
-        if it.get("isActive") is False:
+        if it.get("isActive") is False or it.get("is_active") is False:
             continue
         try:
             rem = float(it.get("remainingValue")

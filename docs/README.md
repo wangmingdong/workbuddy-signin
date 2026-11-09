@@ -528,7 +528,7 @@ nginx 侧现状与已做加固，记录备查：
 - 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
 - 可用 Credits：`GET https://openapi.qoder.sh/api/v2/quota/usage` → `addOnQuota.{total,used,remaining}`（token 即可，无需 cookie；该接口**只有汇总余额，没有逐包到期日**）
 - 将过期积分：`GET https://qoder.com/api/v2/me/usages/big_model_credits`（**网页会话专属**，需 `qoder_cookie.txt` + `X-CSRF-TOKEN`，csrf 从 `/account/usage` 页 HTML 的 `window.csrfToken` 提取；dt- token 调它固定 401）
-  - 按 `details[].expiresAt` + `remainingValue` 汇总，跳过已过期/停用/退款的包；卡面显示最近一档到期量与 7/30 天合计；
+  - 按 `resource_package_quota.quota_detail[]`（缺失时退回 `total_quota.quota_detail[]`）的 `remaining_value` + `expires_at`（毫秒）汇总，跳过已过期/停用/退款及 `expires_at=0`（永不过期）的包；卡面显示最近一档到期量与 7/30 天合计；
   - **诚实边界**：cookie 失效时只显示 token 查到的总余额，不猜到期日、不编造数字；恢复只需按第 5 步重新导出 `qoder_cookie.txt`。
 - **🔑 2026-09-27 破局：真正卡点 = 设备指纹头 `Cosy-Machine*`**（`MachineToken/Type/Code/Id/OS`），由本机 Qoder 客户端/CLI 自带的 `resources/umid/runtime-info.exe` 实时生成（阿里 securityguard SDK，`echo {"account":""} | runtime-info.exe` → stdout JSON）。**不带指纹 → campaigns 返回空数组（看似「没活动」，即旧结论「服务端拿不到入口」的真实根因）；伪造指纹 → 503 RISK_DEPENDENCY_UNAVAILABLE**。实测带指纹后 CLAIM_BENEFIT 活动立即可见并 claim 成功（+100，余额 597）。
 - **架构**：指纹绑定本机硬件 → 服务端不可代领。本机 `qoder_keeper/qoder_keeper.py`（probe / run / --loop）负责真实领取，经 HTTP `/api/qoder/local-status?k=` 或 SFTP 把 `qoder_local_status.json` 推给服务器；`get_qd_card()` 优先渲染守护上报（`_qd_local_today`），无上报则诚实显示「待本机领取」。活动 key 不按天变（如 act-20260923-252）而轮次每日 10:00(UTC+8) 刷新，故领取逻辑为「领任何 CLAIMABLE 项」。

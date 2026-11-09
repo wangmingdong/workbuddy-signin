@@ -63,6 +63,14 @@ async function getCsrf(page, html) {
   return m ? m[1] : '';
 }
 
+function packList(data) {
+  if (!data) return [];
+  const group = (k) => (data[k] && Array.isArray(data[k].quota_detail) ? data[k].quota_detail : []);
+  let packs = group('resource_package_quota').concat(group('dedicated_resource_package_quota'));
+  if (!packs.length) packs = group('total_quota');
+  return packs;
+}
+
 async function check(page, header, csrf) {
   const r = await fetch(API, {
     headers: {
@@ -79,12 +87,11 @@ async function check(page, header, csrf) {
   const text = await r.text();
   let data = null;
   try { data = JSON.parse(text); } catch (e) {}
-  const details = data && (Array.isArray(data.details) ? data.details
-    : (data.data && Array.isArray(data.data.details) ? data.data.details : []));
-  const expiring = details.filter((x) => x && x.expiresAt != null &&
-    Number(x.remainingValue || x.remaining_value || 0) > 0);
-  console.log('[check] HTTP ' + r.status + ' details=' + details.length + ' expiring=' + expiring.length);
-  return r.status === 200 && !!data && Array.isArray(details);
+  const packs = packList(data);
+  const expiring = packs.filter((x) => x && x.expires_at != null &&
+    Number(x.remaining_value || x.remainingValue || 0) > 0);
+  console.log('[check] HTTP ' + r.status + ' packs=' + packs.length + ' expiring=' + expiring.length);
+  return r.status === 200 && !!data;
 }
 
 function push(ctx) {
