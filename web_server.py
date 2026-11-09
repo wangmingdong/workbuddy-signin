@@ -5391,7 +5391,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .row:last-child{border-bottom:0;}
 .row .k{color:var(--sub);white-space:nowrap;}
 .row .v{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere;}
-/* 明细折叠：默认只露前 3 行，其余点开再看，卡片高度才能对齐 */
+/* 明细折叠：先折起量出统一高度，内容装得下的卡由脚本直接展开（不留白） */
 .fold-body[hidden]{display:none;}
 .rows-toggle{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;border:0;
   background:transparent;color:#64748b;font:inherit;font-size:12px;font-weight:600;
@@ -5505,8 +5505,8 @@ body.locked .wrap{display:none;}
 @media (min-width:600px){
   .wrap{max-width:680px;}
   #cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
-  /* 折叠后最高的卡约 483px；统一下限让多列时每张卡等高（按钮仍贴底） */
-  #cards .card{min-height:480px;}
+  /* 等高下限由脚本按实测高度写入（--card-min），短卡不硬留 480px 空白 */
+  #cards .card{min-height:var(--card-min,0px);}
 }
 @media (min-width:920px){
   .wrap{max-width:1040px;}
@@ -5723,7 +5723,11 @@ function fmtLast(lr){
 function creditHTML(it){
   var c = it.credit || {balance:null, unit:""};
   var bal = (c.balance!=null && c.balance!=="") ? (esc(c.balance)+' '+(c.unit||'')) : '—';
-  var h = '<div class="credit-row"><span class="cl">可用积分</span><span class="cv">'+bal+'</span></div>';
+  // 上面的大数字本身就是「可用积分」且数值相同 → 下面不再重复一遍
+  var dup = String(it.metric_label||'') === '可用积分'
+         && c.balance != null && c.balance !== ''
+         && String(c.balance) === String(it.metric_value);
+  var h = dup ? '' : '<div class="credit-row"><span class="cl">可用积分</span><span class="cv">'+bal+'</span></div>';
   if(c.expiring && c.expiring.amount!=null && c.expiring.date){
     h += '<div class="credit-exp">⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' 将于 '+esc(c.expiring.date)+' 过期</div>';
     var sub = [];
@@ -5764,6 +5768,55 @@ function rowsHTML(rows){
        + '<span class="rt-txt">展开其余 '+tail.length+' 项</span><span class="rt-arrow">▾</span></button>';
   }
   return h;
+}
+function resetFolds(card){
+  Array.prototype.forEach.call(card.querySelectorAll('.fold-body'), function(b){ b.setAttribute('hidden',''); });
+  Array.prototype.forEach.call(card.querySelectorAll('.rows-toggle'), function(b){
+    b.style.display = '';
+    b.setAttribute('aria-expanded','false');
+    var t = b.querySelector('.rt-txt'); if(t) t.textContent = b.getAttribute('data-more') || '展开';
+    var a = b.querySelector('.rt-arrow'); if(a) a.textContent = '▾';
+  });
+}
+// 折叠自适应：先全部折起量出统一高度；完整内容装得下的卡直接展开，不做多余的折叠。
+function balanceFolds(){
+  var grid = $('cards'); if(!grid) return;
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.card'));
+  if(!cards.length) return;
+  var prevAlign = grid.style.alignItems;
+  grid.style.alignItems = 'start';
+  var saved = cards.map(function(c){
+    var mh = c.style.minHeight;
+    c.style.minHeight = '0px';
+    return {mh: mh, fold: !!c.querySelector('.rows-toggle')};
+  });
+  cards.forEach(function(c){
+    Array.prototype.forEach.call(c.querySelectorAll('.fold-body'), function(b){ b.removeAttribute('hidden'); });
+  });
+  var full = cards.map(function(c){ return c.getBoundingClientRect().height; });
+  cards.forEach(function(c){ resetFolds(c); });
+  var folded = cards.map(function(c){ return c.getBoundingClientRect().height; });
+  var target = Math.ceil(Math.max.apply(null, folded));
+  cards.forEach(function(c, i){
+    if(saved[i].fold && full[i] <= target + 0.5){
+      Array.prototype.forEach.call(c.querySelectorAll('.fold-body'), function(b){ b.removeAttribute('hidden'); });
+      Array.prototype.forEach.call(c.querySelectorAll('.rows-toggle'), function(b){ b.style.display = 'none'; });
+    }
+    c.style.minHeight = saved[i].mh;
+  });
+  grid.style.alignItems = prevAlign || '';
+  if(window.matchMedia && window.matchMedia('(min-width:600px)').matches){
+    grid.style.setProperty('--card-min', target + 'px');
+  } else {
+    grid.style.removeProperty('--card-min');
+  }
+}
+if(window.addEventListener){
+  var __foldTO = null;
+  window.addEventListener('resize', function(){
+    if(__foldTO) clearTimeout(__foldTO);
+    __foldTO = setTimeout(balanceFolds, 160);
+  });
 }
 function cardHTML(it){
   var manualTag = it.group==='manual' ? '<span class="badge manual">✋ 手动</span>' : '';
@@ -6822,6 +6875,7 @@ function renderCenter(d){
     else { html += cardHTML(it); }
   });
   $("cards").innerHTML = html;
+  balanceFolds();
   // 卡片点击打开详情模态（手动卡不弹详情，聚焦指引）
   Array.prototype.forEach.call(document.querySelectorAll('.card'), function(c){
     if(c.classList.contains('manual-card')) return;
