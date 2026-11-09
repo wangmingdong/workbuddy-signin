@@ -5400,6 +5400,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .row:last-child{border-bottom:0;}
 .row .k{color:var(--sub);white-space:nowrap;}
 .row .v{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere;}
+/* 明细折叠：默认只露前 3 行，其余点开再看，卡片高度才能对齐 */
+.fold-body[hidden]{display:none;}
+.rows-toggle{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;border:0;
+  background:transparent;color:#64748b;font:inherit;font-size:12px;font-weight:600;
+  padding:7px 1px 0;cursor:pointer;white-space:nowrap;}
+.rows-toggle:hover{color:#0f766e;}
+.rows-toggle .rt-arrow{font-size:10px;line-height:1;}
 /* 统一「可用积分」区块：每张卡都显示，缺数据诚实标 — */
 .credit-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:11px;padding:10px 12px;border-radius:12px;
   background:linear-gradient(135deg,rgba(245,247,255,.92),rgba(238,242,255,.72));border:1px solid rgba(99,102,241,.14);font-size:13px;}
@@ -5507,6 +5514,8 @@ body.locked .wrap{display:none;}
 @media (min-width:600px){
   .wrap{max-width:680px;}
   #cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+  /* 折叠后最高的卡约 572px；统一下限让多列时每张卡等高（按钮仍贴底） */
+  #cards .card{min-height:575px;}
 }
 @media (min-width:920px){
   .wrap{max-width:1040px;}
@@ -5748,6 +5757,25 @@ function msubHTML(it){
   if(isNaN(n)) return '';
   return '<div class="msub">昨日用量 <b>'+esc(n.toFixed(2))+'</b> 分</div>';
 }
+function rowHTML(r){
+  return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';
+}
+function rowsHTML(rows){
+  // 明细默认只露前 3 行：长卡片（豆包/MiniMax 等）折起来，各卡高度才接近
+  var VISIBLE = 3;
+  var head = rows.slice(0, VISIBLE), tail = rows.slice(VISIBLE);
+  var h = head.map(rowHTML).join("");
+  if(tail.length >= 2){
+    h += '<div class="fold-body rows-more" hidden>'+tail.map(rowHTML).join("")+'</div>';
+    h += '<button class="rows-toggle" type="button" aria-expanded="false"'
+       + ' data-more="展开其余 '+tail.length+' 项" data-less="收起明细">'
+       + '<span class="rt-txt">展开其余 '+tail.length+' 项</span><span class="rt-arrow">▾</span></button>';
+  } else {
+    // 只多 1 行时不值得再折一次，直接显示
+    h += tail.map(rowHTML).join("");
+  }
+  return h;
+}
 function cardHTML(it){
   var manualTag = it.group==='manual' ? '<span class="badge manual">✋ 手动</span>' : '';
   if(it.disabled){
@@ -5768,7 +5796,7 @@ function cardHTML(it){
   else if(it.badge) badge = '<span class="badge todo">'+esc(it.badge)+'</span>';
   else if(needsAuth) badge = '<span class="badge todo">未配置</span>';
   else badge = '<span class="badge todo">今天还没签</span>';
-  var rows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
+  var rows = rowsHTML(it.rows||[]);
   var last = it.last_run ? fmtLast(it.last_run) : "暂无记录";
   var lastTs = (it.last_run && it.last_run.ts) ? String(it.last_run.ts).slice(5,16) : "";
   var btn;
@@ -5866,7 +5894,12 @@ function entriesHTML(it){
           + '<span class="eic">🧳</span><span class="etx"><b>派猫猫旅行</b><small>'+esc(tt)+'</small></span>'
           + '<span class="earrow">›</span></button></div>';
   }
-  return html;
+  var n = (ge?1:0)+(de?1:0)+(qe?1:0)+(dte?1:0)+(te?1:0);
+  if(n < 2) return html;
+  return '<div class="fold-body entries-more" hidden>'+html+'</div>'
+       + '<button class="rows-toggle entries-toggle" type="button" aria-expanded="false"'
+       + ' data-more="更多入口（'+n+'）" data-less="收起入口">'
+       + '<span class="rt-txt">更多入口（'+n+'）</span><span class="rt-arrow">▾</span></button>';
 }
 // 派猫猫旅行操作按钮（状态驱动：可派/可领/巡检）—— 只在弹窗里用
 function travelActionsHTML(c){
@@ -6806,8 +6839,23 @@ function renderCenter(d){
     c.addEventListener('click', function(e){
       var name = c.getAttribute('data-name');
       if(!name) return;
-      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.entry')) return;
+      if(e.target.closest('button.cta') || e.target.closest('.cta-link') || e.target.closest('.entry') || e.target.closest('.rows-toggle')) return;
       openDetail(name);
+    });
+  });
+  // 明细折叠：展开/收起本卡后几行，不触发详情弹窗
+  Array.prototype.forEach.call(document.querySelectorAll('.rows-toggle'), function(b){
+    b.addEventListener('click', function(ev){
+      if(ev && ev.stopPropagation) ev.stopPropagation();
+      var more = b.parentNode.querySelector('.fold-body');
+      if(!more) return;
+      var open = more.hasAttribute('hidden');
+      if(open){ more.removeAttribute('hidden'); } else { more.setAttribute('hidden',''); }
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      b.querySelector('.rt-txt').textContent = open
+        ? (b.getAttribute('data-less') || '收起')
+        : (b.getAttribute('data-more') || '展开');
+      b.querySelector('.rt-arrow').textContent = open ? '▴' : '▾';
     });
   });
   // 立即签到（排除成长/每日任务、重新检查、旅行专属按钮）
