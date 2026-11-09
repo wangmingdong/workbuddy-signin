@@ -23,7 +23,8 @@
 > （由本机守护完成，不在服务端自动签到列表）。
 > **豆包为「浏览器签名代理」架构**——详见下方「第 9 步 · 豆包」。
 
-> 所有卡片底部统一显示「可用积分」（3 家真实有余额：千帆 / WorkBuddy / Link AI；其余接口不提供余额则诚实显示「—」）。
+> 所有卡片底部统一显示「可用积分」（4 家真实有余额：千帆 / WorkBuddy / Qoder / Link AI；其余接口不提供余额则诚实显示「—」）。
+> WorkBuddy 与 Qoder 还会显示「将过期积分」：WorkBuddy 按赠送包到期日汇总最近一档及 7/30 天合计；Qoder 的逐包到期日取自网页会话（`qoder_cookie.txt` 有效时），失效时只显示 token 查到的总余额。
 
 | 平台 | 官网 | 每日奖励 | 凭据文件（根目录） | 维护频率 |
 |------|------|---------|------------------|----------|
@@ -507,6 +508,10 @@ nginx 侧现状与已做加固，记录备查：
 - 状态：`POST https://copilot.tencent.com/v2/billing/meter/checkin-activity-status`
 - 余额：`POST https://copilot.tencent.com/v2/billing/meter/get-user-resource`（**必须带浏览器 `User-Agent`，否则 403**）
   - ⚠️ **两个口径别混**（否则数值虚高）：`Accounts[].CapacityRemainPrecise` 是资源包**生命周期总余额**；`Accounts[].CycleCapacityRemainPrecise` 是**本周期剩余**，官方客户端「可用积分」用的就是它。对周期型包（`CapacityType=4`，如「CodeBuddy个人体验版」按自然月发 500 分）用总量口径会把本周期已消耗的算成可用 —— 实测总量 4343 vs 客户端 3918，差额 424.65 正是体验版本周期已用。故本页可用余额取 `min(总量剩余, 本期剩余)`，另在详情里回显「资源包总量」供对照。
+- 将过期积分：`POST https://www.workbuddy.cn/billing/meter/get-user-resource-free-packages`（注意**没有 `/v2`**）
+  - 请求体必须带 `PackageCodes`（取 `get-user-resource` 返回的 `PackageCode` 去重）、`PageNumber`、`PageSize`，否则 400；
+  - 逐个包读 `CycleCapacityRemainPrecise`（赠送包该字段才是实际剩余，`CapacityRemainPrecise` 可能为空串）与 `CycleEndTime`（UTC+8），按到期日汇总：卡面只显示最近一档「⏳ X 积分将于 MM-DD 过期」，下一行补 7/30 天合计；
+  - 汇总口径与「可用积分」不完全一致（后者来自 `get-user-resource` 的状态过滤，会漏掉部分无周期/新批次包），只用于提醒哪天有积分到期，不复用为余额；结果缓存 5 分钟。
 - 鉴权：`Authorization: Bearer <accessToken>` + `X-User-Id` + `X-Domain: copilot.tencent.com`
 - token 来源：`%LOCALAPPDATA%\CodeBuddyExtension\Data\Public\auth\workbuddy-desktop.info`
 
@@ -517,6 +522,10 @@ nginx 侧现状与已做加固，记录备查：
 **Qoder**（对应 `get_qd_card` / `run_qd_checkin` + 本机守护 `qoder_keeper/`）：
 - 活动：`GET https://openapi.qoder.sh/sash/api/v1/me/campaigns`；领取：`POST .../campaigns/{id}/claim`（`replayed` 幂等）
 - 最小鉴权：`Authorization: Bearer <token>` + `Cosy-ClientType: 10` + `Accept: application/json` + `User-Agent: Qoder`
+- 可用 Credits：`GET https://openapi.qoder.sh/api/v2/quota/usage` → `addOnQuota.{total,used,remaining}`（token 即可，无需 cookie；该接口**只有汇总余额，没有逐包到期日**）
+- 将过期积分：`GET https://qoder.com/api/v2/me/usages/big_model_credits`（**网页会话专属**，需 `qoder_cookie.txt` + `X-CSRF-TOKEN`，csrf 从 `/account/usage` 页 HTML 的 `window.csrfToken` 提取；dt- token 调它固定 401）
+  - 按 `details[].expiresAt` + `remainingValue` 汇总，跳过已过期/停用/退款的包；卡面显示最近一档到期量与 7/30 天合计；
+  - **诚实边界**：cookie 失效时只显示 token 查到的总余额，不猜到期日、不编造数字；恢复只需按第 5 步重新导出 `qoder_cookie.txt`。
 - **🔑 2026-09-27 破局：真正卡点 = 设备指纹头 `Cosy-Machine*`**（`MachineToken/Type/Code/Id/OS`），由本机 Qoder 客户端/CLI 自带的 `resources/umid/runtime-info.exe` 实时生成（阿里 securityguard SDK，`echo {"account":""} | runtime-info.exe` → stdout JSON）。**不带指纹 → campaigns 返回空数组（看似「没活动」，即旧结论「服务端拿不到入口」的真实根因）；伪造指纹 → 503 RISK_DEPENDENCY_UNAVAILABLE**。实测带指纹后 CLAIM_BENEFIT 活动立即可见并 claim 成功（+100，余额 597）。
 - **架构**：指纹绑定本机硬件 → 服务端不可代领。本机 `qoder_keeper/qoder_keeper.py`（probe / run / --loop）负责真实领取，经 HTTP `/api/qoder/local-status?k=` 或 SFTP 把 `qoder_local_status.json` 推给服务器；`get_qd_card()` 优先渲染守护上报（`_qd_local_today`），无上报则诚实显示「待本机领取」。活动 key 不按天变（如 act-20260923-252）而轮次每日 10:00(UTC+8) 刷新，故领取逻辑为「领任何 CLAIMABLE 项」。
 - 历史：早期「本地记录即已领」误判 → 改「桌面端独占」诚实提示 → 2026-09-27 发现**指纹可跨机重放**，升级为「本机守护 + 服务端代领」双路径（claim 幂等不重复发放），`_qoder_topup_loop` 已恢复为服务端代领线程。

@@ -17,6 +17,7 @@ import json
 import ssl
 import socket
 import hashlib
+import re
 import time
 import datetime
 import random
@@ -602,6 +603,7 @@ def get_remaining():
         pkgs.append(
             {
                 "name": a.get("PackageName"),
+                "code": a.get("PackageCode"),
                 "remain": round(avail, 2),
                 "cycle_remain": round(cyc, 2) if cyc is not None else None,
                 "total_remain": round(rem, 2),
@@ -614,6 +616,93 @@ def get_remaining():
         "total_remain": round(total_raw, 2),
         "packages": pkgs,
     }
+
+
+# 赠送包明细（含各自到期时间）。与 get-user-resource 不同：这个接口把每个
+# 签到/成长任务赠送包单列出来，能算出「哪天有多少积分到期」。
+_WB_EXP_CACHE = {"ts": 0, "codes": None, "data": None}
+
+
+def _wb_num(v):
+    s = ("%.2f" % float(v)).rstrip("0").rstrip(".")
+    return s or "0"
+
+
+def _wb_free_expiring(codes):
+    """按到期日汇总赠送包剩余积分，返回最近一档 + 7/30 天合计。
+
+    只统计「剩余 > 0 且尚未到期」的赠送包；查询失败返回 None，
+    卡片不显示该行，绝不写 0 误导。
+    """
+    codes = [c for c in (codes or []) if c]
+    if not codes:
+        return None
+    key = tuple(sorted(set(codes)))
+    now = time.time()
+    if (_WB_EXP_CACHE.get("data") is not None
+            and _WB_EXP_CACHE.get("codes") == key
+            and now - float(_WB_EXP_CACHE.get("ts") or 0) < 300):
+        return _WB_EXP_CACHE["data"]
+    sess = _session()
+    base = "https://%s/billing/meter" % sess["domain"]
+    accounts = []
+    page = 1
+    while page <= 10:
+        s, b = call(
+            base,
+            "/get-user-resource-free-packages",
+            sess,
+            {"PackageCodes": list(key), "PageNumber": page, "PageSize": 200},
+        )
+        if s != 200:
+            raise RuntimeError("查询赠送包返回 HTTP %s" % s)
+        d = json.loads(b)
+        if d.get("code") not in (0, None):
+            raise RuntimeError("查询赠送包失败：%s" % (d.get("msg") or "未知错误"))
+        data = d.get("data") or {}
+        rows = data.get("Accounts") or []
+        accounts.extend(rows)
+        total = int(data.get("TotalCount") or 0)
+        if not rows or (total and len(accounts) >= total):
+            break
+        page += 1
+    # 接口时间均为 UTC+8（与网页「积分明细」一致）
+    utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    buckets = {}
+    for a in accounts:
+        try:
+            rem = float(a.get("CycleCapacityRemainPrecise")
+                        or a.get("CapacityRemainPrecise") or 0)
+        except Exception:
+            continue
+        if rem <= 0:
+            continue
+        ts = (a.get("CycleEndTime") or "").strip()
+        if not ts:
+            continue
+        try:
+            end = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            continue
+        if end < utc8:
+            continue
+        day = end.date()
+        buckets[day] = buckets.get(day, 0.0) + rem
+    if not buckets:
+        return None
+    first = min(buckets)
+    today = utc8.date()
+
+    def _within(max_days):
+        return sum(v for d, v in buckets.items() if (d - today).days <= max_days)
+
+    data = {
+        "next": {"amount": _wb_num(buckets[first]), "date": first.strftime("%m-%d")},
+        "d7": _wb_num(_within(7)),
+        "d30": _wb_num(_within(30)),
+    }
+    _WB_EXP_CACHE.update({"ts": now, "codes": key, "data": data})
+    return data
 
 
 # 消耗明细接口（官方"积分消耗明细"）的 base：与 get-user-resource 同域名，但路径不带 /v2
@@ -688,6 +777,7 @@ def get_status():
         "total_remain": None,
         "usage": None,
         "packages": [],
+        "expiring": None,
     }
     # 余额与昨日用量（独立接口，失败不影响签到主流程）
     try:
@@ -695,6 +785,12 @@ def get_status():
         st["remaining"] = res["remaining"]
         st["total_remain"] = res.get("total_remain")
         st["packages"] = res["packages"]
+    except Exception:
+        pass
+    # 赠送包到期提醒：按到期日汇总，供卡片显示「将过期积分」
+    try:
+        codes = sorted({p.get("code") for p in (st.get("packages") or []) if p.get("code")})
+        st["expiring"] = _wb_free_expiring(codes)
     except Exception:
         pass
     # 昨日用量：来自官方"积分消耗明细"真实消耗，单独 try 防止拖垮整体
@@ -2203,6 +2299,199 @@ def _qd_find_addon_remaining(obj):
     return None
 
 
+def _qd_num(v):
+    try:
+        s = ("%.2f" % float(v)).rstrip("0").rstrip(".")
+        return s or "0"
+    except Exception:
+        return None
+
+
+# 余额/到期信息缓存：网页刷新频繁，但上游数据变化很慢，短缓存即可
+_QD_QUOTA_CACHE = {"ts": 0, "data": None}
+_QD_USAGE_CACHE = {"ts": 0, "data": None}
+_QD_CSRF_CACHE = {"ts": 0, "token": ""}
+
+
+def _qd_quota_info():
+    """查 openapi 配额：addOnQuota.remaining 即签到 Credits 余额（token 即可，无需 cookie）。"""
+    now = time.time()
+    if now - float(_QD_QUOTA_CACHE.get("ts") or 0) < 60:
+        return _QD_QUOTA_CACHE.get("data")
+    data = None
+    try:
+        tok, _ = _qd_token()
+        if tok:
+            d = _qd_api("/api/v2/quota/usage")
+            aq = d.get("addOnQuota") or {}
+            if isinstance(aq, dict) and aq.get("remaining") is not None:
+                data = {
+                    "balance": _qd_num(aq.get("remaining")),
+                    "total": _qd_num(aq.get("total")),
+                    "used": _qd_num(aq.get("used")),
+                }
+    except Exception:
+        data = None
+    _QD_QUOTA_CACHE.update({"ts": now, "data": data})
+    return data
+
+
+def _qd_web_csrf():
+    """网页接口需要 window.csrfToken（从 usage 页 HTML 里取），带缓存。"""
+    now = time.time()
+    if _QD_CSRF_CACHE.get("token") and now - float(_QD_CSRF_CACHE.get("ts") or 0) < 1800:
+        return _QD_CSRF_CACHE["token"]
+    tok = ""
+    try:
+        headers = _qd_web_headers()
+        if headers.get("Cookie"):
+            req = urllib.request.Request(
+                "%s/account/usage?client=qoder&sourceType=IDE" % QD_WEB_BASE,
+                headers=headers,
+            )
+            with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as r:
+                html = r.read(400000).decode("utf-8", "replace")
+            m = re.search(r"window\.csrfToken\s*=\s*'([^']+)'", html)
+            if m:
+                tok = m.group(1)
+    except Exception:
+        tok = ""
+    _QD_CSRF_CACHE.update({"ts": now, "token": tok})
+    return tok
+
+
+def _qd_parse_pack_expiry(obj):
+    """从 big_model_credits 返回里找资源包列表，按到期日汇总剩余 Credits。"""
+    lists = []
+
+    def _collect(d):
+        if not isinstance(d, dict):
+            return
+        for k in ("details", "packages", "quotas", "resource_packages",
+                  "resourcePackages", "items"):
+            v = d.get(k)
+            if isinstance(v, list):
+                lists.append(v)
+        inner = d.get("data")
+        if isinstance(inner, dict):
+            _collect(inner)
+
+    _collect(obj)
+    packs = None
+    for lst in lists:
+        if any(isinstance(x, dict) and (
+                x.get("remainingValue") is not None
+                or x.get("remaining_value") is not None) for x in lst):
+            packs = lst
+            break
+    if not packs:
+        return None
+    now_ms = time.time() * 1000
+    buckets = {}
+    for it in packs:
+        if not isinstance(it, dict):
+            continue
+        status = str(it.get("status") or "").upper()
+        if status in ("EXPIRED", "SUSPENDED", "REFUNDED", "EXHAUSTED"):
+            continue
+        if it.get("isActive") is False:
+            continue
+        try:
+            rem = float(it.get("remainingValue")
+                        if it.get("remainingValue") is not None
+                        else it.get("remaining_value") or 0)
+        except Exception:
+            continue
+        if rem <= 0:
+            continue
+        exp = it.get("expiresAt")
+        if exp is None:
+            exp = it.get("expires_at")
+        try:
+            if isinstance(exp, str):
+                s = exp.strip()
+                if s.isdigit():
+                    exp = int(s)
+                else:
+                    dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                    exp = dt.timestamp() * 1000
+            exp = float(exp)
+            if exp < 1e12:  # 秒级时间戳
+                exp *= 1000
+        except Exception:
+            continue
+        if exp <= now_ms:
+            continue
+        utc8 = datetime.datetime.utcfromtimestamp(exp / 1000) + datetime.timedelta(hours=8)
+        day = utc8.date()
+        buckets[day] = buckets.get(day, 0.0) + rem
+    if not buckets:
+        return None
+    first = min(buckets)
+    today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).date()
+
+    def _within(max_days):
+        return sum(v for d, v in buckets.items() if (d - today).days <= max_days)
+
+    return {
+        "next": {"amount": _qd_num(buckets[first]), "date": first.strftime("%m-%d")},
+        "d7": _qd_num(_within(7)),
+        "d30": _qd_num(_within(30)),
+    }
+
+
+def _qd_usage_expiring():
+    """网页会话（cookie）专属：逐个资源包的剩余 Credits 与到期日。
+
+    dt- token 的 /api/v2/quota/usage 只有汇总余额，没有分包到期日；
+    网页 /api/v2/me/usages/big_model_credits 才有。cookie 失效时返回 None。
+    """
+    now = time.time()
+    if now - float(_QD_USAGE_CACHE.get("ts") or 0) < 300:
+        return _QD_USAGE_CACHE.get("data")
+    data = None
+    try:
+        if _qd_cookie():
+            headers = _qd_web_headers()
+            headers["Accept"] = "application/json"
+            headers["X-Requested-With"] = "XMLHttpRequest"
+            csrf = _qd_web_csrf()
+            if csrf:
+                headers["X-CSRF-TOKEN"] = csrf
+            req = urllib.request.Request(
+                "%s/api/v2/me/usages/big_model_credits" % QD_WEB_BASE,
+                headers=headers,
+            )
+            with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as r:
+                data = _qd_parse_pack_expiry(json.loads(r.read().decode("utf-8", "replace")))
+    except Exception:
+        data = None
+    _QD_USAGE_CACHE.update({"ts": now, "data": data})
+    return data
+
+
+def _qd_credit_info():
+    """组装 Qoder 卡片的「可用积分 + 将过期」区块（任何一项取不到就不硬写）。"""
+    q = _qd_quota_info()
+    ex = _qd_usage_expiring()
+    bal = q.get("balance") if q else None
+    if bal is None:
+        local = _qd_local_today() or {}
+        if local.get("balance") is not None:
+            bal = _qd_num(local.get("balance"))
+    if bal is None and not ex:
+        return None
+    credit = {"balance": bal, "unit": "Credits", "expiring": None}
+    if ex:
+        credit["expiring"] = {
+            "amount": ex["next"]["amount"],
+            "date": ex["next"]["date"],
+            "d7": ex.get("d7"),
+            "d30": ex.get("d30"),
+        }
+    return credit
+
+
 class _QDExpired(Exception):
     """Qoder 鉴权失效：via='cookie' 表示网页会话过期，via='token' 表示 dt- token 过期。"""
 
@@ -2519,7 +2808,7 @@ def _qd_card_from_local(local, exp, cookie=False):
     }
 
 
-def get_qd_card():
+def _qd_card_impl():
     tok, exp = _qd_token()
     cookie = _qd_cookie()
     if not tok and not cookie:
@@ -2651,6 +2940,22 @@ def get_qd_card():
         return _card_error("qoder", "Qoder 每日领 100 Credits", "#141414", "#4A4A4A", "qd", e)
     except Exception as e:
         return _card_error("qoder", "Qoder 每日领 100 Credits", "#141414", "#4A4A4A", "qd", e)
+
+
+def get_qd_card():
+    """Qoder 卡片：在原签到状态上补「可用 Credits + 将过期」区块。
+
+    余额走 dt- token 的 openapi 配额接口；分包到期日只有网页接口有，
+    需服务器上存在有效的 qoder_cookie.txt（过期则只显示余额，不编造到期日）。
+    """
+    card = _qd_card_impl()
+    try:
+        credit = _qd_credit_info()
+        if credit:
+            card["credit"] = credit
+    except Exception:
+        pass
+    return card
 
 
 def run_qd_checkin():
@@ -3143,8 +3448,17 @@ def get_wb_card():
                 "k": "连续签到",
                 "v": ("%s 天" % st["streak"]) if st.get("streak") is not None else "--",
             },
-            {"k": "活动截止", "v": st.get("end_time") or "--"},
         ]
+        exp = st.get("expiring") or {}
+        expiring = None
+        if exp.get("next"):
+            expiring = {
+                "amount": exp["next"].get("amount"),
+                "date": exp["next"].get("date"),
+                "d7": exp.get("d7"),
+                "d30": exp.get("d30"),
+            }
+        rows.append({"k": "活动截止", "v": st.get("end_time") or "--"})
         return {
             "name": "workbuddy",
             "title": "WorkBuddy加油站",
@@ -3154,7 +3468,7 @@ def get_wb_card():
             "checked": bool(st.get("checked")),
             "metric_label": "累计积分",
             "metric_value": st.get("total"),
-            "credit": {"balance": (str(st["remaining"]) if st.get("remaining") is not None else None), "unit": "积分", "expiring": None},
+            "credit": {"balance": (str(st["remaining"]) if st.get("remaining") is not None else None), "unit": "积分", "expiring": expiring},
             # 卡面摘要：昨日用量（官方「积分消耗明细」真实消耗）。None 表示暂未取到 → 前端整行不渲染
             "usage_yesterday": st.get("usage"),
             # 概览条用：今日签到已得积分（None = 该平台没有此口径，概览条会跳过）
@@ -5041,6 +5355,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .credit-row .cv{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#4338ca;letter-spacing:-.2px;}
 .credit-exp{margin-top:6px;font-size:12px;color:#b54708;background:rgba(247,144,9,.1);border:1px solid rgba(247,144,9,.18);
   padding:6px 10px;border-radius:9px;line-height:1.45;}
+.credit-exp.sub{margin-top:4px;background:transparent;border:0;padding:0 2px;color:#9a6b16;font-size:11.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
 button.cta{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;color:#fff;
   background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
@@ -5357,6 +5673,10 @@ function creditHTML(it){
   var h = '<div class="credit-row"><span class="cl">可用积分</span><span class="cv">'+bal+'</span></div>';
   if(c.expiring && c.expiring.amount!=null && c.expiring.date){
     h += '<div class="credit-exp">⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' 将于 '+esc(c.expiring.date)+' 过期</div>';
+    var sub = [];
+    if(c.expiring.d7!=null) sub.push('7 天内 '+esc(c.expiring.d7));
+    if(c.expiring.d30!=null) sub.push('30 天内 '+esc(c.expiring.d30));
+    if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+'将过期</div>';
   }
   return h;
 }
