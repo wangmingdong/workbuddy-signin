@@ -35,7 +35,7 @@
 | Link AI | console.link-ai.tech | 每日签到随机积分（**已实现自动绕过滑块验证码**，见下方 FAQ） | `linkai_token.txt` | 不定期 |
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
-| **Coze 扣子** | coze.cn | 60 积分/天（登录自动发，当日 23:59 过期） | `coze_cookie.txt` | 约 60 天，过期重新导出 Cookie |
+| **Coze 扣子** | coze.cn | 60 积分/天 + 自动聊天点亮连续活跃（当日 23:59 过期） | `coze_cookie.txt` | 约 60 天，过期重新导出 Cookie |
 | 华为码道（手动卡） | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步；亦支持网页「🔑 配置会话 Cookie」粘贴登录） | 会话失效后双击 `huawei/relogin_huawei.bat` |
 | **豆包 Doubao** | doubao.com / 豆包 PC 客户端 | 每日签到 + 积分任务领奖 | 浏览器实时算签代持（详见下方「第 9 步 · 豆包」） | 随会话（约 30 天，靠本机续传） |
 
@@ -538,10 +538,11 @@ nginx 侧现状与已做加固，记录备查：
 - 历史：早期「本地记录即已领」误判 → 改「桌面端独占」诚实提示 → 2026-09-27 发现**指纹可跨机重放**，升级为「本机守护 + 服务端代领」双路径（claim 幂等不重复发放），`_qoder_topup_loop` 已恢复为服务端代领线程。
 
 **Coze 扣子**（对应 `get_coze_card` / `run_coze_checkin`，**自动卡**）：
-- 每日登录自动发放活动积分，**无手动 claim 接口**；服务器调用官网同款发放接口（幂等，当日只发一次）并实时查询余额/到期，卡片显示真实「可用积分」。
+- 扣子有**两套每日机制**，缺一不可：① 每日登录积分（登录自动发 60 新积分）；② **连续活跃**（客户端看到的「签到」）——官网原话「**每天和扣子聊一次，即可点亮**」，必须当天真的跟 Agent 聊一次、消耗积分才点亮（`active_map` 按 `consume_points>0` 判定），**光登录/领积分不算活跃**。只调发放接口不聊天 → 连续活跃永远 0 天（这正是「签到没成功」的根因）。
+- 因此每日自动签到 = 调官网同款发放接口（幂等，当日只发一次）+ **自动跟 Agent 发一句极简聊天**（动态取会话 `conversation/list_v35`，不写死 ID；约耗 1~2 积分，本就当天过期）点亮活跃日。同日重复签到只聊一次（记录 `chat_done` 幂等）。连续活跃满 7/14/30 天另有 80/200/400 积分（连续相伴任务）。
 - **🔑 2026-11-10 单位改造核对**：官网「剩余积分 60」与旧文案「1500 活动分」并非矛盾——扣子积分单位升级，**新积分 = 原积分 ÷ 25**（官方 banner 原话），每日登录旧 1500 活动分 = 新 **60 积分**。`get_trade_conf` 同时返回 `scene_switch`（新 60）与 `scene_switch_origin`（旧 1500）。
-- **过期规则（实测）**：活动积分在**发放当日 23:59:59 过期**（`credit/balance/detail` 的 `expired_at` 时间戳），当天不用即清零。故签到价值 = 当天领当天用；另有连续相伴任务 7 天 +80 / 14 天 +200 / 30 天 +400 积分。
-- 三个接口均可**仅凭 Cookie 服务端直调，无需 a_bogus 签名**：`POST incentive/activity/reward`（发放/当日状态）、`GET credit/balance/detail`（逐包余额+到期）、`GET get_trade_conf`（每日额度配置）。
+- **过期规则（实测）**：活动积分在**发放当日 23:59:59 过期**（`credit/balance/detail` 的 `expired_at` 时间戳），当天不用即清零。自动聊天把当天必过期的积分用来点亮活跃，一举两得。
+- 接口均可**仅凭 Cookie 服务端直调，无需 a_bogus 签名**：`POST incentive/activity/reward`（发放/当日状态）、`GET credit/balance/detail`（逐包余额+到期）、`GET get_trade_conf`（每日额度）、`POST bff/conversation/list_v35`（取会话）、`POST coze_claw/message/chat`（发聊天点亮活跃）。注意 `GET achievement/active_map`（连续活跃天数）需 a_bogus、裸调 404，故不依赖它，活跃以当日聊天成功为准。
 - 凭据：`coze_cookie.txt`（Cookie 串，含 `sessionid`/`sid_guard`，约 60 天）
 
 **华为码道 DevCloud**（对应 `get_hw_card` / `run_hw_checkin`，**自动卡**）：

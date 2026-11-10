@@ -3932,14 +3932,23 @@ def _generic_record(path, ok, msg):
 
 
 # ============================ Coze 扣子（字节）每日登录适配器 ============================
-# 扣子每日登录自动发放活动积分（无需手动领取）。2026-11 积分单位改造：新积分 = 原积分 ÷ 25，
-# 每日登录旧口径 1500 活动分 = 新口径 60 积分（get_trade_conf 同时返回新旧两套数值）。
-# 活动积分在发放当日 23:59:59 过期（credit/balance/detail 的 expired_at 实测），当天不用即清零。
+# 扣子有两套每日机制（2026-11-10 实测厘清）：
+#   1) 每日登录积分：登录即自动发 60 新积分（旧口径 1500 活动分 ÷ 25，单位改造不影响购买力），
+#      当日活动积分 23:59:59 过期（credit/balance/detail 的 expired_at 实测）。
+#   2) 连续活跃（客户端看到的「签到」）：官网原话「每天和扣子聊一次，即可点亮」——必须当天真的
+#      跟 Agent 聊一次、消耗积分（active_map 按 consume_points>0 判定），光登录/领积分不算活跃。
+#      只调登录发放接口而不聊天 → 连续活跃永远 0 天（这正是之前「签到没成功」的根因）。
+#      故每日自动签到会再自动发一句极简聊天（约耗 1~2 积分，本就当天过期）点亮活跃日，
+#      连续活跃满 7/14/30 天另有 80/200/400 积分（连续相伴任务）。
 # 以下接口均可仅凭 Cookie 服务端直调，无需 a_bogus 签名（2026-11-10 实测）：
 #   POST /api/marketplace/incentive/activity/reward {"activity_types":[1,2],"source":"web_new"}
-#        → 当日发放状态/数额；与官网页面加载时调用的是同一接口，幂等（当日只发一次）
+#        → 当日登录发放状态/数额，幂等（当日只发一次）
 #   GET  /api/marketplace/trade/credit/balance/detail?account_type=2&… → 各积分包余额/过期时间戳
 #   GET  /api/marketplace/trade/get_trade_conf?conf_type=3&scenes=activity_daily_login → 每日发放配置
+#   POST /api/bff/conversation/list_v35 {…} → 会话列表（动态取一个 session_id，避免写死）
+#   POST /api/coze_claw/message/chat {"session_id","content",…} → 发送聊天（点亮活跃；裸调成功）
+#   注：GET /api/achievement/active_map（连续活跃天数）需 a_bogus 签名，服务端裸调 404，故不依赖它，
+#       活跃是否点亮以当日聊天成功为准并在本地记录 chat_done。
 COZE_COOKIE = os.environ.get("COZE_COOKIE", "")
 if not COZE_COOKIE:
     try:
@@ -4048,6 +4057,55 @@ def _coze_exp_hint(ts):
     return dt.strftime("%m-%d %H:%M")
 
 
+def _coze_today_record():
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    try:
+        with open(COZE_STATE_FILE, "r", encoding="utf-8") as _f:
+            hist = json.load(_f)
+        if isinstance(hist, list):
+            for rec in reversed(hist):
+                if rec.get("date") == today:
+                    return rec
+    except Exception:
+        pass
+    return None
+
+
+def _coze_daily_chat():
+    """每天自动跟扣子 Agent 聊一次以点亮「连续活跃」（官方规则：当天聊天消耗积分即点亮）。
+    动态取一个会话（不写死 ID），发一句极简指令把消耗压到约 1~2 积分（当日活动积分本就 23:59 过期）。
+    同日重复调用只聊一次（读当日记录 chat_done）。"""
+    rec = _coze_today_record()
+    if rec and rec.get("chat_done"):
+        return {"ok": True, "skipped": True, "session": rec.get("chat_session"),
+                "message_id": rec.get("chat_message_id"), "error": None}
+    out = {"ok": False, "skipped": False, "session": None, "message_id": None, "error": None}
+    try:
+        lst = _coze_api("/api/bff/conversation/list_v35",
+                        body={"is_pin": False, "is_project": False, "limit": 20,
+                              "project_types": [6, 4, 7, 5, 9]})
+        sess, name = None, None
+        for it in lst.get("items") or []:
+            cv = it.get("conversation") or {}
+            if cv.get("session_id"):
+                sess = cv["session_id"]
+                name = cv.get("claw_name") or cv.get("name") or "扣子 Agent"
+                break
+        if not sess:
+            out["error"] = "没有可用的扣子会话，无法自动点亮活跃（请先在官网创建一个 Agent 会话）"
+            return out
+        r = _coze_api("/api/coze_claw/message/chat",
+                      body={"session_id": sess, "content": "每日活跃打卡，请只回复两个字：已打卡",
+                            "files": [], "skill_ids": [], "at_members": [],
+                            "reference_cards": [], "plugins": []})
+        out.update({"ok": True, "session": name, "message_id": r.get("message_id")})
+    except urllib.error.HTTPError as e:
+        out["error"] = "扣子活跃打卡失败（HTTP %s）" % e.code
+    except Exception as e:
+        out["error"] = "扣子活跃打卡失败：%s" % e
+    return out
+
+
 def get_coze_card():
     if not COZE_COOKIE:
         return {"name": "coze", "title": "Coze 扣子 每日登录", "brand": "#4D6BFE",
@@ -4084,7 +4142,12 @@ def get_coze_card():
         rows.append({"k": "今日发放", "v": "✅ 已发放 %s 积分%s" % (amt if amt is not None else "--", t)})
     else:
         rows.append({"k": "今日发放", "v": "⏳ 当日未发放，登录官网即自动发放"})
-    rows.append({"k": "过期规则", "v": "活动积分发放当日 23:59:59 过期，当天用掉才不浪费"})
+    trec = _coze_today_record()
+    if trec and trec.get("chat_done"):
+        rows.append({"k": "今日活跃", "v": "✅ 已点亮（自动聊天打卡，连续活跃 +1）"})
+    else:
+        rows.append({"k": "今日活跃", "v": "⏳ 待点亮（点「立即签到」自动聊天消耗积分即点亮）"})
+    rows.append({"k": "过期规则", "v": "活动积分当日 23:59:59 过期；连续活跃需当天聊天消耗积分才点亮"})
     rows.append({"k": "登录态", "v": "✅ Cookie 有效（实时查询成功）"})
     if lr:
         rows.append({"k": "上次检查",
@@ -4100,29 +4163,38 @@ def get_coze_card():
             "today_credit": ((live.get("today_amount") if live.get("today_amount") is not None else daily)
                              if live.get("granted_today") else None),
             "last_run": lr, "rows": rows, "error": None,
-            "auto_note": "每日登录自动发放，活动积分当日 23:59 过期"}
+            "auto_note": "每日登录发 60 积分 + 自动聊天点亮连续活跃；活动积分当日 23:59 过期"}
 
 
-def _coze_record_daily(live):
-    # 每天落一条真实查询记录（同日重复检查 → 更新而非追加）。
+def _coze_record_daily(live, chat=None):
+    # 每天落一条真实记录（同日重复检查 → 更新而非追加）。ok 反映「登录发放 + 活跃点亮」整体结果。
     today = datetime.datetime.now().strftime("%Y-%m-%d")
+    chat = chat or {}
     if live.get("ok"):
         amt = live.get("today_amount")
         if amt is None:
             amt = live.get("daily")
         bal = live.get("balance")
         if live.get("granted_this_time"):
-            msg = "本次触发发放 %s 积分；可用余额 %s（活动积分当日 23:59 过期）" % (amt, bal)
+            msg = "本次触发发放 %s 积分；可用余额 %s" % (amt, bal)
         elif live.get("granted_today"):
-            msg = "今日已发放 %s 积分；可用余额 %s（活动积分当日 23:59 过期）" % (amt, bal)
+            msg = "今日已发放 %s 积分；可用余额 %s" % (amt, bal)
         else:
             msg = "当日未发放（登录官网自动发放）；可用余额 %s" % bal
         ok = True
     else:
         ok = False
         msg = live.get("error") or "扣子查询失败"
+    if chat.get("ok"):
+        msg += "；今日活跃已点亮" if chat.get("skipped") else \
+            "；已自动聊天点亮今日活跃（会话：%s）" % chat.get("session")
+    elif chat.get("error"):
+        msg += "；活跃未点亮：%s" % chat["error"]
+        ok = False
     rec = {"ts": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-           "date": today, "ok": ok, "message": msg}
+           "date": today, "ok": ok, "message": msg,
+           "chat_done": bool(chat.get("ok")), "chat_session": chat.get("session"),
+           "chat_message_id": chat.get("message_id")}
     try:
         hist = []
         try:
@@ -4147,9 +4219,14 @@ def run_coze_checkin():
     if not COZE_COOKIE:
         raise RuntimeError("未配置 Coze 会话 Cookie（coze_cookie.txt 或 COZE_COOKIE）")
     live = _coze_live(force=True)
-    _coze_record_daily(live)
+    chat = _coze_daily_chat() if live.get("ok") else {"ok": False, "error": live.get("error")}
+    _coze_record_daily(live, chat)
     if not live.get("ok"):
         raise RuntimeError(live.get("error") or "扣子查询失败")
+    if not chat.get("ok"):
+        raise RuntimeError(chat.get("error") or "扣子活跃打卡失败")
+    if not chat.get("skipped"):
+        _COZE_CACHE["ts"] = 0      # 聊天消耗了积分，令卡片重新查询真实余额
     return get_coze_card()
 
 
@@ -4687,8 +4764,8 @@ def get_detail(name):
         return {
             "ok": True, "name": name, "title": "Coze 扣子 每日登录",
             "signin": {"history": history, "checked": bool(COZE_COOKIE),
-                       "note": "每日登录自动发放 60 积分（2026-11 单位改造：旧 1500 活动分 ÷ 25）；无需手动领取"},
-            "consumption": {"note": "活动积分发放当日 23:59:59 过期（官方积分明细实测）；另有连续相伴任务：7 天 +80 / 14 天 +200 / 30 天 +400 积分"},
+                       "note": "每日登录自动发 60 积分（2026-11 单位改造：旧 1500 活动分 ÷ 25），并自动跟 Agent 聊一次点亮「连续活跃」（官网规则：每天聊一次才点亮，光领积分不算活跃）"},
+            "consumption": {"note": "活动积分发放当日 23:59:59 过期；自动聊天约耗 1~2 积分（本就当天过期）点亮活跃日，连续活跃满 7/14/30 天另有 80/200/400 积分（连续相伴任务）"},
         }
 
     if name == "huawei":
