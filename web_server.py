@@ -4498,6 +4498,11 @@ def get_doubao_card():
         "claimed": _claimed,
         "reward": _reward,
     }
+    # 累计已获额度是活动接口唯一给出的「额度总量读数」（与客户端活动页
+    # 「累计获得额度：9200 点」同口径）。⚠️ 它不是剩余额度：免费版账号的
+    # commerce/quota/summary 只返回空窗口，官方压根不给剩余点数，绝不能拿
+    # 累计值冒充「可用积分」显示。2026-11-11 实测结论。
+    total_amount = (data.get("progress") or {}).get("total_amount")
     rows = [
         {"k": "今日签到", "v": "✅ 今日已签" if checked else "⏳ 待签到（豆包限定 PC 客户端）"},
         {"k": "会话状态", "v": "✅ 登录有效"},
@@ -4507,13 +4512,18 @@ def get_doubao_card():
     if cont_days is not None:
         rows.append({"k": "连续签到", "v": "%s 天" % cont_days})
     if reward is not None:
-        # 未签到时该数值属于「上一次签到」，如实标注，避免被误读成今天已签
-        rows.append({"k": "本次获得" if checked else "上次获得", "v": "%s 额度" % reward})
+        rows.append({"k": "今日已领" if checked else "今日可领", "v": "+%s 额度" % reward})
+    if total_amount is not None:
+        # pin=True：前端 rowsHTML 默认折叠明细，这两行是本次「额度可读性」的核心，置顶常显
+        rows.append({"k": "累计已获额度", "v": "%s 点（活动页口径，非剩余）" % total_amount, "pin": True})
+    rows.append({"k": "剩余额度", "v": "免费版官方不返回（仅给累计值）", "pin": True})
     if _tasks:
         if _claimable > 0:
             rows.append({"k": "待领任务", "v": "🎯 可领 %s 项（约 %s 额度）" % (_claimable, _reward)})
         else:
-            rows.append({"k": "任务奖励", "v": "✅ 今日任务已全部领取（%s/%s）" % (_claimed, _tasks and len(_tasks))})
+            # _claimable=0 只说明「当前没有可领奖励」，不等于全部已领：
+            # 任务可能还没完成（接口不给奖励金额），旧文案会显示「✅ 全部领取（0/8）」误导。
+            rows.append({"k": "任务奖励", "v": "已领 %s/%s 项，其余任务未完成或暂不可领" % (_claimed, len(_tasks))})
     if lr:
         rows.append({"k": "上次执行", "v": "%s %s" % (str(lr.get("ts"))[5:16], "✅" if lr.get("ok") else "⚠️")})
     return {
@@ -5984,8 +5994,10 @@ function rowHTML(r){
 function rowsHTML(rows){
   // 卡面默认只留「凭据有效期 / 上次执行（签到）时间」，其余明细折起来，避免与上方区块重复
   var KEEP = /有效期|登录态|上次执行|上次签到|上次检查|签到时间|领取时间/;
-  var head = rows.filter(function(r){ return KEEP.test(String(r.k||'')); });
-  var tail = rows.filter(function(r){ return !KEEP.test(String(r.k||'')); });
+  // 后端可用 r.pin=true 把某行置顶常显（如豆包的累计已获额度/剩余额度说明），
+  // 不必把关键词硬塞进 KEEP 正则里，语义干净。
+  var head = rows.filter(function(r){ return KEEP.test(String(r.k||'')) || r.pin; });
+  var tail = rows.filter(function(r){ return !KEEP.test(String(r.k||'')) && !r.pin; });
   var h = head.map(rowHTML).join("");
   if(tail.length){
     h += '<div class="fold-body rows-more" hidden>'+tail.map(rowHTML).join("")+'</div>';
