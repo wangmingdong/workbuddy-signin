@@ -1302,7 +1302,16 @@ def _trae_credit_info():
                 buckets[day] = buckets.get(day, 0.0) + rem
             elif 0 <= (day - today).days <= 5:
                 empty_days.append(day)
-        bal = (d.get("usage_summary") or {}).get("total_amount")
+        # ⚠️ usage_summary.total_amount 是「获得总量」，不是可用余额；
+        # 可用 = total_amount - consumed_amount（官方同接口给消耗），
+        # 缺失时用逐包 remaining 求和兜底（与桌面客户端 uJe() 同口径）。
+        us = d.get("usage_summary") or {}
+        bal = us.get("total_amount")
+        if bal is not None:
+            try:
+                bal = float(bal) - float(us.get("consumed_amount") or 0)
+            except (TypeError, ValueError):
+                bal = None
         if bal is None:
             bal = remaining_sum
         expiring = None
