@@ -2480,18 +2480,24 @@ def _qd_parse_pack_expiry(obj):
             lst = container.get("quotaDetail")
         return lst if isinstance(lst, list) else []
 
-    packs = []
+    # 通用包（签到/活动赠送，计入可用积分）与「专用包」必须分开：
+    # dedicated 包只对特定模型生效（如 SOTA 专属包仅 Sonus 模型抵扣），
+    # 既不计入 addOnQuota 余额，也不该混进「即将过期」吓人。2026-11-11 实测。
+    general_packs = []
+    dedicated_packs = []
     if isinstance(obj, dict):
-        for k in ("resource_package_quota", "resourcePackageQuota",
-                  "dedicated_resource_package_quota", "dedicatedResourcePackageQuota"):
-            packs.extend(_detail_list(obj.get(k)))
-        if not packs:
+        for k in ("resource_package_quota", "resourcePackageQuota"):
+            general_packs.extend(_detail_list(obj.get(k)))
+        for k in ("dedicated_resource_package_quota", "dedicatedResourcePackageQuota"):
+            dedicated_packs.extend(_detail_list(obj.get(k)))
+        if not general_packs and not dedicated_packs:
             for k in ("total_quota", "totalQuota", "plan_quota", "planQuota"):
                 lst = _detail_list(obj.get(k))
                 if lst:
-                    packs.extend(lst)
+                    general_packs.extend(lst)
                     break
-    if not packs:
+    packs = general_packs
+    if not packs and not dedicated_packs:
         # 兼容其它/旧结构：details / packages / quotas / ... 列表
         lists = []
 
@@ -2514,32 +2520,26 @@ def _qd_parse_pack_expiry(obj):
                     or x.get("remaining_value") is not None) for x in lst):
                 packs = lst
                 break
-    if not packs:
+    if not packs and not dedicated_packs:
         return None
     now_ms = time.time() * 1000
     today = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).date()
-    buckets = {}
-    empty_days = []
-    seen = set()
-    for it in packs:
+
+    def _pack_state(it):
+        """解析单个资源包，返回 (剩余额度, 到期日)；无效/已过期返回 None。"""
         if not isinstance(it, dict):
-            continue
-        pid = it.get("id")
-        if pid:
-            if pid in seen:
-                continue
-            seen.add(pid)
+            return None
         status = str(it.get("status") or "").upper()
         if status in ("EXPIRED", "SUSPENDED", "REFUNDED", "EXHAUSTED"):
-            continue
+            return None
         if it.get("isActive") is False or it.get("is_active") is False:
-            continue
+            return None
         try:
             rem = float(it.get("remainingValue")
                         if it.get("remainingValue") is not None
                         else it.get("remaining_value") or 0)
         except Exception:
-            continue
+            return None
         exp = it.get("expiresAt")
         if exp is None:
             exp = it.get("expires_at")
@@ -2555,11 +2555,25 @@ def _qd_parse_pack_expiry(obj):
             if exp < 1e12:  # 秒级时间戳
                 exp *= 1000
         except Exception:
-            continue
+            return None
         if exp <= now_ms:
-            continue
+            return None
         utc8 = datetime.datetime.utcfromtimestamp(exp / 1000) + datetime.timedelta(hours=8)
-        day = utc8.date()
+        return rem, utc8.date()
+
+    buckets = {}
+    empty_days = []
+    seen = set()
+    for it in packs:
+        pid = it.get("id") if isinstance(it, dict) else None
+        if pid:
+            if pid in seen:
+                continue
+            seen.add(pid)
+        st = _pack_state(it)
+        if st is None:
+            continue
+        rem, day = st
         if rem <= 0:
             # 已用完的包：Qoder 网页照样标「即将到期」（≤5 天），
             # 卡片要能解释「为什么页面写着明天到期、卡里却没有」
@@ -2567,25 +2581,61 @@ def _qd_parse_pack_expiry(obj):
                 empty_days.append(day)
             continue
         buckets[day] = buckets.get(day, 0.0) + rem
-    if not buckets:
+
+    # 专属包（如 SOTA 专属积分，仅在模型选择器里选 Sonus 时才抵扣）：
+    # 既不计入 addOnQuota 可用积分，也不该混进「即将过期」——否则会让人以为
+    # 有一笔通用积分要作废，而在用量页压根看不到它。单独汇总如实说明。
+    ded_amount = 0.0
+    ded_days = []
+    ded_labels = set()
+    ded_seen = set()
+    for it in dedicated_packs:
+        pid = it.get("id") if isinstance(it, dict) else None
+        if pid:
+            if pid in ded_seen:
+                continue
+            ded_seen.add(pid)
+        st = _pack_state(it)
+        if st is None:
+            continue
+        rem, day = st
+        if rem <= 0:
+            continue
+        ded_amount += rem
+        ded_days.append(day)
+        for lb in (it.get("display_labels") or []):
+            if isinstance(lb, dict) and lb.get("dimension") == "title":
+                zh = (lb.get("value_i18n") or {}).get("zh-CN")
+                if zh:
+                    ded_labels.add(zh)
+
+    if not buckets and ded_amount <= 0:
         return None
-    first = min(buckets)
+    first = min(buckets) if buckets else None
 
     def _within(max_days):
         return sum(v for d, v in buckets.items() if (d - today).days <= max_days)
 
     empty = None
-    if empty_days:
+    if empty_days and first is not None:
         first_empty = min(empty_days)
         if first_empty < first:
             empty = {"count": len(empty_days), "date": first_empty.strftime("%m-%d")}
 
-    return {
-        "next": {"amount": _qd_num(buckets[first]), "date": first.strftime("%m-%d")},
-        "d7": _qd_num(_within(7)),
-        "d30": _qd_num(_within(30)),
+    out = {
+        "next": ({"amount": _qd_num(buckets[first]), "date": first.strftime("%m-%d")}
+                 if first is not None else None),
+        "d7": (_qd_num(_within(7)) if buckets else None),
+        "d30": (_qd_num(_within(30)) if buckets else None),
         "empty": empty,
     }
+    if ded_amount > 0 and ded_days:
+        out["dedicated"] = {
+            "amount": _qd_num(ded_amount),
+            "date": min(ded_days).strftime("%m-%d"),
+            "label": ("、".join(sorted(ded_labels)) or "专属积分"),
+        }
+    return out
 
 
 def _qd_usage_expiring():
@@ -2635,13 +2685,16 @@ def _qd_credit_info():
     if bal is None and not ex:
         return None
     credit = {"balance": bal, "unit": "Credits", "expiring": None}
-    if ex:
+    # next 可能为 None（只有专属包、没有通用包）——不能直接取下标
+    if ex and ex.get("next"):
         credit["expiring"] = {
             "amount": ex["next"]["amount"],
             "date": ex["next"]["date"],
             "d7": ex.get("d7"),
             "d30": ex.get("d30"),
             "empty": ex.get("empty"),
+            # 专属包（如 SOTA 专属积分）单独一条，不混进「即将过期」主提醒
+            "dedicated": ex.get("dedicated"),
         }
     return credit
 
@@ -5817,6 +5870,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* 日期改「M月D日（明天）」后这行变长，窄屏允许换行，别把「（已用完）」裁掉 */
 .credit-exp.sub.gone{color:#94a3b8;white-space:normal;overflow:visible;text-overflow:clip;}
+/* 专属积分（仅指定模型可用、不计入可用积分）：允许换行，用蓝灰拉开层次 */
+.credit-exp.sub.ded{color:#5b6472;white-space:normal;overflow:visible;text-overflow:clip;}
 .credit-exp .rel{font-weight:800;}
 .credit-exp .rel.today{color:#d92d20;}
 .last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
@@ -6194,6 +6249,14 @@ function creditHTML(it){
       var ed = expDateInfo(c.expiring.empty.date);
       var part = ed.html + (ed.rest ? ' '+esc(ed.rest) : '') + ' 起到期';
       h += '<div class="credit-exp sub gone">另有 '+esc(c.expiring.empty.count)+' 个资源包 '+part+'（已用完）</div>';
+    }
+    if(c.expiring.dedicated && c.expiring.dedicated.amount!=null && c.expiring.dedicated.date){
+      // 专属积分（如 Qoder 的 SOTA 专属）只对指定模型生效，不计入「可用积分」，
+      // 单独一行说明，免得被误认为有通用积分要作废（2026-11-11 用户反馈 2000 对不上账）
+      var dd = expDateInfo(c.expiring.dedicated.date);
+      h += '<div class="credit-exp sub ded">另有 '+esc(c.expiring.dedicated.amount)+' '+(c.unit||'积分')
+         + ' '+esc(c.expiring.dedicated.label||'专属积分')+' 将于 '+dd.html+' 到期'
+         + (dd.rest ? ' '+esc(dd.rest) : '')+'（仅指定模型可用，不计入可用积分）</div>';
     }
   }
   return h;
