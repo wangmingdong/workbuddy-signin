@@ -1229,7 +1229,107 @@ def _trae_read_last():
 # 并发互斥：避免「手动点」与「定时任务」同时 claim 造成重复请求
 _TRAE_CLAIM_LOCK = threading.Lock()
 
+# 客户端同款「权益/资源包用量」接口：每个赠送包单列 credits_limit + 独立 expire_time，
+# 才能算出「哪天有多少 Credits 到期」。签到 status 接口只给当日奖励，给不了这些。
+TRAE_PAY_USAGE_API = "https://api.trae.cn/trae/api/v2/pay/ide_user_ent_usage"
+_TRAE_CREDIT_CACHE = {"ts": 0, "data": None}
 
+
+def _trae_num(v):
+    s = ("%.2f" % float(v)).rstrip("0").rstrip(".")
+    return s or "0"
+
+
+def _trae_credit_info():
+    """组装 Trae 卡片的「可用积分 + 将过期」区块（与 WorkBuddy / Qoder 同款）。
+
+    数据源：POST /trae/api/v2/pay/ide_user_ent_usage  {"require_usage":true,"req_source":2}
+    口径对齐桌面客户端 main.js 的 uJe()：
+      remaining = Σ max(quota.credits_limit - usage.credits_amount, 0)
+      balance   = usage_summary.total_amount（官方汇总；缺失时用 remaining 兜底）
+    每个包有独立 expire_time（秒级 UTC+8），按到期日分桶即可得「最近一档 / 7 天 / 30 天」。
+    成功缓存 5 分钟、失败短缓存 60 秒；任何异常返回 None，卡片不显示该区块、绝不写 0 误导。
+    """
+    now = time.time()
+    cached = _TRAE_CREDIT_CACHE.get("data")
+    ts = float(_TRAE_CREDIT_CACHE.get("ts") or 0)
+    if cached is not None and now - ts < 300:
+        return cached
+    if cached is None and now - ts < 60:
+        return None
+    data = None
+    try:
+        d = _trae_post(TRAE_PAY_USAGE_API,
+                       {"require_usage": True, "req_source": TRAE_REQ_SOURCE})
+        if d.get("code") not in (0, None):
+            raise RuntimeError("code=%s" % d.get("code"))
+        packs = d.get("user_entitlement_pack_list") or []
+        utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+        today = utc8.date()
+        buckets = {}
+        empty_days = []
+        remaining_sum = 0.0
+        for p in packs:
+            if not isinstance(p, dict):
+                continue
+            b = p.get("entitlement_base_info") or {}
+            q = b.get("quota") or {}
+            try:
+                lim = float(q.get("credits_limit") or 0)
+            except (TypeError, ValueError):
+                continue
+            # 0 = 免费订阅包（无积分额度），-1 = 无限量包：都不计入「将过期积分」
+            if lim <= 0:
+                continue
+            try:
+                used = float((p.get("usage") or {}).get("credits_amount") or 0)
+            except (TypeError, ValueError):
+                used = 0.0
+            rem = max(lim - used, 0.0)
+            remaining_sum += rem
+            exp = p.get("expire_time") or b.get("end_time") or 0
+            try:
+                exp = float(exp)
+                if exp <= 0:
+                    continue
+                end = datetime.datetime.utcfromtimestamp(exp) + datetime.timedelta(hours=8)
+            except (TypeError, ValueError, OverflowError, OSError):
+                continue
+            day = end.date()
+            if day < today:
+                continue
+            if rem > 0:
+                buckets[day] = buckets.get(day, 0.0) + rem
+            elif 0 <= (day - today).days <= 5:
+                empty_days.append(day)
+        bal = (d.get("usage_summary") or {}).get("total_amount")
+        if bal is None:
+            bal = remaining_sum
+        expiring = None
+        if buckets:
+            first = min(buckets)
+            def _within(max_days):
+                return sum(v for day, v in buckets.items() if (day - today).days <= max_days)
+            empty = None
+            if empty_days and min(empty_days) < first:
+                empty = {"count": len(empty_days), "date": min(empty_days).strftime("%m-%d")}
+            expiring = {
+                "amount": _trae_num(buckets[first]),
+                "date": first.strftime("%m-%d"),
+                "d7": _trae_num(_within(7)),
+                "d30": _trae_num(_within(30)),
+                "empty": empty,
+            }
+        if bal is not None or expiring:
+            data = {
+                "balance": _trae_num(bal) if bal is not None else None,
+                "unit": "Credits",
+                "expiring": expiring,
+            }
+    except Exception:
+        data = None
+    _TRAE_CREDIT_CACHE.update({"ts": now, "data": data})
+    return data
 
 
 def get_trae_card():
@@ -1352,6 +1452,8 @@ def get_trae_card():
             "badge": badge,
             "metric_label": "今日状态",
             "metric_value": "已签到" if checked else "待签到",
+            # 与 WorkBuddy / Qoder 同款：可用 Credits + 按到期日汇总的「将过期积分」
+            "credit": _trae_credit_info(),
             "last_run": lr,
             "rows": rows,
             "error": None,
@@ -6039,7 +6141,7 @@ function creditHTML(it){
     var sub = [];
     if(c.expiring.d7!=null) sub.push('7 天内 '+esc(c.expiring.d7));
     if(c.expiring.d30!=null) sub.push('30 天内 '+esc(c.expiring.d30));
-    if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+'将过期</div>';
+    if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+' 将过期</div>';
     if(c.expiring.empty && c.expiring.empty.date){
       h += '<div class="credit-exp sub gone">另有 '+esc(c.expiring.empty.count)+' 个资源包 '+esc(c.expiring.empty.date)+' 起到期（已用完）</div>';
     }
