@@ -4423,6 +4423,41 @@ def _db_task_claimed(t):
     return False
 
 
+_DB_QUOTA_CACHE = {"ts": 0, "data": None}
+
+
+def _db_quota_records():
+    """活动额度发放流水（官方唯一的额度明细接口，2026-11-11 从客户端前端包挖出）。
+
+    ⚠️ 只返回「发放」记录（amount 全为正），没有任何消耗/回收记录，
+    所以只能核对「累计获得」，**不能**据此推算「剩余额度」。
+    结果缓存 5 分钟，避免每次刷卡片都多打一次接口；失败静默降级为空列表。
+    """
+    now = time.time()
+    if _DB_QUOTA_CACHE["data"] is not None and now - _DB_QUOTA_CACHE["ts"] < 300:
+        return _DB_QUOTA_CACHE["data"]
+    try:
+        _, _, raw = _db_request("/alice/ug/campaign/quota/records/", {"page_size": 100})
+        recs = ((raw or {}).get("data") or {}).get("records") or []
+        out = []
+        for r in recs:
+            if not isinstance(r, dict):
+                continue
+            try:
+                amt = float(r.get("amount") or 0)
+            except (TypeError, ValueError):
+                amt = 0.0
+            out.append({
+                "amount": amt,
+                "ts": r.get("create_time_ms") or 0,
+                "task": r.get("task_name") or r.get("task_code") or "",
+            })
+        _DB_QUOTA_CACHE.update(ts=now, data=out)
+        return out
+    except Exception:
+        return _DB_QUOTA_CACHE["data"] or []
+
+
 def get_doubao_card():
     if not _db_cookie():
         return {
@@ -4498,11 +4533,28 @@ def get_doubao_card():
         "claimed": _claimed,
         "reward": _reward,
     }
-    # 累计已获额度是活动接口唯一给出的「额度总量读数」（与客户端活动页
-    # 「累计获得额度：9200 点」同口径）。⚠️ 它不是剩余额度：免费版账号的
-    # commerce/quota/summary 只返回空窗口，官方压根不给剩余点数，绝不能拿
-    # 累计值冒充「可用积分」显示。2026-11-11 实测结论。
+    # 累计已获额度是活动接口给出的「额度总量读数」（与客户端活动页
+    # 「累计获得额度：9200 点」同口径）。⚠️ 它不是剩余额度。
+    # 2026-11-11 二次深挖：CDP 抓客户端真实请求 + 扫本地 2095 个前端 JS 包，
+    # 枚举出 63 个 commerce/campaign 接口并逐个实测：
+    #   ug/campaign/quota/records   → 额度发放流水（只有正数发放，无消耗记录）
+    #   marketing/card/balance      → 额度重置「卡」张数，不是点数
+    #   subscription/activity_reward_quota / entitlement/usage_detail
+    #   /intake/entitlement/query   → 免费账号全空或只给 fingerprint
+    # 前端包里连 consume/cost/deduct/remain 类路径都是 0 个。
+    # 结论：官方既不返回剩余点数，也不给消耗流水，连「累计 - 消耗」都算不出来。
+    # 这里用流水独立核对累计值，并把「无法推算」的原因如实写进卡片。
     total_amount = (data.get("progress") or {}).get("total_amount")
+    _recs = _db_quota_records()
+    _rec_sum = int(sum(r["amount"] for r in _recs)) if _recs else None
+    _month = datetime.date.today().strftime("%Y-%m")
+    _month_sum = 0.0
+    for r in _recs:
+        try:
+            if datetime.datetime.fromtimestamp(r["ts"] / 1000).strftime("%Y-%m") == _month:
+                _month_sum += r["amount"]
+        except Exception:
+            pass
     rows = [
         {"k": "今日签到", "v": "✅ 今日已签" if checked else "⏳ 待签到（豆包限定 PC 客户端）"},
         {"k": "会话状态", "v": "✅ 登录有效"},
@@ -4514,9 +4566,27 @@ def get_doubao_card():
     if reward is not None:
         rows.append({"k": "今日已领" if checked else "今日可领", "v": "+%s 额度" % reward})
     if total_amount is not None:
-        # pin=True：前端 rowsHTML 默认折叠明细，这两行是本次「额度可读性」的核心，置顶常显
-        rows.append({"k": "累计已获额度", "v": "%s 点（活动页口径，非剩余）" % total_amount, "pin": True})
-    rows.append({"k": "剩余额度", "v": "免费版官方不返回（仅给累计值）", "pin": True})
+        # pin=True：前端 rowsHTML 默认折叠明细，这两行是「额度可读性」的核心，置顶常显
+        _extra = ""
+        if _recs:
+            if _rec_sum is not None and int(total_amount) == _rec_sum:
+                _extra = " · %d 笔流水核对一致" % len(_recs)
+            else:
+                _extra = " · %d 笔流水合计 %s" % (len(_recs), _rec_sum)
+            if _month_sum:
+                _extra += " · 本月 +%d" % int(_month_sum)
+        rows.append({"k": "累计已获额度", "v": "%s 点%s（非剩余）" % (total_amount, _extra), "pin": True})
+    elif _rec_sum is not None:
+        rows.append({"k": "累计已获额度", "v": "%s 点（%d 笔流水合计，非剩余）" % (_rec_sum, len(_recs)), "pin": True})
+    rows.append({"k": "剩余额度", "v": "官方仅给发放流水、无消耗记录，无法推算", "pin": True})
+    if _recs:
+        try:
+            _last = _recs[0]
+            _d = datetime.datetime.fromtimestamp(_last["ts"] / 1000).strftime("%m-%d")
+            rows.append({"k": "最近一笔", "v": "%s +%d 点 · %s" % (_d, int(_last["amount"]), _last["task"])})
+        except Exception:
+            pass
+        rows.append({"k": "额度流水", "v": "共 %d 笔，全部为发放；官方无消耗/回收记录" % len(_recs)})
     if _tasks:
         if _claimable > 0:
             rows.append({"k": "待领任务", "v": "🎯 可领 %s 项（约 %s 额度）" % (_claimable, _reward)})
