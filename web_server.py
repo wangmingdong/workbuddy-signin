@@ -5816,6 +5816,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .credit-exp.sub{margin-top:4px;background:transparent;border:0;padding:0 2px;color:#9a6b16;font-size:11.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .credit-exp.sub.gone{color:#94a3b8;}
+.credit-exp .rel{font-weight:800;}
+.credit-exp .rel.today{color:#d92d20;}
 .last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
 button.cta{width:100%;margin-top:14px;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;color:#fff;
   background:linear-gradient(135deg,var(--c,#00C29A),var(--c2,#00C885));
@@ -6128,6 +6130,30 @@ function fmtLast(lr){
   }
   return "暂无记录";
 }
+// 把「11-12」「2026-11-12」「11-12 23:59」「今晚 23:59」这类到期日
+// 换算成「今天 / 明天」。积分到期日由服务器按 UTC+8 计算，这里也用 UTC+8
+// 的今天做比较，避免手机在其它时区时错位（跨年按 MM-DD 比较不会出错）。
+function expRelDay(s){
+  var t = String(s == null ? '' : s).trim();
+  if(!t) return null;
+  if(/^今天|^今晚/.test(t)) return {rel:'今天', rest:t.slice(2).trim()};
+  if(/^明天/.test(t)) return {rel:'明天', rest:t.slice(2).trim()};
+  var m = t.match(/^(?:([0-9]{4})-)?([0-9]{1,2})-([0-9]{1,2})(.*)$/);
+  if(!m) return null;
+  var md = ('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  function md8(off){
+    var d = new Date(Date.now() + 8*3600*1000 + off*86400*1000);
+    return ('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
+  }
+  var rel = md===md8(0) ? '今天' : (md===md8(1) ? '明天' : null);
+  if(!rel) return null;
+  return {rel:rel, rest:(m[4]||'').trim()};
+}
+function relHTML(rd){
+  if(!rd) return '';
+  return '<b class="rel'+(rd.rel==='今天'?' today':'')+'">'+rd.rel+'</b>'
+       + (rd.rest ? ' '+esc(rd.rest) : '');
+}
 function creditHTML(it){
   var c = it.credit || {balance:null, unit:""};
   var bal = (c.balance!=null && c.balance!=="") ? (esc(c.balance)+' '+(c.unit||'')) : '—';
@@ -6137,13 +6163,24 @@ function creditHTML(it){
          && String(c.balance) === String(it.metric_value);
   var h = dup ? '' : '<div class="credit-row"><span class="cl">可用积分</span><span class="cv">'+bal+'</span></div>';
   if(c.expiring && c.expiring.amount!=null && c.expiring.date){
-    h += '<div class="credit-exp">⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' 将于 '+esc(c.expiring.date)+' 过期</div>';
+    var rd = expRelDay(c.expiring.date);
+    var head = '⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' ';
+    if(rd){
+      // 「明天过期」比「将于明天过期」顺口；带时刻时留个空格：「今天 23:59 过期」
+      h += '<div class="credit-exp">'+head+relHTML(rd)+(rd.rest?' ':'')+'过期</div>';
+    }else{
+      h += '<div class="credit-exp">'+head+'将于 '+esc(c.expiring.date)+' 过期</div>';
+    }
     var sub = [];
     if(c.expiring.d7!=null) sub.push('7 天内 '+esc(c.expiring.d7));
     if(c.expiring.d30!=null) sub.push('30 天内 '+esc(c.expiring.d30));
     if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+' 将过期</div>';
     if(c.expiring.empty && c.expiring.empty.date){
-      h += '<div class="credit-exp sub gone">另有 '+esc(c.expiring.empty.count)+' 个资源包 '+esc(c.expiring.empty.date)+' 起到期（已用完）</div>';
+      var ed = expRelDay(c.expiring.empty.date);
+      var part = ed
+        ? relHTML(ed)+(ed.rest?' ':'')+'起到期'
+        : esc(c.expiring.empty.date)+' 起到期';
+      h += '<div class="credit-exp sub gone">另有 '+esc(c.expiring.empty.count)+' 个资源包 '+part+'（已用完）</div>';
     }
   }
   return h;
