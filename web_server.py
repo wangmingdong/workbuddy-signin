@@ -5815,7 +5815,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   padding:6px 10px;border-radius:9px;line-height:1.45;}
 .credit-exp.sub{margin-top:4px;background:transparent;border:0;padding:0 2px;color:#9a6b16;font-size:11.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.credit-exp.sub.gone{color:#94a3b8;}
+/* 日期改「M月D日（明天）」后这行变长，窄屏允许换行，别把「（已用完）」裁掉 */
+.credit-exp.sub.gone{color:#94a3b8;white-space:normal;overflow:visible;text-overflow:clip;}
 .credit-exp .rel{font-weight:800;}
 .credit-exp .rel.today{color:#d92d20;}
 .last{font-size:11.5px;color:#94a3b8;margin-top:9px;}
@@ -6130,29 +6131,46 @@ function fmtLast(lr){
   }
   return "暂无记录";
 }
-// 把「11-12」「2026-11-12」「11-12 23:59」「今晚 23:59」这类到期日
-// 换算成「今天 / 明天」。积分到期日由服务器按 UTC+8 计算，这里也用 UTC+8
-// 的今天做比较，避免手机在其它时区时错位（跨年按 MM-DD 比较不会出错）。
+// 到期日统一写成「M月D日」，今天/明天在日期后面补括号：「11月12日（明天）」。
+// 日期本身必须留着（要看得见确切哪天），相对说法只是补充，不能替换。
+// 积分到期日由服务器按 UTC+8 计算，这里也用 UTC+8 判定，手机在境外不会错位；
+// 跨年按 MM-DD 比较天然正确（12-31 → 01-01 也算明天）。
+function utc8MD(off){
+  var d = new Date(Date.now() + 8*3600*1000 + (off||0)*86400*1000);
+  return {m:d.getUTCMonth()+1, d:d.getUTCDate()};
+}
 function expRelDay(s){
   var t = String(s == null ? '' : s).trim();
   if(!t) return null;
-  if(/^今天|^今晚/.test(t)) return {rel:'今天', rest:t.slice(2).trim()};
-  if(/^明天/.test(t)) return {rel:'明天', rest:t.slice(2).trim()};
+  if(/^今天|^今晚/.test(t)) return '今天';
+  if(/^明天/.test(t)) return '明天';
   var m = t.match(/^(?:([0-9]{4})-)?([0-9]{1,2})-([0-9]{1,2})(.*)$/);
   if(!m) return null;
   var md = ('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
-  function md8(off){
-    var d = new Date(Date.now() + 8*3600*1000 + off*86400*1000);
-    return ('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2);
+  function pad(off){
+    var o = utc8MD(off);
+    return ('0'+o.m).slice(-2)+'-'+('0'+o.d).slice(-2);
   }
-  var rel = md===md8(0) ? '今天' : (md===md8(1) ? '明天' : null);
-  if(!rel) return null;
-  return {rel:rel, rest:(m[4]||'').trim()};
+  return md===pad(0) ? '今天' : (md===pad(1) ? '明天' : null);
 }
-function relHTML(rd){
-  if(!rd) return '';
-  return '<b class="rel'+(rd.rel==='今天'?' today':'')+'">'+rd.rel+'</b>'
-       + (rd.rest ? ' '+esc(rd.rest) : '');
+// 返回 {html: 日期(含括号), rest: 时刻}；认不出的原文照旧输出，绝不吞信息。
+function expDateInfo(s){
+  var t = String(s == null ? '' : s).trim();
+  if(!t) return {html:'', rest:''};
+  var rel = expRelDay(t);
+  var m = t.match(/^(?:([0-9]{4})-)?([0-9]{1,2})-([0-9]{1,2})(.*)$/);
+  var mm, dd, rest;
+  if(m){
+    mm = Number(m[2]); dd = Number(m[3]); rest = (m[4]||'').trim();
+  }else if(/^今天|^今晚|^明天/.test(t)){
+    var o = utc8MD(rel==='明天' ? 1 : 0);
+    mm = o.m; dd = o.d; rest = t.slice(2).trim();
+  }else{
+    return {html:esc(t), rest:''};
+  }
+  var html = mm+'月'+dd+'日';
+  if(rel) html += '（<b class="rel'+(rel==='今天'?' today':'')+'">'+rel+'</b>）';
+  return {html:html, rest:rest};
 }
 function creditHTML(it){
   var c = it.credit || {balance:null, unit:""};
@@ -6163,23 +6181,18 @@ function creditHTML(it){
          && String(c.balance) === String(it.metric_value);
   var h = dup ? '' : '<div class="credit-row"><span class="cl">可用积分</span><span class="cv">'+bal+'</span></div>';
   if(c.expiring && c.expiring.amount!=null && c.expiring.date){
-    var rd = expRelDay(c.expiring.date);
-    var head = '⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' ';
-    if(rd){
-      // 「明天过期」比「将于明天过期」顺口；带时刻时留个空格：「今天 23:59 过期」
-      h += '<div class="credit-exp">'+head+relHTML(rd)+(rd.rest?' ':'')+'过期</div>';
-    }else{
-      h += '<div class="credit-exp">'+head+'将于 '+esc(c.expiring.date)+' 过期</div>';
-    }
+    var d = expDateInfo(c.expiring.date);
+    // 带时刻（如 Coze「今晚 23:59」）留个空格：将于 11月11日（今天） 23:59 过期
+    var tail = d.rest ? ' '+esc(d.rest)+' 过期' : ' 过期';
+    h += '<div class="credit-exp">⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')
+       + ' 将于 '+d.html+tail+'</div>';
     var sub = [];
     if(c.expiring.d7!=null) sub.push('7 天内 '+esc(c.expiring.d7));
     if(c.expiring.d30!=null) sub.push('30 天内 '+esc(c.expiring.d30));
     if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+' 将过期</div>';
     if(c.expiring.empty && c.expiring.empty.date){
-      var ed = expRelDay(c.expiring.empty.date);
-      var part = ed
-        ? relHTML(ed)+(ed.rest?' ':'')+'起到期'
-        : esc(c.expiring.empty.date)+' 起到期';
+      var ed = expDateInfo(c.expiring.empty.date);
+      var part = ed.html + (ed.rest ? ' '+esc(ed.rest) : '') + ' 起到期';
       h += '<div class="credit-exp sub gone">另有 '+esc(c.expiring.empty.count)+' 个资源包 '+part+'（已用完）</div>';
     }
   }
