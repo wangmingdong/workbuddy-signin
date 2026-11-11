@@ -1319,6 +1319,12 @@ def _trae_credit_info():
                 "d7": _trae_num(_within(7)),
                 "d30": _trae_num(_within(30)),
                 "empty": empty,
+                # 逐日明细（对齐官方「用量管理→奖励积分」按到期日逐包口径），
+                # 取最近 4 档，前端拼成一行；官方页面有延迟，这里口径更新
+                "detail": [
+                    {"date": day.strftime("%m-%d"), "amount": _trae_num(v)}
+                    for day, v in sorted(buckets.items())[:4]
+                ],
             }
         if bal is not None or expiring:
             data = {
@@ -5870,6 +5876,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* 日期改「M月D日（明天）」后这行变长，窄屏允许换行，别把「（已用完）」裁掉 */
 .credit-exp.sub.gone{color:#94a3b8;white-space:normal;overflow:visible;text-overflow:clip;}
+/* 逐日到期明细（Trae）：一行放不下时换行 */
+.credit-exp.sub.detail{white-space:normal;overflow:visible;text-overflow:clip;}
 /* 专属积分（仅指定模型可用、不计入可用积分）：允许换行，用蓝灰拉开层次 */
 .credit-exp.sub.ded{color:#5b6472;white-space:normal;overflow:visible;text-overflow:clip;}
 .credit-exp .rel{font-weight:800;}
@@ -6245,6 +6253,15 @@ function creditHTML(it){
     if(c.expiring.d7!=null) sub.push('7 天内 '+esc(c.expiring.d7));
     if(c.expiring.d30!=null) sub.push('30 天内 '+esc(c.expiring.d30));
     if(sub.length) h += '<div class="credit-exp sub">'+sub.join(' · ')+' '+(c.unit||'积分')+' 将过期</div>';
+    if(c.expiring.detail && c.expiring.detail.length){
+      // 逐日到期明细（Trae 官方「用量管理→奖励积分」同口径），一行可换行
+      var parts = c.expiring.detail.map(function(x){
+        if(!x || x.amount==null || !x.date) return '';
+        var di = expDateInfo(x.date);
+        return di.html+(di.rest?' '+esc(di.rest):'')+' '+esc(x.amount);
+      }).filter(Boolean);
+      if(parts.length) h += '<div class="credit-exp sub detail">近期到期：'+parts.join(' · ')+'</div>';
+    }
     if(c.expiring.empty && c.expiring.empty.date){
       var ed = expDateInfo(c.expiring.empty.date);
       var part = ed.html + (ed.rest ? ' '+esc(ed.rest) : '') + ' 起到期';
