@@ -2230,7 +2230,11 @@ def _qoder_notify_claimed(balance):
 def _qoder_topup_loop():
     # 2026-09-27 恢复：指纹可跨机重放（守护上报 Cosy-Machine* 到 qoder_local_status.json），
     # 服务端重新具备代领能力；此前「本机守护独占」版线程停用。
-    print("[qoder-topup] 服务端代领线程启动（10:05~13:00 每 30 分钟，claim 幂等安全）")
+    # 2026-11-12 修正：原 sleep(1800) 的首次检查点从「服务启动时刻」起算，
+    # 会漂到 10:20 甚至更晚；改 5 分钟轮询 + 25 分钟节流，进窗口后 5 分钟内必领。
+    global _QODER_TOPUP_LAST
+    _QODER_TOPUP_LAST = 0.0
+    print("[qoder-topup] 服务端代领线程启动（10:05~13:00 每 25 分钟，进窗口 5 分钟内触发）")
     while True:
         try:
             utc8 = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
@@ -2238,7 +2242,9 @@ def _qoder_topup_loop():
             local = _qd_local_today()
             if (10, 5) <= hm <= (13, 0) and not (local and local.get("checked")):
                 # cookie 路径（无需指纹）或 token+指纹路径任一就绪即可代领
-                if _qd_cookie() or (_qd_token()[0] and _qd_fp() is not None):
+                if (_qd_cookie() or (_qd_token()[0] and _qd_fp() is not None)) \
+                        and time.time() - _QODER_TOPUP_LAST >= 1500:
+                    _QODER_TOPUP_LAST = time.time()
                     status, message, balance = _qd_try_server_claim()
                     if status in ("claimed", "token_expired"):
                         _qd_record_server_claim(status, message, balance)
@@ -2250,7 +2256,7 @@ def _qoder_topup_loop():
                     print("[qoder-topup] %s: %s" % (status, message))
         except Exception as e:
             print("[qoder-topup] 异常: %r" % e)
-        time.sleep(1800)
+        time.sleep(300)
 QD_CAMPAIGN_PATH = "/sash/api/v1/me/campaigns"
 # 服务端绝不刷新 token（刷新会挤掉你本机 Qoder 客户端的登录态），只读着用；
 # token 过期只能靠本机脚本重新取一份推上来。
@@ -2742,8 +2748,17 @@ def _qd_query_campaigns():
 
     # ---- 主路径：openapi token + 指纹（能查到今日活动） ----
     if tok and fp:
+        # 绑定指纹头，统一成 api(path, method, body) 签名供后续 claim 调用。
+        # ⚠️ 不能直接返回 _qd_api_fp（它需要 headers 位置参数），
+        # 否则服务端代领必报 "missing 1 required positional argument: 'headers'"
+        # （2026-11-11 10:16 线上日志实证，今天 11-12 未签到的根因）。
+        fp_headers = _qd_fp_headers(tok, fp)
+
+        def _fp_api(path, method="GET", body=None, _h=fp_headers):
+            return _qd_api_fp(path, _h, method=method, body=body)
+
         try:
-            d = _qd_api_fp(QD_CAMPAIGN_PATH, _qd_fp_headers(tok, fp))
+            d = _qd_api_fp(QD_CAMPAIGN_PATH, fp_headers)
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):
                 raise _QDExpired(e.code, "token")
@@ -2752,7 +2767,7 @@ def _qd_query_campaigns():
             camps = [c for c in (d.get("campaigns") or [])
                      if isinstance(c, dict) and c.get("actionType") == "CLAIM_BENEFIT"]
             if camps:
-                return camps, _qd_api_fp, QD_CAMPAIGN_PATH
+                return camps, _fp_api, QD_CAMPAIGN_PATH
 
     # ---- 兜底：网页 cookie（qoder.com） ----
     if cookie:
@@ -2770,7 +2785,7 @@ def _qd_query_campaigns():
     # ---- 两条路都没查到活动 ----
     if tok and fp:
         # 主路径接口通但今天确实没有 CLAIM_BENEFIT 活动（活动暂停/改版）
-        return [], _qd_api_fp, QD_CAMPAIGN_PATH
+        return [], _fp_api, QD_CAMPAIGN_PATH
     if cookie:
         # cookie 路通用但无活动（活动可能在桌面端，待本机守护领取）
         raise RuntimeError("网页会话查询无活动（活动可能在桌面端，待本机守护领取）")
