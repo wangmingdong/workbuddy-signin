@@ -5817,6 +5817,8 @@ def get_center():
         "next_run": _sched_next_hint(),
         # 凭据到期预警：[{name,title,level,label,days}]；没有就空数组
         "cred_alerts": cred_alerts,
+        # 前端据此决定是否渲染「更新凭据」类按钮（服务器模式只读，不摆死按钮）
+        "cred_writable": not is_server_mode(),
         "items": items,
     }
 
@@ -6248,6 +6250,18 @@ button.entry:hover{background:#eef7f4;}
 .cu-status{font-size:12.5px;color:var(--sub);padding:8px 10px;background:rgba(15,23,42,.03);border-radius:10px;}
 .cu-launch{display:flex;flex-direction:column;align-items:center;gap:6px;margin:12px 0 4px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}
 .cu-launch-tip{font-size:11.5px;color:#15803d;text-align:center;line-height:1.5;}
+/* 傻瓜式三步引导（本机自动采集） */
+.cu-guide{margin:12px 0 4px;padding:15px;background:linear-gradient(180deg,#f0fdf9,#f7fefb);border:1px solid #b7e9d5;border-radius:14px;}
+.cu-guide-title{font-size:14.5px;font-weight:800;color:#0a7d5a;margin-bottom:11px;}
+.cu-step{display:flex;align-items:flex-start;gap:9px;margin:9px 0;font-size:13px;color:#33524a;line-height:1.5;}
+.cu-step .n{flex:0 0 22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:#00B896;color:#fff;font-weight:800;font-size:12.5px;}
+.cu-biglaunch{display:block;width:100%;margin-top:13px;padding:15px;border:0;border-radius:13px;background:linear-gradient(135deg,#00B896,#00A07F);color:#fff;font-size:15.5px;font-weight:800;cursor:pointer;box-shadow:0 12px 24px -12px rgba(0,184,150,.9);transition:transform .08s ease,filter .2s ease;}
+.cu-biglaunch:active{transform:scale(.985);filter:brightness(.97);}
+.cu-biglaunch[disabled]{background:#e6eeec;color:#9aa9a5;box-shadow:none;cursor:default;}
+.cu-guide-tip{margin-top:10px;font-size:12px;color:#15803d;line-height:1.6;min-height:1em;}
+.cu-more{margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:10px;}
+.cu-more summary{cursor:pointer;font-size:12.5px;color:#64748b;line-height:1.6;}
+.cu-more .ftip{margin:10px 0 6px;}
 .cu-actions{display:flex;gap:10px;margin-top:12px;}
 .cu-actions button{border:0;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer;transition:transform .08s ease,filter .2s ease;}
 .cu-actions button:active{transform:scale(.985);filter:brightness(.97);}
@@ -6568,11 +6582,14 @@ function cardHTML(it){
       : '<button class="cta manual-signed" data-name="'+esc(it.name)+'" style="margin-top:8px">✅ 我已在网页签到</button>';
     btn = cta + msigned + retry;
   } else if(needsAuth){
-    // cookie 类平台：签到用「服务器自己那份 Cookie」。华为支持在网页里粘贴登录态 Cookie 直接登录。
+    // cookie 类平台：签到用「服务器自己那份 Cookie」。华为支持在网页里粘贴登录态 Cookie 直接登录（仅本机可写模式）。
     var retry = '<button class="cta recheck" data-name="'+esc(it.name)+'" style="margin-top:'+(it.hide_auth_link?'0px':'8px')+'">🔄 重新检查签到状态</button>';
-    if(it.login_supported){
+    if(it.login_supported && credWritable()){
       var loginBtn = '<button class="cta login-cookie" type="button" data-name="'+esc(it.name)+'">🔑 配置会话 Cookie</button>';
       btn = loginBtn + retry;
+    } else if(it.login_supported && !credWritable()){
+      // 服务器模式：不摆「配置会话 Cookie」死按钮，只留重新检查
+      btn = retry;
     } else {
       btn = it.hide_auth_link
         ? retry
@@ -6587,8 +6604,8 @@ function cardHTML(it){
   }
   // 注：派猫猫旅行已不再是独立卡片，改为 WorkBuddy 卡内的入口 + 弹窗（见 entriesHTML/openTravel）
   var entries = entriesHTML(it);
-  // 凭据更新入口直接放卡面：需要凭据的平台都能点，不再藏在设置页里
-  var credBtn = CRED_KEYS[it.name]
+  // 凭据更新入口直接放卡面：仅「本机可写模式」才摆；服务器模式只读，摆了也是点了弹提示的死按钮，索性不显示
+  var credBtn = (CRED_KEYS[it.name] && credWritable())
     ? '<button class="cta ghost cred-upd" type="button" data-name="'+esc(it.name)+'" style="margin-top:6px">🔑 更新凭据</button>'
     : '';
   var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
@@ -6935,11 +6952,14 @@ function openCredUpdate(name){
     var local = d.local;
     var writable = (d.writable !== undefined) ? d.writable : !!local;
     // 服务器模式没有弹窗采集按钮，提示里「本机可点弹窗采集」「粘贴」这类句子会误导，过滤掉
+    var canAuto = local && it.launcher_ok && it.launcher;
     var hintText = it.hint || '';
-    if(!writable){
+    // 服务器模式只读；本机可自动采集的平台也过滤旧措辞（三步引导已说清），避免重复
+    if(!writable || canAuto){
       hintText = String(hintText).split(/[。；;]/).filter(function(s){
         return s && s.indexOf('本机')<0 && s.indexOf('弹窗')<0
-          && s.indexOf('粘贴')<0 && s.indexOf('复制')<0 && s.indexOf('F12')<0;
+          && s.indexOf('粘贴')<0 && s.indexOf('复制')<0 && s.indexOf('F12')<0
+          && s.indexOf('采集')<0;
       }).map(function(s){ return s.trim().replace(/^或/,''); }).join('。');
     }
     var h = (hintText ? '<div class="mg-note" style="margin-bottom:10px">'+esc(hintText)+'</div>' : '')
@@ -6954,32 +6974,63 @@ function openCredUpdate(name){
       body.innerHTML = h;
       return;
     }
-    if(local && it.launcher_ok){
-      h += '<div class="cu-launch"><button class="btn-mini" id="cuLaunchBtn" type="button">🖥️ 弹窗采集（推荐）</button>'
-        + '<span class="cu-launch-tip">自动弹出登录窗，登录后凭据写回本机，无需手动复制</span></div>';
-    } else if(!local){
-      h += '<div class="mg-note">当前是服务器部署，无法在本机弹登录窗。请在<b>你自己的电脑</b>登录后复制凭据，粘贴到下方保存。</div>';
+    if(canAuto){
+      // 傻瓜式：一个大按钮 + 三步说明，登录后自动写回；手动粘贴折叠兜底
+      h += '<div class="cu-guide">'
+        +   '<div class="cu-guide-title">✨ 不用复制，点一下就能自动更新</div>'
+        +   '<div class="cu-step"><span class="n">1</span><span>点下面的绿色按钮，会自动打开一个登录窗口</span></div>'
+        +   '<div class="cu-step"><span class="n">2</span><span>在弹出的窗口里登录一次 '+esc(PLATFORMS[name]||name)+'</span></div>'
+        +   '<div class="cu-step"><span class="n">3</span><span>登录成功后凭据自动写回本页，无需手动复制</span></div>'
+        +   '<button class="cu-biglaunch" id="cuLaunchBtn" type="button">🌐 打开浏览器登录 · 自动获取</button>'
+        +   '<div class="cu-guide-tip" id="cuMsg"></div>'
+        + '</div>'
+        + '<details class="cu-more"><summary>登录窗打不开？点这里手动粘贴凭据</summary>'
+        +   '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
+        +   '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
+        +   '<div class="cu-actions"><button class="cu-save" id="cuSave" type="button">💾 保存凭据</button></div>'
+        +   '<div id="cuMsg2" class="mg-note" style="margin-top:10px"></div>'
+        + '</details>';
+    } else {
+      // 本机但该平台无采集脚本：只能手动，给清晰引导
+      h += '<div class="mg-note" style="margin-bottom:10px">'+esc(it.hint||'')+'</div>'
+        + '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
+        + '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
+        + '<div class="cu-actions">'
+        +   '<button class="cu-save" id="cuSave" type="button">💾 保存凭据</button>'
+        + '</div><div id="cuMsg2" class="mg-note" style="margin-top:10px"></div>';
     }
-    h += '<p class="ftip" style="margin:12px 0 6px">或手动粘贴凭据：</p>'
-      + '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
-      + '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
-      + '<div class="cu-actions">'
-      +   '<button class="cu-save" id="cuSave" type="button">💾 保存凭据</button>'
-      +   '<button class="cu-cancel" type="button" onclick="closeModal()">取消</button>'
-      + '</div><div id="cuMsg" class="mg-note" style="margin-top:10px"></div>';
+    h += '<div class="cu-actions" style="justify-content:flex-end">'
+      + '<button class="cu-cancel" type="button" onclick="closeModal()">关闭</button></div>';
     body.innerHTML = h;
     var lb=$('cuLaunchBtn');
     if(lb) lb.addEventListener('click',function(){
-      lb.disabled=true; lb.textContent='启动中…';
+      lb.disabled=true; lb.innerHTML='<span class="spin"></span> 正在打开登录窗口…';
+      var tip=$('cuMsg'); if(tip){ tip.style.color='#0a7'; tip.textContent='登录窗口已弹出，请在窗口里完成登录；成功后凭据会自动写回，本页会自动刷新。'; }
       api("api/cred_wizard",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({name:name,action:"launch"})}).then(function(r){
-        lb.disabled=false; lb.textContent='🖥️ 弹窗采集（推荐）';
-        var msg=$('cuMsg'); if(msg){ msg.style.color=r.ok?'#0a7':'#c0392b'; msg.textContent=r.ok?(r.msg||'已启动采集窗口，登录后凭据自动写回'):(r.error||'启动失败'); }
-      }).catch(function(e){ lb.disabled=false; lb.textContent='🖥️ 弹窗采集（推荐）'; if($('cuMsg')) $('cuMsg').textContent='启动失败：'+(e&&e.message); });
+        if(!r.ok){
+          lb.disabled=false; lb.textContent='🌐 打开浏览器登录 · 自动获取';
+          if(tip){ tip.style.color='#c0392b'; tip.textContent=r.error||'启动失败'; }
+          return;
+        }
+        // 启动成功：轮询凭据文件 mtime，写回后自动提示并刷新
+        var startMt = (window._cwItems.filter(function(x){return x.key===name;})[0]||{}).mtime || 0;
+        var tries=0, timer=setInterval(function(){
+          tries++;
+          api("api/cred_wizard").then(function(dd){
+            var cur=(dd.items||[]).filter(function(x){return x.key===name;})[0]||{};
+            if((cur.mtime||0)>startMt || (startMt===0 && cur.exists)){
+              clearInterval(timer);
+              if(tip){ tip.style.color='#0a7'; tip.textContent='✅ 检测到凭据已更新！正在刷新…'; }
+              setTimeout(function(){ closeModal(); load(function(){ showMsg('凭据已更新，可以签到了 ✅','ok'); }); }, 900);
+            } else if(tries>=40){ clearInterval(timer); if(tip){ tip.textContent='若已在窗口登录但仍未更新，请关闭本页稍后点「重新检查」。'; } }
+          }).catch(function(){});
+        }, 3000);
+      }).catch(function(e){ lb.disabled=false; lb.textContent='🌐 打开浏览器登录 · 自动获取'; if($('cuMsg')) $('cuMsg').style.color='#c0392b'; if($('cuMsg')) $('cuMsg').textContent='启动失败：'+(e&&e.message); });
     });
     var sb=$('cuSave');
     if(sb) sb.addEventListener('click',function(){
-      var v=($('cuText').value||'').trim(); var msg=$('cuMsg');
+      var v=($('cuText').value||'').trim(); var msg=$('cuMsg2');
       if(!v){ if(msg){msg.style.color='#c0392b';msg.textContent='内容为空，先粘贴凭据';} return; }
       sb.disabled=true; sb.innerHTML='<span class="spin"></span> 保存中…';
       api("api/cred_wizard",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -7609,6 +7660,9 @@ function netMsg(e,prefix){
 }
 var LAST_CENTER = null;
 var TAB = (function(){ try { return localStorage.getItem('wb_tab') || 'auto'; } catch(e){ return 'auto'; } })();
+// 凭据是否可写（服务器模式只读）：由中心接口同步，默认 true 兼容老后端；卡片/预警条据此决定要不要摆「更新凭据」按钮
+var WRITABLE_CRED = true;
+function credWritable(){ return WRITABLE_CRED !== false; }
 
 function manualCardHTML(it){
   var g = it.manual_guide || {};
@@ -7670,7 +7724,8 @@ function renderCredAlert(alerts){
   var bad = list.some(function(a){ return a.level!=='soon'; });
   var names = list.map(function(a){
     var key = a.name || '';
-    var clickable = CRED_KEYS[key];
+    // 服务器模式只读：平台名不可点，避免点了弹「请用本机更新」的死按钮
+    var clickable = CRED_KEYS[key] && credWritable();
     return (clickable
       ? '<button class="ca-name" type="button" data-cw="'+esc(key)+'">'+esc(a.title||a.name)+'</button>'
       : '<b>'+esc(a.title||a.name)+'</b>')+'（'+esc(a.label)+'）';
@@ -7681,7 +7736,10 @@ function renderCredAlert(alerts){
     +   '<div class="ct">'+esc(list.length+' 个平台凭据'+(bad?'马上要过期/已过期':'即将过期'))+'</div>'
     +   '<div class="cl">'+names+'</div>'
     +   '<div class="cd">到期后卡片会显示「登录态过期」、当天签到也会失败。'
-    +   '点上方平台名即可更新凭据（本机可一键弹窗登录，服务器粘贴新值即可）。</div>'
+    +   (credWritable()
+          ? '点上方平台名即可更新凭据：本机可一键打开浏览器登录、自动写回。'
+          : '服务器部署不支持网页改凭据，请用本机版登录后自动写回，或用 SFTP 更新凭据文件。')
+    +   '</div>'
     + '</div>'
     + '<button class="cx" type="button" title="知道了" aria-label="关闭">×</button>'
     + '</div>';
@@ -7738,6 +7796,7 @@ function renderStats(d, items){
 function renderCenter(d){
   if(!d.ok){ $("summary").textContent="读取失败"; showMsg(d.error||"读取失败","err"); return; }
   LAST_CENTER = d;
+  if(d.cred_writable !== undefined) WRITABLE_CRED = !!d.cred_writable;
   $("summary").textContent = "已签 "+d.signed_count+" / "+d.total_count;
   var pct = d.total_count ? Math.round(d.signed_count/d.total_count*100) : 0;
   $("prog").style.width = pct+"%";
