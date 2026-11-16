@@ -19,8 +19,8 @@
 >   从未失败）；之前误放在手动组，是因为其 Cookie 短效需偶尔重登，
 >   但那属于「维护凭据」而非「手动签到」。
 >
-> Qoder 卡片仍展示，但每日 100 Credits 因官方限制需**桌面端领取**
-> （由本机守护完成，不在服务端自动签到列表）。
+> Qoder 每日 100 Credits 由**本机守护领取 + 服务端代领双保险**（见下方第 5 步），
+> 已回归 `AUTO_RUN` 自动列表；本机守护不在线时服务端可兜底。
 > **豆包为「浏览器签名代理」架构**——详见下方「第 9 步 · 豆包」。
 
 > 所有卡片底部统一显示「可用积分」（4 家真实有余额：千帆 / WorkBuddy / Qoder / Link AI；其余接口不提供余额则诚实显示「—」）。
@@ -36,7 +36,7 @@
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
 | **Coze 扣子** | coze.cn | 60 积分/天 + 自动聊天点亮连续活跃（当日 23:59 过期） | `coze_cookie.txt` | 约 60 天，过期重新导出 Cookie |
-| 华为码道（手动卡） | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步；亦支持网页「🔑 配置会话 Cookie」粘贴登录） | 会话失效后双击 `huawei/relogin_huawei.bat` |
+| 华为码道 | devcloud.cn-north-4.huaweicloud.com | — | `hw_cookie.txt`（本机 `hw_autopush.py` 自动同步；亦支持网页「🔑 配置会话 Cookie」粘贴登录） | 会话失效后双击 `huawei/relogin_huawei.bat` |
 | **豆包 Doubao** | doubao.com / 豆包 PC 客户端 | 每日签到 + 积分任务领奖 | 浏览器实时算签代持（详见下方「第 9 步 · 豆包」） | 随会话（约 30 天，靠本机续传） |
 
 > **派猫猫旅行**已并入 WorkBuddy：它共用 WorkBuddy 登录态，在 WorkBuddy 卡内作为弹窗入口，不单独成卡、也不在设置页单独配置（开关跟随 WorkBuddy）。
@@ -162,6 +162,41 @@ workbuddy-signin/
 
 ---
 
+## 🧭 两种使用方式（先选一条）
+
+本项目只有一份代码（`web_server.py`），按「谁常驻运行」分两种用法。**凭据、设置页、卡片功能完全一样**，区别只在本机跑还是服务器跑：
+
+| | 🖥️ **本机模式** | ☁️ **服务器模式** |
+|---|---|---|
+| 适合谁 | 有台电脑常开、只想自己用、零成本试用 | 电脑经常关机、想手机随时看、要公网地址 |
+| 谁来跑 | 你的 Windows 电脑 | 云服务器（nginx 反代） |
+| 访问地址 | `http://localhost:8765`（手机同 WiFi 用局域网 IP） | `https://你的域名/checkin/` |
+| 端口 | 默认 `8765`（`WB_PORT` 可改） | `127.0.0.1:8790`，由 nginx 反代 |
+| 自动签到 / 开机自启 | 设置页定时 + `install.bat` 写的启动文件夹 VBS | 设置页定时 + systemd `wb-checkin` 常驻 |
+| 凭据放哪 | 你电脑上的项目根目录 | 服务器 `/opt/wb-checkin/` |
+| 凭据采集 | 设置页「凭据向导」点「弹窗采集」，自动写盘 | 本机采集后推服务器（或向导里「粘贴凭据」） |
+| 电脑关机后 | ❌ 停签 | ✅ 照常签 |
+
+> ⚠️ **两种模式不要同时开调度**——两边都设了定时会各签一次、各推一次通知（重复推送）。选定一边后，把另一边设置页的「启用自动签到」关掉即可。
+
+### 🖥️ 本机模式（3 步）
+
+1. 装 **Python 3.8+**（勾选 Add to PATH）；需要弹窗采集的平台再装 **Node.js**。
+2. 双击 **`install.bat`**：自动检测 Python → 写开机自启 → 起服务 → 打开 `http://localhost:8765`。
+3. 进设置页 →「🗝️ 凭据向导」逐平台配置 → 设定时 → 完成。
+
+完整小白步骤、喂 AI 的提示词见根目录 **[QUICKSTART.md](../QUICKSTART.md)**。
+
+### ☁️ 服务器模式（概要）
+
+1. 一台常驻服务器（装 nginx、Python 3.11）+ 域名反代 `location /checkin/` → `127.0.0.1:8790`。
+2. `web_server.py` 及凭据平铺到 `/opt/wb-checkin/`，systemd 起 `wb-checkin`（内置调度线程读 `settings.json` 的 `schedule_time`）。
+3. 凭据在本机采集后推服务器；设置页定时 + 通知。详见下方「用法 → 第 4 步」和「服务器安全加固」。
+
+> 服务器 `python3` 是 3.6.8 跑不动本项目，**必须用 `python3.11`**。
+
+---
+
 ## 🚀 开源首次配置指南（Clone 后从零跑起来）
 
 面向第一次拿到本仓库、想自己部署签到的用户。**核心代码已配置化，没有写死任何人的令牌 / 设备 id**—— clone 后只需按下面填好你自己的凭据即可。
@@ -170,10 +205,10 @@ workbuddy-signin/
 - **Python 3.8+**（纯标准库，无需 `pip install`）
 - 一台常驻机器跑 `web_server.py`（本机 / 云服务器均可）；手机同 WiFi 或经 nginx 反代访问网页
 
-### 1. 启动服务（三选一）
-- **本机试用**：双击 `start_web.bat`，窗口打印手机访问地址（需同 WiFi + 防火墙允许）。
-- **服务器 systemd**（已部署示例）：`web_server.py` 监听 `127.0.0.1:8790`，由 nginx `location /checkin/` 反代；**进程内自带调度线程**，每天按 `settings.json` 的 `schedule_time` 自动签到。
-- **手动前台**：`python web_server.py --daily` 跑一次签到；`python web_server.py` 起网页服务。
+### 1. 启动服务（按上面选的模式来）
+- **🖥️ 本机模式（推荐）**：双击 `install.bat` —— 检测 Python → 写开机自启 VBS → 起服务并打开 `http://localhost:8765`（端口默认 8765，`WB_PORT` 可改）。本机需要弹窗采集的平台，设置页「凭据向导」一键处理。
+- **☁️ 服务器模式**：`web_server.py` 由 systemd `wb-checkin` 常驻，监听 `127.0.0.1:8790`，nginx `location /checkin/` 反代；**进程内自带调度线程**，每天按 `settings.json` 的 `schedule_time` 自动签到。凭据在本机采集后推服务器。
+- **手动前台（调试用）**：`python web_server.py --daily` 跑一次签到；`python web_server.py` 起网页服务。旧脚本 `start_web.bat` / `setup_task.ps1` 仍可用，但新用户直接用 `install.bat` 即可。
 
 ### 2. 配置访问口令（建议）
 - 环境变量 `WB_ACCESS_KEY`（服务器 systemd 注入）或本地 `.env` 的 `ACCESS_KEY`。
@@ -390,21 +425,16 @@ python wb_token_sync.py --print    # 附带打印令牌片段，排障用
   （对照：豆包的 cookie 因为服务端有内存缓存，才需要热加载 + 重启路径。）
 
 ### 2. 设置每天自动跑（本机，一次设置长期有效）
-以**管理员身份**打开 PowerShell：
-```powershell
-Set-Location "D:\path\to\workbuddy-signin"
-.\setup_task.ps1
-```
-之后每天 09:10 自动签到，结果记录在 `checkin.log`。立即验证：
-```powershell
-schtasks /run /tn WorkBuddyDailyCheckin
-```
+推荐：双击 `install.bat`（写好开机自启），然后进设置页填「每日签到时间」并保存——调度在 `web_server.py` 进程内，不用再配 Windows 任务计划。
+旧方式（仍可用）：管理员 PowerShell 跑 `.\setup_task.ps1`，每天 09:10 由系统任务计划触发 `run_checkin.bat`，结果写在 `checkin.log`。
+> ⚠️ 两种方式别同时启用，否则一天签两次。本机模式用 `install.bat` + 设置页即可。
 
 ### 3. 手机打开网页签到（想手动签的时候用）
-双击 `start_web.bat` 启动服务，窗口打印**手机访问地址**（需连同一 WiFi）。手机浏览器打开即可看积分和「立即签到」按钮。
+双击 `start_web.bat` 启动服务（或 `install.bat` 已起），窗口打印**手机访问地址**（需连同一 WiFi）；本机默认 `http://localhost:8765`。手机浏览器打开即可看积分和「立即签到」按钮。
 - 防火墙首次弹窗选「允许访问（专用网络）」。
-- 想开机自启：双击 `install_autostart.bat`（无需管理员）。取消就删启动文件夹里的 `WorkBuddyCheckinWeb.vbs`。
-- 加访问口令：在 `.env` 设 `ACCESS_KEY=你的口令`（或服务器 `WB_ACCESS_KEY`），重启服务后手机首次访问需输入一次。
+- 想开机自启：双击 `install.bat`（推荐）或 `install_autostart.bat`。取消就删启动文件夹里的对应 VBS（`wb-checkin-local.vbs` / `WorkBuddyCheckinWeb.vbs`）。
+- 加访问口令：在设置页「🔑 中心访问口令」改，或 `.env` 设 `ACCESS_KEY=你的口令`（服务器用 `WB_ACCESS_KEY`），手机首次访问需输入一次。
+- 配凭据：设置页「🗝️ 凭据向导」，有弹窗采集脚本的平台一键登录写盘，其余粘贴 token / Cookie。
 
 ### 4. 服务器自动签到 + 手机网页查看（已部署到云服务器 ✅）
 
