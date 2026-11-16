@@ -16,6 +16,8 @@ import sys
 import json
 import ssl
 import socket
+import shutil
+import subprocess
 import hashlib
 import re
 import time
@@ -113,6 +115,80 @@ _SSL_CTX.verify_mode = ssl.CERT_NONE
 
 # ============================ 运行设置（傻瓜式配置，持久化于 settings.json） ============================
 SETTINGS_FILE = os.environ.get("WB_SETTINGS_FILE", os.path.join(BASE_DIR, "settings.json"))
+
+# ---- 凭据向导元数据（key 与前端 PLATFORMS 一致） ----
+# launcher: 本机弹窗采集脚本（相对根目录）。.js 需要 node；.bat 仅 Windows 本机可启动。
+CRED_WIZARD = [
+    {"key": "workbuddy", "files": ["token.info"],
+     "paste_hint": "粘贴 WorkBuddy token（token.info 全文内容）",
+     "hint": "打开 WorkBuddy 客户端登录一次即自动续期写入 token.info；也可直接粘贴 token。",
+     "launcher": None},
+    {"key": "qianfan", "files": ["qf_token.txt"],
+     "paste_hint": "粘贴千帆 access_token",
+     "hint": "登录 qianfan.baidu.com 控制台 → Access Token，复制粘贴。",
+     "launcher": None},
+    {"key": "minimax", "files": ["mm_web_token.json"],
+     "paste_hint": "粘贴网页端 token（JSON 或纯 token 均可）",
+     "hint": "登录 platform.minimax.io，F12 → Network 找鉴权 token 复制粘贴。",
+     "launcher": None},
+    {"key": "qoder", "files": ["qoder_token.txt"],
+     "paste_hint": "粘贴 Qoder token（token 或 token + # expiresAt=…）",
+     "hint": "Windows 本机可点「弹窗采集」安装守护（每 15 分钟自动领）；或从桌面客户端取 token 粘贴。",
+     "launcher": os.path.join("qoder_keeper", "install_keeper.bat")},
+    {"key": "linkai", "files": ["linkai_token.txt"],
+     "paste_hint": "粘贴 Link AI 的 token",
+     "hint": "登录 console.link-ai.tech 取 token 粘贴（滑块验证码已实现自动破解）。",
+     "launcher": None},
+    {"key": "lingxi", "files": ["lx_cookie.txt"],
+     "paste_hint": "粘贴 lingxi.wps.cn 的 Cookie 整串",
+     "hint": "本机可点「弹窗采集」自动导出；或浏览器登录后 F12 复制 Cookie 粘贴。",
+     "launcher": "lx_capture.js"},
+    {"key": "trae", "files": ["trae_cookie.txt"],
+     "paste_hint": "粘贴 work.trae.cn 的 Cookie 整串",
+     "hint": "本机可点「弹窗采集」自动导出（Cookie 约 14 天需重采一次，卡片会预警）。",
+     "launcher": "trae_capture.js"},
+    {"key": "huawei", "files": ["hw_cookie.txt", os.path.join("huawei", "hw_cookie.txt")],
+     "paste_hint": "粘贴 devcloud 的 Cookie",
+     "hint": "Windows 本机可点「弹窗采集」重新登录（会话静置 30~60 分钟失效，靠本机守护保活）。",
+     "launcher": os.path.join("huawei", "relogin_huawei.bat")},
+    {"key": "coze", "files": ["coze_cookie.txt"],
+     "paste_hint": "粘贴 coze.cn 的 Cookie 整串",
+     "hint": "浏览器登录 coze.cn → F12 → Network 复制 Cookie 整串粘贴。",
+     "launcher": None},
+    {"key": "doubao", "files": ["doubao_cookie.json", "doubao_cookies_server.json"],
+     "paste_hint": "粘贴豆包 cookie JSON（含 sessionid）",
+     "hint": "本机可点「弹窗采集」（Playwright + Edge 实时算签）；或粘贴 cookie JSON。",
+     "launcher": "doubao_capture.js"},
+]
+# 粘贴目标 = files 第一个（主凭据文件）
+_CRED_PASTE_TARGET = {it["key"]: it["files"][0] for it in CRED_WIZARD}
+
+
+def _cred_wizard_items():
+    """向导 GET 数据：每个平台的凭据文件状态 + 本机采集能力判定。"""
+    import time as _time
+    items = []
+    for it in CRED_WIZARD:
+        fps = [os.path.join(BASE_DIR, f) for f in it["files"]]
+        have = [f for f in fps if os.path.exists(f)]
+        mt = max([os.path.getmtime(f) for f in have], default=None) if have else None
+        launcher = it.get("launcher")
+        lok = False
+        if launcher:
+            lp = os.path.join(BASE_DIR, launcher)
+            if str(launcher).endswith(".js"):
+                lok = os.path.exists(lp) and bool(shutil.which("node"))
+            else:
+                lok = os.name == "nt" and os.path.exists(lp)
+        items.append({
+            "key": it["key"], "files": it["files"],
+            "exists": bool(have), "mtime": mt,
+            "mtime_text": _time.strftime("%m-%d %H:%M", _time.localtime(mt)) if mt else "",
+            "hint": it["hint"], "paste_hint": it["paste_hint"],
+            "launcher": launcher, "launcher_ok": bool(lok),
+        })
+    return items
+
 
 PLATFORM_TITLES = {
     "workbuddy": "WorkBuddy",
@@ -6105,6 +6181,17 @@ button.entry:hover{background:#eef7f4;}
   border-radius:14px;padding:11px 13px;margin:12px 0;}
 .fgroup{background:#fff;border-radius:18px;padding:4px 16px 10px;box-shadow:0 10px 30px rgba(15,23,42,.06);
   border:1px solid rgba(15,23,42,.04);margin-bottom:14px;}
+/* 凭据向导 */
+.cw-row{border-top:1px dashed #e2e8f0;padding:9px 0;}
+.cw-row:first-of-type{border-top:0;}
+.cw-top{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;overflow-wrap:anywhere;}
+.cw-name{font-weight:800;font-size:13px;}
+.cw-ok{color:#16a34a;font-size:12px;font-weight:700;white-space:nowrap;}
+.cw-no{color:#dc2626;font-size:12px;font-weight:700;white-space:nowrap;}
+.cw-hint{color:#64748b;font-size:12px;margin:4px 0 2px;line-height:1.55;overflow-wrap:anywhere;}
+.cw-btns{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;}
+.cw-ta{width:100%;min-height:130px;border:1px solid #d7e0dd;border-radius:10px;padding:9px;
+  font-size:12px;font-family:ui-monospace,Consolas,monospace;resize:vertical;box-sizing:border-box;}
 .fgroup > h4{margin:14px 0 2px;font-size:13px;font-weight:800;color:var(--sub);letter-spacing:.3px;}
 .task{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);}
 .task:last-child{border-bottom:0;}
@@ -7225,6 +7312,7 @@ function renderSettings(){
       +'<label class="fld col"><span>新口令（留空=不变）</span><input type="password" id="newKey" placeholder="输入新口令"></label>'
       +'<p class="ftip">修改后立即生效；保存后本机需用新口令访问。</p>'
       +'</div>'
+      +'<div id="credWizardBox"><div class="fgroup"><h4>🗝️ 凭据向导</h4><p class="ftip">加载中…</p></div></div>'
       +'<div class="fgroup"><h4>🎚 平台开关</h4>'+ph+'</div>'
       +'<div class="fgroup"><h4>🔔 完成通知</h4>'
       +'<label class="fld"><span>启用通知</span><input type="checkbox" id="notifyOn" '+(s.notify_on?'checked':'')+'></label>'
@@ -7237,7 +7325,69 @@ function renderSettings(){
     $('fbody').innerHTML=html;
     $('saveSettings').addEventListener('click', saveSettings);
     $('testWebhook').addEventListener('click', testWebhook);
+    renderCredWizard();
   }).catch(function(e){ showMsg("读取设置失败："+(e&&e.message),"err"); });
+}
+function renderCredWizard(){
+  var box=$('credWizardBox'); if(!box) return;
+  api("api/cred_wizard").then(function(d){
+    var items=d.items||[]; window._cwItems=items;
+    var rows='';
+    items.forEach(function(it){
+      var st=it.exists
+        ?'<span class="cw-ok">已配置'+(it.mtime_text?' · '+esc(it.mtime_text):'')+'</span>'
+        :'<span class="cw-no">缺失</span>';
+      var btns='';
+      if(it.launcher_ok) btns+='<button class="btn-mini" data-cw-launch="'+it.key+'" type="button">弹窗采集</button>';
+      btns+='<button class="btn-mini" data-cw-paste="'+it.key+'" type="button">粘贴凭据</button>';
+      rows+='<div class="cw-row"><div class="cw-top"><span class="cw-name">'+esc(PLATFORMS[it.key]||it.key)+'</span>'+st+'</div>'
+        +'<div class="cw-hint">'+esc(it.hint)+'</div><div class="cw-btns">'+btns+'</div></div>';
+    });
+    box.innerHTML='<div class="fgroup"><h4>🗝️ 凭据向导</h4>'
+      +'<p class="ftip">本机部署：点「弹窗采集」会弹出登录窗口，登录后凭据自动写盘。服务器部署：点「粘贴凭据」贴入 token / Cookie。凭据等同密码，注意保密。</p>'
+      +'<div class="cw-list">'+rows+'</div></div>';
+    Array.prototype.forEach.call(box.querySelectorAll('[data-cw-paste]'),function(b){
+      b.addEventListener('click',function(){ cwPaste(b.getAttribute('data-cw-paste')); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-cw-launch]'),function(b){
+      b.addEventListener('click',function(){ cwLaunch(b.getAttribute('data-cw-launch'),b); });
+    });
+  }).catch(function(e){
+    box.innerHTML='<div class="fgroup"><h4>🗝️ 凭据向导</h4><p class="ftip">读取失败：'+esc(e&&e.message)+'</p></div>';
+  });
+}
+function cwPaste(key){
+  var it=(window._cwItems||[]).filter(function(x){ return x.key===key; })[0]; if(!it) return;
+  var t=$('modal-title'); if(t) t.textContent='🗝️ 粘贴凭据 · '+(PLATFORMS[key]||key);
+  var m=$('modal'); if(!m) return;
+  $('modal-body').innerHTML='<p class="ftip">'+esc(it.paste_hint)+'</p>'
+    +'<textarea id="cwText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
+    +'<div style="text-align:center;margin-top:12px"><button class="cta" id="cwSave" type="button">💾 保存</button></div>';
+  m.classList.add('show'); document.body.style.overflow='hidden';
+  var ta=$('cwText'); ta.addEventListener('focus',function(){ ta.style.height='auto'; });
+  $('cwSave').addEventListener('click',function(){
+    var v=($('cwText').value||'').trim();
+    if(!v){ showMsg('内容为空，先粘贴凭据','err'); return; }
+    api('api/cred_wizard',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:key,content:v})}).then(function(r){
+      if(r.ok){
+        m.classList.remove('show'); document.body.style.overflow='';
+        showMsg(r.msg||'已保存','ok');
+        renderCredWizard();
+      } else { showMsg(r.error||'保存失败','err'); }
+    }).catch(function(e){ showMsg('保存失败：'+(e&&e.message),'err'); });
+  });
+}
+function cwLaunch(key,btn){
+  if(btn){ btn.disabled=true; btn.textContent='启动中…'; }
+  api('api/cred_wizard',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:key,action:'launch'})}).then(function(r){
+    if(btn){ btn.disabled=false; btn.textContent='弹窗采集'; }
+    showMsg(r.ok?(r.msg||'已启动采集窗口'):(r.error||'启动失败'), r.ok?'ok':'err');
+  }).catch(function(e){
+    if(btn){ btn.disabled=false; btn.textContent='弹窗采集'; }
+    showMsg('启动失败：'+(e&&e.message),'err');
+  });
 }
 function saveSettings(){
   var plat={};
@@ -7991,6 +8141,18 @@ class Handler(BaseHTTPRequestHandler):
                 "has_webhook": bool(SETTINGS.get("notify_webhook", "")),
             })
             return
+        if u.path == "/api/cred_wizard":
+            # 凭据向导：各平台凭据文件状态 + 本机弹窗采集能力（不回传凭据内容）
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                self._json(200, {"ok": True, "items": _cred_wizard_items(),
+                                 "local": os.name == "nt"})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         if u.path == "/api/doubao/poll":
             # 本机签名服务轮询(GET)：返回是否有待处理签到请求，并消费(清空)标志。
             q = parse_qs(u.query)
@@ -8322,6 +8484,64 @@ class Handler(BaseHTTPRequestHandler):
                 SETTINGS.update(saved)
                 reschedule()
                 self._json(200, {"ok": True})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
+        if u.path == "/api/cred_wizard":
+            # 粘贴保存凭据：{name, content}；或本机启动弹窗采集：{name, action:"launch"}
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                name = (body.get("name") or "").strip()
+                if name not in _CRED_PASTE_TARGET:
+                    self._json(200, {"ok": False, "error": "未知平台: %s" % name})
+                    return
+                if (body.get("action") or "") == "launch":
+                    meta = next(it for it in CRED_WIZARD if it["key"] == name)
+                    launcher = meta.get("launcher")
+                    if not launcher:
+                        self._json(200, {"ok": False, "error": "该平台没有本机弹窗采集脚本"})
+                        return
+                    lp = os.path.join(BASE_DIR, launcher)
+                    if not os.path.exists(lp):
+                        self._json(200, {"ok": False, "error": "采集脚本不存在: %s" % launcher})
+                        return
+                    if str(launcher).endswith(".js"):
+                        flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
+                        subprocess.Popen(
+                            ["node", launcher], cwd=BASE_DIR,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            creationflags=flags,
+                        )
+                        self._json(200, {"ok": True, "launched": True,
+                                         "msg": "已弹出采集窗口，登录成功后 cookie 自动写盘"})
+                    else:
+                        if os.name != "nt":
+                            self._json(200, {"ok": False, "error": "仅支持 Windows 本机启动 .bat"})
+                            return
+                        os.startfile(lp)  # noqa: 新窗口弹出登录脚本
+                        self._json(200, {"ok": True, "launched": True,
+                                         "msg": "已启动登录脚本，按弹出的窗口操作即可"})
+                    return
+                content = body.get("content")
+                if content is None or not str(content).strip():
+                    self._json(200, {"ok": False, "error": "内容为空"})
+                    return
+                content = str(content).strip()
+                target = _CRED_PASTE_TARGET[name]
+                path = os.path.join(BASE_DIR, target)
+                if os.path.exists(path):
+                    import time as _t
+                    bak = path + ".bak_" + _t.strftime("%Y%m%d_%H%M%S")
+                    shutil.copy2(path, bak)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content + "\n")
+                self._json(200, {"ok": True, "saved": target,
+                                 "msg": "已保存到 %s（旧文件已备份）" % target})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
