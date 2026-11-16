@@ -5920,6 +5920,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 #credAlert .ca .ct{font-weight:800;}
 #credAlert .ca .cl{margin-top:2px;}
 #credAlert .ca .cl b{font-weight:800;font-variant-numeric:tabular-nums;}
+#credAlert .ca .cl .ca-name{border:0;background:none;padding:0;font:inherit;font-weight:800;color:#9a3412;text-decoration:underline;text-underline-offset:2px;cursor:pointer;}
+#credAlert .ca.bad .cl .ca-name{color:#b91c1c;}
+#credAlert .ca .cl .ca-name:hover{opacity:.75;}
 #credAlert .ca .cl .sep{opacity:.45;margin:0 5px;}
 #credAlert .ca .cd{margin-top:5px;font-size:11.5px;opacity:.82;}
 #credAlert .ca .cx{flex:none;border:0;background:transparent;color:inherit;opacity:.5;cursor:pointer;
@@ -6197,6 +6200,9 @@ button.entry:hover{background:#eef7f4;}
 .cw-name{font-weight:800;font-size:13px;}
 .cw-ok{color:#16a34a;font-size:12px;font-weight:700;white-space:nowrap;}
 .cw-no{color:#dc2626;font-size:12px;font-weight:700;white-space:nowrap;}
+.cu-status{font-size:12.5px;color:var(--sub);padding:8px 10px;background:rgba(15,23,42,.03);border-radius:10px;}
+.cu-launch{display:flex;flex-direction:column;align-items:center;gap:6px;margin:12px 0 4px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}
+.cu-launch-tip{font-size:11.5px;color:#15803d;text-align:center;line-height:1.5;}
 .cw-hint{color:#64748b;font-size:12px;margin:4px 0 2px;line-height:1.55;overflow-wrap:anywhere;}
 .cw-btns{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;}
 .cw-ta{width:100%;min-height:130px;border:1px solid #d7e0dd;border-radius:10px;padding:9px;
@@ -6530,6 +6536,10 @@ function cardHTML(it){
   }
   // 注：派猫猫旅行已不再是独立卡片，改为 WorkBuddy 卡内的入口 + 弹窗（见 entriesHTML/openTravel）
   var entries = entriesHTML(it);
+  // 凭据更新入口直接放卡面：需要凭据的平台都能点，不再藏在设置页里
+  var credBtn = CRED_KEYS[it.name]
+    ? '<button class="cta ghost cred-upd" type="button" data-name="'+esc(it.name)+'" style="margin-top:6px">🔑 更新凭据</button>'
+    : '';
   var err = it.error ? '<div class="card-err">⚠️ '+esc(it.error)+'</div>' : '';
   return ''+
     '<div class="card" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
@@ -6543,7 +6553,7 @@ function cardHTML(it){
         creditHTML(it) +
         '<div class="rows">'+rows+'</div>'+
         (it.checked ? '' : '<div class="last">上次签到：'+last+'</div>')+
-        '<div class="card-acts">'+btn + entries + err +'</div>'+
+        '<div class="card-acts">'+btn + credBtn + entries + err +'</div>'+
       '</div>'+
     '</div>';
 }
@@ -6854,6 +6864,71 @@ function closeModal(){
   var b = $('modal-body'); if(b) b.innerHTML = '';
   GROWTH_VIEW = 'focus';
   DAILY_VIEW = 'focus';
+}
+// 通用「更新凭据」弹窗：本机模式有采集脚本就给「弹窗采集」，服务器模式只给「粘贴」
+// 数据全部来自 /api/cred_wizard（后端按部署判定 launcher_ok，不暴露凭据内容）
+function openCredUpdate(name){
+  var m=$('modal'); if(!m) return;
+  var panel=$('modal-panel'); if(panel) panel.style.setProperty('--mc','#0F9D58');
+  var titleEl=$('modal-title'); if(titleEl) titleEl.textContent='🔑 更新凭据 · '+(PLATFORMS[name]||name);
+  var body=$('modal-body'); if(!body) return;
+  body.innerHTML='<div class="dloading" style="padding:30px 0"><span class="spin"></span> 读取凭据状态…</div>';
+  m.classList.add('show'); document.body.style.overflow='hidden';
+  api("api/cred_wizard").then(function(d){
+    var it=(d.items||[]).filter(function(x){ return x.key===name; })[0];
+    if(!it){ body.innerHTML='<div class="mg-note">未找到该平台的凭据配置。</div>'; return; }
+    window._cwItems = d.items||[];
+    var st = it.exists
+      ? '<span class="cw-ok">🟢 已配置'+(it.mtime_text?' · '+esc(it.mtime_text):'')+'</span>'
+      : '<span class="cw-no">🔴 缺失 / 未配置</span>';
+    var local = d.local;
+    // 服务器模式没有弹窗采集按钮，提示里「本机可点弹窗采集」这类句子会误导，过滤掉
+    var hintText = it.hint || '';
+    if(!local){
+      hintText = String(hintText).split(/[。；;]/).filter(function(s){
+        return s && s.indexOf('本机')<0 && s.indexOf('弹窗采集')<0 && s.indexOf('弹窗')<0;
+      }).map(function(s){ return s.trim().replace(/^或/,''); }).join('。');
+    }
+    var h = (hintText ? '<div class="mg-note" style="margin-bottom:10px">'+esc(hintText)+'</div>' : '')
+      + '<div class="cu-status">当前状态：'+st+'</div>';
+    if(local && it.launcher_ok){
+      h += '<div class="cu-launch"><button class="btn-mini" id="cuLaunchBtn" type="button">🖥️ 弹窗采集（推荐）</button>'
+        + '<span class="cu-launch-tip">自动弹出登录窗，登录后凭据写回本机，无需手动复制</span></div>';
+    } else if(!local){
+      h += '<div class="mg-note">当前是服务器部署，无法在本机弹登录窗。请在<b>你自己的电脑</b>登录后复制凭据，粘贴到下方保存。</div>';
+    }
+    h += '<p class="ftip" style="margin:12px 0 6px">或手动粘贴凭据：</p>'
+      + '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
+      + '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
+      + '<div style="display:flex;gap:8px;margin-top:10px">'
+      +   '<button class="cta" id="cuSave" type="button">💾 保存凭据</button>'
+      +   '<button class="cta ghost" type="button" onclick="closeModal()">取消</button>'
+      + '</div><div id="cuMsg" class="mg-note" style="margin-top:10px"></div>';
+    body.innerHTML = h;
+    var lb=$('cuLaunchBtn');
+    if(lb) lb.addEventListener('click',function(){
+      lb.disabled=true; lb.textContent='启动中…';
+      api("api/cred_wizard",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:name,action:"launch"})}).then(function(r){
+        lb.disabled=false; lb.textContent='🖥️ 弹窗采集（推荐）';
+        var msg=$('cuMsg'); if(msg){ msg.style.color=r.ok?'#0a7':'#c0392b'; msg.textContent=r.ok?(r.msg||'已启动采集窗口，登录后凭据自动写回'):(r.error||'启动失败'); }
+      }).catch(function(e){ lb.disabled=false; lb.textContent='🖥️ 弹窗采集（推荐）'; if($('cuMsg')) $('cuMsg').textContent='启动失败：'+(e&&e.message); });
+    });
+    var sb=$('cuSave');
+    if(sb) sb.addEventListener('click',function(){
+      var v=($('cuText').value||'').trim(); var msg=$('cuMsg');
+      if(!v){ if(msg){msg.style.color='#c0392b';msg.textContent='内容为空，先粘贴凭据';} return; }
+      sb.disabled=true; sb.innerHTML='<span class="spin"></span> 保存中…';
+      api("api/cred_wizard",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({name:name,content:v})}).then(function(r){
+        sb.disabled=false; sb.textContent='💾 保存凭据';
+        if(msg){ msg.style.color=r.ok?'#0a7':'#c0392b'; msg.textContent=r.ok?(r.msg||'已保存'):(r.error||'保存失败'); }
+        if(r.ok) load(function(){ showMsg(r.msg||'凭据已保存 ✅','ok'); });
+      }).catch(function(e){ sb.disabled=false; sb.textContent='💾 保存凭据'; if(msg){msg.style.color='#c0392b';msg.textContent='保存失败：'+(e&&e.message);} });
+    });
+  }).catch(function(e){
+    body.innerHTML='<div class="mg-note">读取失败：'+esc(e&&e.message)+'</div>';
+  });
 }
 function openHwLogin(name){
   var m = $('modal'); if(!m) return;
@@ -7293,6 +7368,8 @@ function showMain(){
   load();
 }
 var PLATFORMS = {workbuddy:"WorkBuddy",qianfan:"百度千帆",minimax:"MiniMax Code",qoder:"Qoder",linkai:"Link AI",lingxi:"WPS 灵犀",trae:"Trae Work",huawei:"华为码道",coze:"Coze 扣子",doubao:"豆包",};
+// 有本地凭据文件、支持「更新凭据」的平台（与后端 CRED_WIZARD 对齐）
+var CRED_KEYS = {workbuddy:1,qianfan:1,minimax:1,qoder:1,linkai:1,lingxi:1,trae:1,huawei:1,coze:1,doubao:1};
 function focusSettings(){
   var el=$('focus');
   el.innerHTML='<a class="back" id="backBtn">‹ 返回签到中心</a><div id="fbody" class="settings"></div>';
@@ -7504,7 +7581,11 @@ function renderCredAlert(alerts){
   if(!list.length){ el.innerHTML=''; return; }
   var bad = list.some(function(a){ return a.level!=='soon'; });
   var names = list.map(function(a){
-    return '<b>'+esc(a.title||a.name)+'</b>（'+esc(a.label)+'）';
+    var key = a.name || '';
+    var clickable = CRED_KEYS[key];
+    return (clickable
+      ? '<button class="ca-name" type="button" data-cw="'+esc(key)+'">'+esc(a.title||a.name)+'</button>'
+      : '<b>'+esc(a.title||a.name)+'</b>')+'（'+esc(a.label)+'）';
   }).join('<span class="sep">·</span>');
   el.innerHTML = '<div class="ca'+(bad?' bad':'')+'">'
     + '<div class="ci">'+(bad?'🔴':'🟡')+'</div>'
@@ -7512,12 +7593,15 @@ function renderCredAlert(alerts){
     +   '<div class="ct">'+esc(list.length+' 个平台凭据'+(bad?'马上要过期/已过期':'即将过期'))+'</div>'
     +   '<div class="cl">'+names+'</div>'
     +   '<div class="cd">到期后卡片会显示「登录态过期」、当天签到也会失败。'
-    +   '按 README「配置各平台凭据」更新对应文件即可（大多是重新登录后复制新值）。</div>'
+    +   '点上方平台名即可更新凭据（本机可一键弹窗登录，服务器粘贴新值即可）。</div>'
     + '</div>'
     + '<button class="cx" type="button" title="知道了" aria-label="关闭">×</button>'
     + '</div>';
   var x = el.querySelector('.cx');
   if(x){ x.addEventListener('click', function(){ el.innerHTML=''; }); }
+  Array.prototype.forEach.call(el.querySelectorAll('.ca-name'), function(b){
+    b.addEventListener('click', function(){ openCredUpdate(b.getAttribute('data-cw')); });
+  });
 }
 function renderStats(d, items){
   var el = $('stats'); if(!el) return;
@@ -7625,8 +7709,12 @@ function renderCenter(d){
     });
   });
   // 立即签到（排除成长/每日任务、重新检查、旅行专属按钮）
-  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run):not(.travel-act):not(.login-cookie)"), function(b){
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta[data-name]:not(.recheck):not(.growth-run):not(.daily-run):not(.travel-act):not(.login-cookie):not(.cred-upd)"), function(b){
     b.addEventListener("click", function(){ doCheckin(b.getAttribute("data-name"), b); });
+  });
+  // 「更新凭据」入口（卡片上）：打开通用更新弹窗，本机/服务器模式由后端 cred_wizard 自动判定
+  Array.prototype.forEach.call(document.querySelectorAll("button.cta.cred-upd[data-name]"), function(b){
+    b.addEventListener("click", function(ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); openCredUpdate(b.getAttribute("data-name")); });
   });
   // WorkBuddy 卡内的「派猫猫旅行」入口 → 打开弹窗
   // 注意：弹窗里的按钮由 bindTravelModal() 单独绑定；这里只绑卡片内的入口，避免重复触发。
