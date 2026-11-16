@@ -37,7 +37,12 @@ try:
 except Exception:
     pass
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller frozen 时 __file__ 指向临时解压目录，凭据/状态文件必须落在 exe 旁边（持久化）
+if getattr(sys, "frozen", False):
+    BASE_DIR = os.path.dirname(os.path.abspath(sys.executable))
+    # 内置资源（页面用到的静态数据等）若将来需要，可用 sys._MEIPASS；当前无外部静态依赖
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
@@ -173,6 +178,24 @@ CRED_WIZARD = [
 _CRED_PASTE_TARGET = {it["key"]: it["files"][0] for it in CRED_WIZARD}
 
 
+def _bundled_node():
+    """采集脚本用的 node：exe 打包版用内嵌 runtime/node.exe，否则用系统 node。"""
+    if getattr(sys, "frozen", False):
+        p = os.path.join(BASE_DIR, "runtime", "node.exe" if os.name == "nt" else "node")
+        return p if os.path.exists(p) else None
+    return shutil.which("node")
+
+
+def _capture_env():
+    """采集子进程环境变量：让 runtime_env.js 找到内嵌 playwright-core。"""
+    env = os.environ.copy()
+    if getattr(sys, "frozen", False):
+        pcore = os.path.join(BASE_DIR, "runtime", "playwright-core")
+        if os.path.exists(pcore):
+            env["PLAYWRIGHT_CORE_PATH"] = pcore
+    return env
+
+
 def _cred_wizard_items():
     """向导 GET 数据：每个平台的凭据文件状态 + 本机采集能力判定。"""
     import time as _time
@@ -186,7 +209,7 @@ def _cred_wizard_items():
         if launcher:
             lp = os.path.join(BASE_DIR, launcher)
             if str(launcher).endswith(".js"):
-                lok = os.path.exists(lp) and bool(shutil.which("node"))
+                lok = os.path.exists(lp) and bool(_bundled_node())
             else:
                 lok = os.name == "nt" and os.path.exists(lp)
         items.append({
@@ -6203,6 +6226,12 @@ button.entry:hover{background:#eef7f4;}
 .cu-status{font-size:12.5px;color:var(--sub);padding:8px 10px;background:rgba(15,23,42,.03);border-radius:10px;}
 .cu-launch{display:flex;flex-direction:column;align-items:center;gap:6px;margin:12px 0 4px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}
 .cu-launch-tip{font-size:11.5px;color:#15803d;text-align:center;line-height:1.5;}
+.cu-actions{display:flex;gap:10px;margin-top:12px;}
+.cu-actions button{border:0;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer;transition:transform .08s ease,filter .2s ease;}
+.cu-actions button:active{transform:scale(.985);filter:brightness(.97);}
+.cu-save{flex:1;background:linear-gradient(135deg,#00C29A,#00C885);color:#fff;box-shadow:0 10px 20px -11px rgba(0,194,154,.9);}
+.cu-cancel{flex:0 0 84px;background:#f1f5f4;color:#5b6b7c;border:1px solid var(--line) !important;}
+.cu-save[disabled]{background:#eef2f1;color:#9faead;box-shadow:none;}
 .cw-hint{color:#64748b;font-size:12px;margin:4px 0 2px;line-height:1.55;overflow-wrap:anywhere;}
 .cw-btns{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;}
 .cw-ta{width:100%;min-height:130px;border:1px solid #d7e0dd;border-radius:10px;padding:9px;
@@ -6900,9 +6929,9 @@ function openCredUpdate(name){
     h += '<p class="ftip" style="margin:12px 0 6px">或手动粘贴凭据：</p>'
       + '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
       + '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
-      + '<div style="display:flex;gap:8px;margin-top:10px">'
-      +   '<button class="cta" id="cuSave" type="button">💾 保存凭据</button>'
-      +   '<button class="cta ghost" type="button" onclick="closeModal()">取消</button>'
+      + '<div class="cu-actions">'
+      +   '<button class="cu-save" id="cuSave" type="button">💾 保存凭据</button>'
+      +   '<button class="cu-cancel" type="button" onclick="closeModal()">取消</button>'
       + '</div><div id="cuMsg" class="mg-note" style="margin-top:10px"></div>';
     body.innerHTML = h;
     var lb=$('cuLaunchBtn');
@@ -8608,11 +8637,15 @@ class Handler(BaseHTTPRequestHandler):
                         self._json(200, {"ok": False, "error": "采集脚本不存在: %s" % launcher})
                         return
                     if str(launcher).endswith(".js"):
+                        node = _bundled_node()
+                        if not node:
+                            self._json(200, {"ok": False, "error": "未找到 Node 运行环境（node.exe）"})
+                            return
                         flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
                         subprocess.Popen(
-                            ["node", launcher], cwd=BASE_DIR,
+                            [node, launcher], cwd=BASE_DIR,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            creationflags=flags,
+                            creationflags=flags, env=_capture_env(),
                         )
                         self._json(200, {"ok": True, "launched": True,
                                          "msg": "已弹出采集窗口，登录成功后 cookie 自动写盘"})
@@ -8795,6 +8828,13 @@ def main():
     print("  停止服务: 按 Ctrl+C")
     print(line)
     sys.stdout.flush()
+    # exe 桌面版：服务起来后自动弹浏览器（小白双击 exe 即见页面，不用手输地址）
+    if getattr(sys, "frozen", False):
+        try:
+            import webbrowser
+            webbrowser.open_new("http://127.0.0.1:%d/" % PORT)
+        except Exception:
+            pass
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -60,6 +60,15 @@ idx.js
 checkin.log
 local_server.log
 
+# exe 打包产物（157MB，按需本地生成，不入库）
+dist/
+build_pyinstaller/
+*.spec
+_btn_fix.png
+_exe_page.png
+_cred_modal*.png
+_shot_cred*.js
+
 # Python 缓存
 __pycache__/
 *.pyc
