@@ -103,6 +103,28 @@ ACCESS_KEY = os.environ.get(
     "WB_ACCESS_KEY", ""
 )  # 留空 = 不校验口令；非空则手机首次访问需输入一次（生产环境由 systemd service 的 WB_ACCESS_KEY 注入）
 
+# ---- 部署模式：公网服务器 vs 本机桌面 ----
+# 服务器部署（Linux + nginx 反代）下，网页端禁止写入/覆盖任何平台凭据文件。
+# 原因：网页写凭据接口只靠一把访问口令保护，口令走 URL ?k= 易泄露；一旦外人拿到，
+#       就能把「他自己的」token 覆盖到本机凭据文件，让服务器每天替他的账号签到，
+#       同时顶掉本人凭据、并把服务器 IP 暴露给平台风控。
+# 凭据更新在服务器模式下一律收回本机：SFTP 上传，或本机脚本 HTTP 心跳推送（见 upload-token）。
+# 本机桌面版（Windows exe / 本机 Python）不受限制，该采集采集、该粘贴粘贴。
+# 判定：显式 WB_SERVER_MODE 优先（1/0），否则 Linux=服务器、Windows=本机。
+def is_server_mode():
+    v = os.environ.get("WB_SERVER_MODE", "").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    return os.name != "nt"
+
+
+_CRED_WRITE_DENY_MSG = (
+    "服务器部署模式已禁用「网页写入凭据」。为防他人用自身 token 顶替凭据、借本机代签，"
+    "请在本机更新凭据（exe 桌面版可直接采集），或用 SFTP 上传凭据文件到部署目录。"
+)
+
 # 最近一次签到结果（由 workbuddy_checkin.py 写入；自动定时与手动点击都会记）
 STATE_FILE = os.environ.get("WB_STATE_FILE", os.path.join(BASE_DIR, "last_run.json"))
 # 当天的随机签到计划（落盘后重启不重抽，保证一天只触发一次）
@@ -6911,15 +6933,27 @@ function openCredUpdate(name){
       ? '<span class="cw-ok">🟢 已配置'+(it.mtime_text?' · '+esc(it.mtime_text):'')+'</span>'
       : '<span class="cw-no">🔴 缺失 / 未配置</span>';
     var local = d.local;
-    // 服务器模式没有弹窗采集按钮，提示里「本机可点弹窗采集」这类句子会误导，过滤掉
+    var writable = (d.writable !== undefined) ? d.writable : !!local;
+    // 服务器模式没有弹窗采集按钮，提示里「本机可点弹窗采集」「粘贴」这类句子会误导，过滤掉
     var hintText = it.hint || '';
-    if(!local){
+    if(!writable){
       hintText = String(hintText).split(/[。；;]/).filter(function(s){
-        return s && s.indexOf('本机')<0 && s.indexOf('弹窗采集')<0 && s.indexOf('弹窗')<0;
+        return s && s.indexOf('本机')<0 && s.indexOf('弹窗')<0
+          && s.indexOf('粘贴')<0 && s.indexOf('复制')<0 && s.indexOf('F12')<0;
       }).map(function(s){ return s.trim().replace(/^或/,''); }).join('。');
     }
     var h = (hintText ? '<div class="mg-note" style="margin-bottom:10px">'+esc(hintText)+'</div>' : '')
       + '<div class="cu-status">当前状态：'+st+'</div>';
+    // 服务器模式：只读，绝不渲染粘贴框/采集按钮，避免外人用自身 token 顶替凭据借本机代签
+    if(!writable){
+      h += '<div class="mg-note" style="margin-top:12px;line-height:1.7">🔒 '
+        + esc(d.deny_msg || '服务器部署模式已禁用网页写入凭据。') + '</div>'
+        + '<div class="cu-actions" style="margin-top:14px">'
+        +   '<button class="cu-cancel" type="button" onclick="closeModal()">知道了</button>'
+        + '</div>';
+      body.innerHTML = h;
+      return;
+    }
     if(local && it.launcher_ok){
       h += '<div class="cu-launch"><button class="btn-mini" id="cuLaunchBtn" type="button">🖥️ 弹窗采集（推荐）</button>'
         + '<span class="cu-launch-tip">自动弹出登录窗，登录后凭据写回本机，无需手动复制</span></div>';
@@ -6964,6 +6998,17 @@ function openHwLogin(name){
   var panel = $('modal-panel'); if(panel) panel.style.setProperty('--mc', '#804FED');
   var titleEl = $('modal-title'); if(titleEl) titleEl.textContent = '配置华为会话 Cookie';
   var body = $('modal-body'); if(!body) return;
+  // 服务器模式先拦截：网页写凭据已禁用，不渲染粘贴框（后端也会 403 双保险）
+  api("api/cred_wizard").then(function(w){
+    if(w && w.writable === false){
+      body.innerHTML='<div class="mg-note" style="line-height:1.7">🔒 '+esc(w.deny_msg||'服务器部署模式已禁用网页写入凭据。')+'</div>'
+        +'<div class="cu-actions" style="margin-top:14px"><button class="cu-cancel" type="button" onclick="closeModal()">知道了</button></div>';
+      m.classList.add('show'); document.body.style.overflow='hidden';
+      return;
+    }
+    renderHwLoginForm();
+  }).catch(function(){ renderHwLoginForm(); });
+  function renderHwLoginForm(){
   body.innerHTML = ''
     + '<div class="mg-note" style="margin-bottom:10px">华为会话 Cookie 为 <b>HttpOnly</b>，网页读不到，所以无法「输入账号密码自动登录」。请在电脑浏览器登录 '
     + '<b>devcloud.cn-north-4.huaweicloud.com</b> 后，按 <b>F12 → Application → Cookies</b>，复制 <b>devclouddevuibjJ_SESSION_ID</b>（或整个 Cookie 字符串）粘贴到下方，保存后服务器即可立即签到。</div>'
@@ -6995,6 +7040,7 @@ function openHwLogin(name){
       saveBtn.disabled = false; saveBtn.textContent = "💾 保存并验证";
     });
   });
+  }
 }
 function renderDetail(d, name){
   var detail = $('modal-body');
@@ -7447,19 +7493,32 @@ function renderCredWizard(){
   var box=$('credWizardBox'); if(!box) return;
   api("api/cred_wizard").then(function(d){
     var items=d.items||[]; window._cwItems=items;
+    var writable = (d.writable !== undefined) ? d.writable : !!d.local;
     var rows='';
     items.forEach(function(it){
       var st=it.exists
         ?'<span class="cw-ok">已配置'+(it.mtime_text?' · '+esc(it.mtime_text):'')+'</span>'
         :'<span class="cw-no">缺失</span>';
       var btns='';
-      if(it.launcher_ok) btns+='<button class="btn-mini" data-cw-launch="'+it.key+'" type="button">弹窗采集</button>';
-      btns+='<button class="btn-mini" data-cw-paste="'+it.key+'" type="button">粘贴凭据</button>';
+      if(writable){
+        if(it.launcher_ok) btns+='<button class="btn-mini" data-cw-launch="'+it.key+'" type="button">弹窗采集</button>';
+        btns+='<button class="btn-mini" data-cw-paste="'+it.key+'" type="button">粘贴凭据</button>';
+      }
+      var hintText = it.hint || '';
+      if(!writable){
+        // 只读模式：去掉「粘贴/复制粘贴」这类诱导句子，只留纯说明
+        hintText = String(hintText).split(/[。；;]/).filter(function(s){
+          return s && s.indexOf('粘贴')<0 && s.indexOf('复制')<0 && s.indexOf('F12')<0;
+        }).map(function(s){ return s.trim().replace(/^或/,''); }).join('。');
+      }
       rows+='<div class="cw-row"><div class="cw-top"><span class="cw-name">'+esc(PLATFORMS[it.key]||it.key)+'</span>'+st+'</div>'
-        +'<div class="cw-hint">'+esc(it.hint)+'</div><div class="cw-btns">'+btns+'</div></div>';
+        +(hintText?'<div class="cw-hint">'+esc(hintText)+'</div>':'')+(btns?'<div class="cw-btns">'+btns+'</div>':'')+'</div>';
     });
+    var cwTip = writable
+      ? '本机部署：点「弹窗采集」会弹出登录窗口，登录后凭据自动写盘；也可「粘贴凭据」贴入 token / Cookie。凭据等同密码，注意保密。'
+      : '🔒 服务器部署为只读：网页禁止写入凭据。要更新请在本机（exe 桌面版）采集，或用 SFTP 上传凭据文件到部署目录。'+(d.deny_msg?' '+esc(d.deny_msg):'');
     box.innerHTML='<div class="fgroup"><h4>🗝️ 凭据向导</h4>'
-      +'<p class="ftip">本机部署：点「弹窗采集」会弹出登录窗口，登录后凭据自动写盘。服务器部署：点「粘贴凭据」贴入 token / Cookie。凭据等同密码，注意保密。</p>'
+      +'<p class="ftip">'+cwTip+'</p>'
       +'<div class="cw-list">'+rows+'</div></div>';
     Array.prototype.forEach.call(box.querySelectorAll('[data-cw-paste]'),function(b){
       b.addEventListener('click',function(){ cwPaste(b.getAttribute('data-cw-paste')); });
@@ -8148,6 +8207,13 @@ class Handler(BaseHTTPRequestHandler):
         got = (query.get("k", [""])[0]) or self.headers.get("X-Access-Key", "")
         return got == current_key()
 
+    def _deny_cred_write(self):
+        """服务器模式下拒绝网页写凭据；本机模式恒返回 False（放行）。"""
+        if is_server_mode():
+            self._json(403, {"ok": False, "error": _CRED_WRITE_DENY_MSG, "denied": True})
+            return True
+        return False
+
     def do_GET(self):
         u = urlparse(self.path)
         if u.path in ("/", "/index.html"):
@@ -8274,8 +8340,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
                 return
             try:
+                # writable=False 表示服务器模式：前端应隐藏粘贴/采集入口，避免误导
                 self._json(200, {"ok": True, "items": _cred_wizard_items(),
-                                 "local": os.name == "nt"})
+                                 "local": os.name == "nt",
+                                 "server_mode": is_server_mode(),
+                                 "writable": not is_server_mode(),
+                                 "deny_msg": _CRED_WRITE_DENY_MSG if is_server_mode() else ""})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
@@ -8619,6 +8689,8 @@ class Handler(BaseHTTPRequestHandler):
             if not self._key_ok(q):
                 self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
                 return
+            if self._deny_cred_write():
+                return
             try:
                 length = int(self.headers.get("Content-Length", "0") or "0")
                 body = json.loads(self.rfile.read(length) or b"{}")
@@ -8745,6 +8817,8 @@ class Handler(BaseHTTPRequestHandler):
             q = parse_qs(u.query)
             if not self._key_ok(q):
                 self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            if self._deny_cred_write():
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0") or "0")
