@@ -162,3 +162,7 @@ balance_history.json
 # 本机智能体工作目录数据（会话日志 / 项目记忆，禁止入库）
 .workbuddy-ai/
 
+trae_capture.out.log
+trae_capture.err.log
+package-lock.json
+package.json
