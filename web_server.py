@@ -2215,12 +2215,43 @@ def _hw_portal_api(path, method="GET", body=None):
         )
 
 
-def _hw_portal_credit():
-    """码道门户 package/overview → 可用积分 + 即将过期。
+def _hw_portal_benefits():
+    """promptcenter 每笔积分明细：ops/credit/overview 给 campaign 列表，
+    逐个 ops/credit/campaign/{id} 拿每笔 benefit（claimedAt/expireAt/已用/已过期）。
+    返回 [{campaign, amount, consumed, expire_at(datetime|None)}]，失败抛异常。"""
+    ov = _hw_portal_api("/portal/promptcenter/v1/ops/credit/overview")
+    items = ((ov.get("data") or {}).get("items")) or []
+    out = []
+    for it in items:
+        cid = it.get("campaignId")
+        if cid is None:
+            continue
+        d = _hw_portal_api("/portal/promptcenter/v1/ops/credit/campaign/%s" % cid)
+        data = d.get("data") or {}
+        for b in (data.get("benefits") or []):
+            exp_raw = b.get("expireAt") or ""
+            try:
+                exp_dt = datetime.datetime.fromisoformat(exp_raw.replace("Z", "+00:00")) if exp_raw else None
+            except ValueError:
+                exp_dt = None
+            out.append({
+                "campaign": data.get("campaignTitle") or it.get("campaignTitle") or "",
+                "amount": float(b.get("claimedAmount") or 0),
+                "consumed": float(b.get("consumedAmount") or 0),
+                "expire_at": exp_dt,
+            })
+    return out
 
-    口径（2026-11-17 实测）：all_credit_package.package_credit_remain = 可用积分，
-    expiring_credit_amount = 即将过期总额。门户接口**不返回精确到期日期**，
-    所以 date 置 None，前端用兜底文案提示去门户「个人用量」页看。
+
+def _hw_portal_credit():
+    """码道门户 → 可用积分 + 即将过期（含精确日期）。
+
+    口径（2026-11-17 实测破解）：
+    - all_credit_package.package_credit_remain = 可用积分
+    - all_credit_package.expiring_credit_amount = 即将过期总额，**恰好等于**
+      未来 7 天内到期的未消费积分（promptcenter 每笔明细逐笔验证吻合）
+    - 精确日期来自 ops/credit/campaign/{id} 每笔 benefit.expireAt（ISO UTC），
+      最早一笔的北京时间作为展示日期
     取不到一律返回 None（卡片不硬写，不因门户会话失效而影响签到主流程）。
     """
     if not _hw_portal_cookie():
@@ -2234,10 +2265,31 @@ def _hw_portal_credit():
         credit = {"balance": remain, "unit": "积分", "expiring": None}
         exp = a.get("expiring_credit_amount") or 0
         if exp > 0:
+            # 每笔明细：算精确日期（失败只是没日期，不影响金额展示）
+            exp_date_str = None
+            try:
+                now = datetime.datetime.now(datetime.timezone.utc)
+                week_later = now + datetime.timedelta(days=7)
+                alive = []
+                for b in _hw_portal_benefits():
+                    exp_dt = b.get("expire_at")
+                    if exp_dt is None or exp_dt <= now:
+                        continue
+                    left = b["amount"] - b["consumed"]
+                    if left <= 0:
+                        continue
+                    if exp_dt <= week_later:
+                        alive.append((exp_dt, left))
+                if alive:
+                    alive.sort(key=lambda x: x[0])
+                    earliest = alive[0][0].astimezone(datetime.timezone(datetime.timedelta(hours=8)))
+                    exp_date_str = earliest.strftime("%Y-%m-%d %H:%M")
+            except Exception as _be:
+                print("[hw-portal] 每笔明细获取失败（不影响总额）: %s" % _be, flush=True)
             credit["expiring"] = {
                 "amount": exp,
-                "date": None,
-                "portal_note": "精确到期日期见码道门户「个人用量」页",
+                "date": exp_date_str,
+                "portal_note": None if exp_date_str else "精确到期日期见码道门户「个人用量」页",
             }
         return credit
     except Exception as _e:
