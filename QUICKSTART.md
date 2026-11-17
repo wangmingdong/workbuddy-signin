@@ -17,12 +17,12 @@
 | WorkBuddy | 100 积分 | `token.info` | 打开 WorkBuddy 客户端自动续期，无需配置 |
 | 百度千帆 | — | `qf_token.txt` | 千帆控制台取 token 粘贴 |
 | MiniMax Code | 400 智点 | `mm_web_token.json` | 登录 platform.minimax.io 复制 token 粘贴 |
-| Qoder | 100 Credits | `qoder_token.txt` | `qoder_capture.js` 弹窗采集 + 本机守护自动领 |
+| Qoder | 100 Credits | `qoder_token.txt` | 网页一键登录采集（`qoder_login.js`，token+cookie 一起写盘）；本机守护可选 |
 | Link AI | 随机积分 | `linkai_token.txt` | 控制台 token 粘贴（验证码自动破解） |
 | WPS 灵犀 | 100 智点 | `lx_cookie.txt` | `lx_capture.js` 弹窗采集 |
 | Trae Work | 150+50 积分 | `trae_cookie.txt` | `trae_capture.js` 弹窗采集（约 14 天续一次） |
 | Coze 扣子 | 60 积分/天 | `coze_cookie.txt` | 浏览器 F12 复制 Cookie 粘贴 |
-| 华为码道 | 活动积分 | `hw_cookie.txt` | `huawei/relogin_huawei.bat` 弹窗采集 |
+| 华为码道 | 活动积分 | `hw_cookie.txt` | 网页一键登录采集（`huawei_login.js` 弹 Edge，登录完成自动写回） |
 | 豆包 | 签到+任务 | `doubao_cookie.json` | `doubao_capture.js` 弹窗采集（需本机 Edge） |
 
 > 全部可选：只配你用的平台，其它开关关掉即可（设置页 → 平台开关）。
@@ -62,6 +62,9 @@ python3 web_server.py        # 终端前台跑；开机自启用 cron @reboot �
 
 - 页面右上 ⚙️ 进设置，找到「凭据向导」：每个平台一行，🟢=已配置 / 🔴=缺失。
 - 有「弹窗采集」按钮的平台（Trae/灵犀/豆包/华为/Qoder）：点一下会弹出浏览器窗口，登录后 cookie 自动写盘，**无需手动复制**。
+  - 注意：登录完成的标志是**浏览器窗口自动关闭**——在那之前请安心登录，不要提前关窗。
+  - 华为/Qoder 若窗口闪退或卡片报错，看项目根目录 `capture_logs/<平台>.log` 排障。
+- 没有一键按钮的平台（千帆/MiniMax/Link AI/Coze）：点「更新凭据」展开「手动粘贴」，弹窗里写了逐步引导（打开哪个网址 → 按 F12 → 点哪个标签 → 复制什么），照做即可。
 - 其余平台：点「粘贴」，把 token/cookie 贴进去保存即可（每种要贴什么，输入框上方有说明）。
 - 配完在首页点对应卡的「签到」按钮试一次，卡片变「✅ 今日已领」即通。
 

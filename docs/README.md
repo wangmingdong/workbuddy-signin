@@ -83,6 +83,10 @@ workbuddy-signin/
 ├─ install_autostart.bat  ← 网页服务开机后台自启（无需管理员）
 ├─ trae_capture.js        ← Trae Cookie 抓取脚本（本机从浏览器导出）
 ├─ qoder_capture.js       ← Qoder 网页会话抓取（Edge 登录一次 → 校验后推 112）
+├─ qoder_login.js         ← Qoder 一键登录（exe 版专用：内嵌 playwright + 系统 Edge，登录采 cookie 写本地即退，不依赖 python）
+├─ huawei_login.js        ← 华为一键登录（同上；登录完成判据 = 页面回到码道主页，见「凭据一键更新」节）
+├─ lx_capture.js          ← 灵犀 Cookie 抓取（本机采集 + 推送）
+├─ capture_logs/          ← 各平台采集脚本运行日志（点一键登录时自动生成，崩溃排障看这里）
 ├─ refresh_qoder_cookie.bat ← Qoder「将过期积分」一键刷新入口
 ├─ push_qoder_cookie.py   ← 推送 qoder_cookie.txt 到 112 并实测逐包到期接口
 │
@@ -134,6 +138,8 @@ workbuddy-signin/
 | `config.example.json` | 各平台凭据文件 / 环境变量 / 获取方式说明模板（不进仓库） |
 | `start_web.bat` | 启动网页版服务，打印手机访问地址 |
 | `install_autostart.bat` | 可选：网页版开机自动后台运行（无需管理员） |
+| `qoder_login.js` | Qoder 一键登录采集器（exe 桌面版专用）：用 exe 内嵌 Node + playwright-core 拉起系统 Edge，登录 qoder.com 采到会话 cookie 写 `qoder_cookie.txt` 即自动退出，**不依赖 python**；未登录成功绝不写盘 |
+| `huawei_login.js` | 华为一键登录采集器（同上机制）：弹独立 Edge 登录 DevCloud，**登录完成判据 = 会话 cookie 存在 且 页面已回到码道主页**（只看 cookie 会把登录页的「预登录会话」误判成已登录，踩过），回主页后再等 `agencyID` 等补发 cookie 收全才写盘关窗 |
 | `doubao_sign.js` | 本机豆包签名代理：Playwright 开真 Edge 算 `a_bogus` 真签；`/sync-cookie` 手动 + 每 30 分自动把 cookie 推给 112（方案二） |
 | `doubao_signer.bat` | 本机签名服务启动器：启动前释放 8791 端口防冲突 + node 崩溃 5s 自愈循环 |
 | `install_doubao_autostart.bat` | 一键注册豆包签名服务开机自启（双击即自动提权 + 注册计划任务 + 立即拉起） |
@@ -194,6 +200,47 @@ workbuddy-signin/
 3. 凭据在本机采集后推服务器；设置页定时 + 通知。详见下方「用法 → 第 4 步」和「服务器安全加固」。
 
 > 服务器 `python3` 是 3.6.8 跑不动本项目，**必须用 `python3.11`**。
+
+---
+
+## 🔐 更新凭据：一键 vs 手动（2026-11-17）
+
+凭据过期不用再翻控制台复制粘贴——**本机模式（含 exe 桌面版）** 点卡片「🔑 更新凭据」即可。能力分两档：
+
+### 一键平台（6 家，全程不用复制）
+
+| 平台 | 一键方式 | 说明 |
+|------|---------|------|
+| WorkBuddy | 🔄 一键自动更新 | 解密本机客户端登录态写 `token.info`（需装并登录过 WorkBuddy 客户端） |
+| 豆包 | 🌐 弹 Edge 登录 | 采集脚本 `doubao_capture.js --once`，带 `sessionid` 门槛 |
+| WPS 灵犀 | 🌐 弹 Edge 登录 | `lx_capture.js` |
+| Trae | 🌐 弹 Edge 登录 | `trae_capture.js --once`，带 `sessionid` 门槛 |
+| Qoder | 🌐 弹 Edge 登录 | `qoder_login.js`（exe 内嵌 playwright + 系统 Edge，**不依赖 python**；采到即写 `qoder_cookie.txt` 并自动退出） |
+| 华为码道 | 🌐 弹 Edge 登录 | `huawei_login.js`，写 `hw_cookie.txt` |
+
+一键脚本共同约定：**没登录成功绝不写盘**（不会拿空 cookie 骗过前端刷新）；采到有效凭据写盘后**窗口自动关闭**，页面自动检测刷新，无需手动复制。
+
+> ⚠️ **华为的两个坑（已修，写下来防止再踩）**：
+> 1. **「cookie 存在」≠「已登录」**——打开登录页时华为就会发一个**未激活的预登录 `J_SESSION_ID`**，只看 cookie 会在用户还没扫码时就误判成功、提前关窗。可靠判据是**页面 URL 回到码道主页**（`huaweicloud.com/chat/` 且不含 login/auth）。
+> 2. **登录跳转完成后华为才陆续补发 `agencyID` 等 cookie**——看到主页就立刻写盘会缺 cookie，接口返回空体报 `Expecting value`。脚本会在回主页后等 `agencyID` 出现（或最多多等 6 秒）才写盘关窗。
+> 3. 华为 cookie 已改为**现读盘**（`_hw_cookie()`，环境变量优先、否则读文件）：一键写回后无需重启立即生效；接口返回空/HTML 时给人话提示「登录态可能失效，请重新一键登录」，不再裸抛 JSONDecodeError。
+
+**排障**：一键脚本崩溃/闪退时，看 `capture_logs/<平台>.log`（每次点一键登录都会重写该文件，记录脚本全程输出）。
+
+### 手动平台（4 家，按步骤照做即可）
+
+点「更新凭据」→ 展开「手动粘贴」，弹窗里有同款傻瓜文案。速查：
+
+| 平台 | 步骤要点 |
+|------|---------|
+| 百度千帆 | 特殊：需**自建千帆服务**（`QF_BASE_URL`，由管理员提供），不是官网直接可取的 token——先找管理员要服务地址和 token |
+| MiniMax | 登录 `platform.minimax.io` → 右键「检查」或按 F12 →「网络/Network」标签 → 刷新页面 → 点列表里任意请求 → 找请求头里 `authorization` 或 `token` 开头的那串复制粘贴 |
+| Link AI | 登录 `link-ai.tech/console/account` → 页面上的 API Token 直接复制粘贴（签到已自动过滑块，token 即可） |
+| Coze | 登录 `coze.cn` → F12 →「网络/Network」→ 刷新 → 点第一个请求 → 请求头 `Cookie:` 后面的**整串**全选复制粘贴 |
+
+> **F12 是什么**：键盘最上面一排的 F12 键（或页面空白处右键 → 「检查/Inspect」），打开的就是浏览器开发者工具；凭据藏在「网络/Network」标签的请求头里。
+>
+> ⚠️ **服务器模式没有以上任何入口**：网页写凭据接口一律 403（防止外人上传自己的 token 借服务器代签），按钮也不会渲染——凭据只能在本机采集后推服务器。
 
 ---
 
@@ -329,8 +376,11 @@ curl -s 127.0.0.1:8791/health     # 应返回 {"ok":true,"hasCookie":false}
 |------|------|------|
 | 启用自动签到 `schedule_enabled` | 开关内置调度器 | `True` |
 | 每日签到时间 `schedule_time` | 进程内守护线程按此时间每日自动 `run_daily_all()` | `08:35` |
+| 开机自动运行（仅 exe 桌面版显示） | 写注册表 `HKCU\...\Run` 键 `WbCheckinCenter`，开机以 `--silent` 静默拉起 exe（不弹浏览器），配合内置调度实现「开机即无人值守」。本机 python 版 / 服务器模式不显示此项 | 关 |
 
 > 改时间**热更新**（唤醒调度线程，无需重启）。若服务器另有 systemd 定时任务（`wb-checkin-daily.timer`）未关闭，会再跑一次——结果**幂等无副作用**。
+>
+> 补充（exe 版）：程序常驻期间每天到点自动签，**关掉浏览器页面不影响**；勾上「开机自动运行」后，电脑重启也不用再手动双击 exe。
 
 ### 2. 🔑 中心访问口令
 | 字段 | 含义 |
@@ -505,7 +555,9 @@ nginx 侧现状与已做加固，记录备查：
 - **网页版和计划任务冲突吗**：不冲突，两边调用同一接口，幂等，谁先签都行。
 - **Qoder 卡片显示「登录态过期」**：`qoder_token.txt` 失效，约 1 个月有效期。重新从本机已登录的 Qoder 客户端取出最新 token、经 `deploy_ui.py` 部署到服务器即可（服务端不会自动刷新，否则会顶掉你本机客户端登录态）。
 - **Coze 卡片显示「未配置」**：`coze_cookie.txt` 缺失或 Cookie 过期（约 60 天）。浏览器登录 coze.cn 后从 DevTools → Application → Cookies 复制全部 cookie 存为 `coze_cookie.txt`，再 `deploy_ui.py` 推 112。
-- **华为卡显示「登录态过期」**：本机双击 `huawei/relogin_huawei.bat` 重新登录一次；之后 `hw_keeper.js` + `hw_autopush.py` 会自动维持并推送（本机需常驻运行）。
+- **华为卡显示「登录态过期」**：本机模式 / exe 版点华为卡「更新凭据」→「🌐 打开浏览器登录」一键恢复（登录完成自动写回、现读盘立即生效）；服务器侧由本机 `huawei/` 工具链维持（`hw_keeper.js` + `hw_autopush.py` 自动推送，本机需常驻运行），本机守护停了再双击 `huawei/relogin_huawei.bat`。
+- **一键登录窗口突然关闭 / 卡片报错**：先分两种情况——①窗口在登录完成后自动关闭是**正常行为**（采到即退）；②还没登录完就闪退，看 `capture_logs/<平台>.log` 里最后的输出（脚本每次启动都会重写日志），常见是脚本崩溃（`FATAL`）或超时退出（6 分钟未检测到登录态）。
+- **卡片提示「华为接口没返回数据」**：登录态失效或不完整，重新点一次一键登录即可；这是给人话的替代报错（旧版会甩英文 `Expecting value: line 1 column 1`）。
 - **华为卡想从网页直接登录**：卡片 / 详情页点「🔑 配置会话 Cookie」，从浏览器 DevTools 复制登录后的华为 Cookie 粘贴保存即可（因 `J_SESSION_ID` 是 HttpOnly，JS 读不到，无法做「输账号密码自动登录」；粘贴方案是最诚实可行的网页登录方式）。保存后寿命仍仅 30~60 分，够当下立即签到一次。
 - **Link AI 卡显示「登录态过期」**：`linkai_token.txt` 的 JWT 失效。登录 `link-ai.tech/console/account` 复制新的 API Token 覆盖该文件，经 `deploy_ui.py` 推到 112 后**重启服务**即可（该文件历史上是启动时读一次，现已改为现读盘，但仍建议重启一次确保干净）。
 - **Link AI 的图片验证码怎么解决的**：已用纯代码自动绕过，**不再需要手动签到**。原理：
@@ -579,7 +631,8 @@ nginx 侧现状与已做加固，记录备查：
 - 端点前缀 `https://devcloud.cn-north-4.huaweicloud.com/chat/PromptCenterService/v1/ops/`，每日签到需带浏览器同款头（`cftk` CSRF）否则回 SPA HTML。
 - **签到本身是全自动的**：服务器按 `schedule_time` 每天自动 claim + confirm，`hw_last_run.json` 显示长期每天 `ok:true`「+1000 积分」。
 - 唯一的维护点是**会话 Cookie 短效**（静置 30~60 分失效）：本机 `hw_keeper.js` 无头常驻每 5 分刷新 + `hw_autopush.py` 推 112，维持服务器那份会话可用。本机没开机/守护停了 → 华为卡转「登录态过期」→ 双击 `huawei/relogin_huawei.bat` 恢复。
-- **网页直接登录**：因 `devclouddevuibjJ_SESSION_ID` 是 HttpOnly（JS 读不到），无法做「输账号密码自动登录」。卡片 / 详情页提供「🔑 配置会话 Cookie」按钮（`openHwLogin()` 弹窗），从浏览器 DevTools 复制登录后的 Cookie 粘贴保存即可——后端 `set_hw_cookie()` 写入 `hw_cookie.txt`（已 gitignored）并实测验证可用性，立即可「立即签到」。寿命仍仅 30~60 分，够当下签到一次；每日自动定时仍靠本机守护。
+- **网页直接登录（2026-11-17 升级为一键）**：本机模式 / exe 桌面版点华为卡「🔑 更新凭据」→「🌐 打开浏览器登录」，`huawei_login.js` 弹独立 Edge 登录后自动采 cookie 写 `hw_cookie.txt`（判据与防抢跑见「凭据一键更新」节）。服务器模式仍走「🔑 配置会话 Cookie」粘贴（HttpOnly 无法网页自动登录）。
+- **cookie 现读盘**：`_hw_cookie()` 每次调用现读文件（环境变量 `HW_COOKIE` 优先），本机/服务器一键写回或粘贴保存后**立即生效，无需重启**；`_hw_api()` 遇接口返回空/HTML（登录态失效、被 WAF 拦）时抛人话错误「请重新一键登录」，不再裸抛 `Expecting value`。
 
 **千帆 / Link AI / WPS 灵犀 / Trae**：均为标准 token 或 Cookie 串鉴权，凭据见 `config.example.json`，过期后重新导出并经 `deploy_ui.py` 部署。
 
