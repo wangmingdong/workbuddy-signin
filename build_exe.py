@@ -19,7 +19,7 @@ NODE_EXE = r"C:/Users/54004/.workbuddy/binaries/node/versions/22.22.2/node.exe"
 PLAYWRIGHT = os.path.join(ROOT, "node_modules", "playwright-core")
 CAPTURE_SCRIPTS = [
     "trae_capture.js", "lx_capture.js", "doubao_capture.js", "qoder_capture.js",
-    "runtime_env.js",
+    "runtime_env.js", "wb_token_dump.js",
 ]
 PY_MODULES = ["wb_icon.py", "wb_travel.py", "wb_growth.py", "workbuddy_checkin.py"]
 
@@ -82,9 +82,12 @@ def main():
             "========================\n\n"
             "1) 双击「签到中心.exe」——程序在后台启动，浏览器会自动打开签到页面。\n"
             "   首次会要求设置访问口令，请记牢。\n\n"
-            "2) 点右上角「设置」→「凭据向导」，或直接点每张卡上的「🔑 更新凭据」：\n"
-            "   - 有「弹窗采集」按钮的平台：点它 → 在弹出的 Edge 窗口登录 → cookie 自动写回。\n"
-            "   - 其余平台：在自己电脑登录后按 F12 复制 Cookie/token，粘贴保存。\n\n"
+            "2) 更新凭据（傻瓜式）：点每张卡上的「🔑 更新凭据」：\n"
+            "   - WorkBuddy：点「🔄 一键自动更新」→ 自动解密本机客户端登录态写入凭据，\n"
+            "     全程不用复制（需本机已安装并登录过 WorkBuddy 客户端）。\n"
+            "   - Trae/灵犀/豆包/Qoder/华为：点绿色大按钮 → 弹出浏览器/登录窗 → 登录一次，\n"
+            "     凭据自动写回，本页自动刷新。\n"
+            "   - 其余平台：登录后按 F12/控制台复制 Cookie/token，展开「手动粘贴」保存。\n\n"
             "3) 回到设置页设定每日签到时间、开启通知，完成。\n\n"
             "常见问题：\n"
             "- Windows Defender 可能误报（PyInstaller 未签名），选「允许/添加排除项」即可。\n"

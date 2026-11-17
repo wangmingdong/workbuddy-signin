@@ -157,8 +157,8 @@ SETTINGS_FILE = os.environ.get("WB_SETTINGS_FILE", os.path.join(BASE_DIR, "setti
 CRED_WIZARD = [
     {"key": "workbuddy", "files": ["token.info"],
      "paste_hint": "粘贴 WorkBuddy token（token.info 全文内容）",
-     "hint": "打开 WorkBuddy 客户端登录一次即自动续期写入 token.info；也可直接粘贴 token。",
-     "launcher": None},
+     "hint": "点「一键更新」自动解密本机 WorkBuddy 客户端的登录态并写入凭据；也可手动粘贴 token。",
+     "launcher": "__wb_client__"},
     {"key": "qianfan", "files": ["qf_token.txt"],
      "paste_hint": "粘贴千帆 access_token",
      "hint": "登录 qianfan.baidu.com 控制台 → Access Token，复制粘贴。",
@@ -218,6 +218,84 @@ def _capture_env():
     return env
 
 
+def _find_workbuddy_exe():
+    """定位本机 WorkBuddy 客户端 exe（解密 token 要借它自带的 node 运行时）。"""
+    import glob as _glob
+    explicit = os.environ.get("WORKBUDDY_EXE", "").strip()
+    if explicit and os.path.isfile(explicit):
+        return explicit
+    roots = []
+    for env in ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)"):
+        v = os.environ.get(env)
+        if v and os.path.isdir(v):
+            roots.append(v)
+    for drive in "CDEFGH":
+        if os.path.isdir(drive + ":\\"):
+            roots.append(drive + ":\\")
+    seen = set()
+    for base in roots:
+        try:
+            names = os.listdir(base)
+        except Exception:
+            continue
+        for name in names:
+            if "workbuddy" not in name.lower():
+                continue
+            root = os.path.join(base, name)
+            if root in seen or not os.path.isdir(root):
+                continue
+            seen.add(root)
+            for dirpath, dirnames, filenames in os.walk(root):
+                rel = os.path.relpath(dirpath, root)
+                if rel.count(os.sep) >= 4:
+                    dirnames[:] = []
+                    continue
+                for exe in ("WorkBuddy.exe", "WorkBuddyAI.exe"):
+                    if exe in filenames:
+                        return os.path.join(dirpath, exe)
+    return ""
+
+
+def _wb_refresh_token():
+    """一键刷新 WorkBuddy token：借客户端 exe 的 node 模式跑 wb_token_dump.js，
+    把加密会话解密成明文 token.info。返回 (ok, msg)。仅 Windows 本机可用。"""
+    import tempfile as _tf
+    if os.name != "nt":
+        return False, "仅 Windows 本机支持一键刷新 WorkBuddy 凭据"
+    exe = _find_workbuddy_exe()
+    if not exe:
+        return False, "没找到 WorkBuddy 客户端。请先安装并登录一次 WorkBuddy 客户端，再点本按钮。"
+    dump_js = os.path.join(BASE_DIR, "wb_token_dump.js")
+    if not os.path.exists(dump_js):
+        return False, "缺少解密组件 wb_token_dump.js，请重新解压完整程序包。"
+    fd, tmp = _tf.mkstemp(prefix="token_", suffix=".info", dir=BASE_DIR)
+    os.close(fd)
+    env = os.environ.copy()
+    env["ELECTRON_RUN_AS_NODE"] = "1"
+    try:
+        p = subprocess.run([exe, dump_js, "--out", tmp], env=env, cwd=BASE_DIR,
+                           capture_output=True, timeout=120)
+        out = (p.stdout or b"").decode("utf-8", "replace")
+        err = (p.stderr or b"").decode("utf-8", "replace")
+        if p.returncode != 0:
+            return False, ("解密失败：%s" % (err or out or ("退出码 %d" % p.returncode)))[:200]
+        with open(tmp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        tok = (data.get("auth") or {}).get("accessToken")
+        if not isinstance(tok, str) or not tok:
+            return False, "解密结果里没有有效 accessToken，请确认 WorkBuddy 客户端已登录。"
+        os.replace(tmp, os.path.join(BASE_DIR, "token.info"))
+        return True, "✅ WorkBuddy 凭据已自动更新，无需手动复制。"
+    except Exception as e:
+        return False, ("刷新失败：%s" % e)[:200]
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+
+
 def _cred_wizard_items():
     """向导 GET 数据：每个平台的凭据文件状态 + 本机采集能力判定。"""
     import time as _time
@@ -228,7 +306,11 @@ def _cred_wizard_items():
         mt = max([os.path.getmtime(f) for f in have], default=None) if have else None
         launcher = it.get("launcher")
         lok = False
-        if launcher:
+        if launcher == "__wb_client__":
+            # WorkBuddy 走内建解密：需本机有客户端 + 解密脚本（服务器模式永远 false）
+            lok = (os.name == "nt" and bool(_find_workbuddy_exe())
+                   and os.path.exists(os.path.join(BASE_DIR, "wb_token_dump.js")))
+        elif launcher:
             lp = os.path.join(BASE_DIR, launcher)
             if str(launcher).endswith(".js"):
                 lok = os.path.exists(lp) and bool(_bundled_node())
@@ -6976,15 +7058,23 @@ function openCredUpdate(name){
     }
     if(canAuto){
       // 傻瓜式：一个大按钮 + 三步说明，登录后自动写回；手动粘贴折叠兜底
+      // WorkBuddy 是「解密本机客户端会话」，其余平台是「弹浏览器登录」，文案分开
+      var isWB = (name === 'workbuddy');
+      var steps = isWB
+        ? [ '先确认本机 WorkBuddy 客户端已登录过（没登录就先打开客户端登录一次）',
+            '点下面的绿色按钮，自动读取客户端登录态并解密',
+            '凭据自动写回本页，无需手动复制' ]
+        : [ '点下面的绿色按钮，会自动打开一个登录窗口',
+            '在弹出的窗口里登录一次 '+esc(PLATFORMS[name]||name),
+            '登录成功后凭据自动写回本页，无需手动复制' ];
+      var launchLabel = isWB ? '🔄 一键自动更新（从客户端读取）' : '🌐 打开浏览器登录 · 自动获取';
       h += '<div class="cu-guide">'
         +   '<div class="cu-guide-title">✨ 不用复制，点一下就能自动更新</div>'
-        +   '<div class="cu-step"><span class="n">1</span><span>点下面的绿色按钮，会自动打开一个登录窗口</span></div>'
-        +   '<div class="cu-step"><span class="n">2</span><span>在弹出的窗口里登录一次 '+esc(PLATFORMS[name]||name)+'</span></div>'
-        +   '<div class="cu-step"><span class="n">3</span><span>登录成功后凭据自动写回本页，无需手动复制</span></div>'
-        +   '<button class="cu-biglaunch" id="cuLaunchBtn" type="button">🌐 打开浏览器登录 · 自动获取</button>'
+        +   steps.map(function(s,i){ return '<div class="cu-step"><span class="n">'+(i+1)+'</span><span>'+s+'</span></div>'; }).join('')
+        +   '<button class="cu-biglaunch" id="cuLaunchBtn" type="button">'+launchLabel+'</button>'
         +   '<div class="cu-guide-tip" id="cuMsg"></div>'
         + '</div>'
-        + '<details class="cu-more"><summary>登录窗打不开？点这里手动粘贴凭据</summary>'
+        + '<details class="cu-more"><summary>'+(isWB?'客户端没登录？点这里手动粘贴凭据':'登录窗打不开？点这里手动粘贴凭据')+'</summary>'
         +   '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
         +   '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
         +   '<div class="cu-actions"><button class="cu-save" id="cuSave" type="button">💾 保存凭据</button></div>'
@@ -7004,15 +7094,16 @@ function openCredUpdate(name){
     body.innerHTML = h;
     var lb=$('cuLaunchBtn');
     if(lb) lb.addEventListener('click',function(){
-      lb.disabled=true; lb.innerHTML='<span class="spin"></span> 正在打开登录窗口…';
-      var tip=$('cuMsg'); if(tip){ tip.style.color='#0a7'; tip.textContent='登录窗口已弹出，请在窗口里完成登录；成功后凭据会自动写回，本页会自动刷新。'; }
+      lb.disabled=true; lb.innerHTML='<span class="spin"></span> '+(isWB?'正在读取客户端登录态…':'正在打开登录窗口…');
+      var tip=$('cuMsg'); if(tip){ tip.style.color='#0a7'; tip.textContent=isWB?'正在从 WorkBuddy 客户端读取登录态并解密，请稍候…':'登录窗口已弹出，请在窗口里完成登录；成功后凭据会自动写回，本页会自动刷新。'; }
       api("api/cred_wizard",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({name:name,action:"launch"})}).then(function(r){
         if(!r.ok){
-          lb.disabled=false; lb.textContent='🌐 打开浏览器登录 · 自动获取';
+          lb.disabled=false; lb.textContent=launchLabel;
           if(tip){ tip.style.color='#c0392b'; tip.textContent=r.error||'启动失败'; }
           return;
         }
+        if(r.msg){ if(tip){ tip.style.color='#0a7'; tip.textContent=r.msg; } }
         // 启动成功：轮询凭据文件 mtime，写回后自动提示并刷新
         var startMt = (window._cwItems.filter(function(x){return x.key===name;})[0]||{}).mtime || 0;
         var tries=0, timer=setInterval(function(){
@@ -7023,10 +7114,10 @@ function openCredUpdate(name){
               clearInterval(timer);
               if(tip){ tip.style.color='#0a7'; tip.textContent='✅ 检测到凭据已更新！正在刷新…'; }
               setTimeout(function(){ closeModal(); load(function(){ showMsg('凭据已更新，可以签到了 ✅','ok'); }); }, 900);
-            } else if(tries>=40){ clearInterval(timer); if(tip){ tip.textContent='若已在窗口登录但仍未更新，请关闭本页稍后点「重新检查」。'; } }
+            } else if(tries>=40){ clearInterval(timer); if(tip){ tip.textContent=isWB?'若仍未更新，请先打开 WorkBuddy 客户端登录一次再试。':'若已在窗口登录但仍未更新，请关闭本页稍后点「重新检查」。'; } }
           }).catch(function(){});
         }, 3000);
-      }).catch(function(e){ lb.disabled=false; lb.textContent='🌐 打开浏览器登录 · 自动获取'; if($('cuMsg')) $('cuMsg').style.color='#c0392b'; if($('cuMsg')) $('cuMsg').textContent='启动失败：'+(e&&e.message); });
+      }).catch(function(e){ lb.disabled=false; lb.textContent=launchLabel; if($('cuMsg')) $('cuMsg').style.color='#c0392b'; if($('cuMsg')) $('cuMsg').textContent='启动失败：'+(e&&e.message); });
     });
     var sb=$('cuSave');
     if(sb) sb.addEventListener('click',function(){
@@ -7737,7 +7828,7 @@ function renderCredAlert(alerts){
     +   '<div class="cl">'+names+'</div>'
     +   '<div class="cd">到期后卡片会显示「登录态过期」、当天签到也会失败。'
     +   (credWritable()
-          ? '点上方平台名即可更新凭据：本机可一键打开浏览器登录、自动写回。'
+          ? '点上方平台名即可更新凭据：本机可一键登录/解密并自动写回。'
           : '服务器部署不支持网页改凭据，请用本机版登录后自动写回，或用 SFTP 更新凭据文件。')
     +   '</div>'
     + '</div>'
@@ -8762,6 +8853,12 @@ class Handler(BaseHTTPRequestHandler):
                     launcher = meta.get("launcher")
                     if not launcher:
                         self._json(200, {"ok": False, "error": "该平台没有本机弹窗采集脚本"})
+                        return
+                    if launcher == "__wb_client__":
+                        # WorkBuddy：同步解密客户端会话写 token.info；前端轮询 mtime 会自动检测到
+                        ok, msg = _wb_refresh_token()
+                        self._json(200, {"ok": ok, "launched": ok,
+                                         "msg": msg if ok else "", "error": "" if ok else msg})
                         return
                     lp = os.path.join(BASE_DIR, launcher)
                     if not os.path.exists(lp):
