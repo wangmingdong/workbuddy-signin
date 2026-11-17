@@ -25,6 +25,7 @@ verify*.py
 # 华为凭据与运行时产物（含敏感信息，禁止入库）
 hw_credentials.json
 hw_cookie.txt
+hw_cookie_codearts.txt
 hw_cookies.json
 hw_keeper.heartbeat
 hw_keeper.log

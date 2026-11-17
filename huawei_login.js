@@ -79,7 +79,34 @@ function saveCookie(all) {
         clearInterval(timer);
         const n = saveCookie(all);
         const miss = hasAgency ? '' : '（未见 agencyID，已按最长等待写入）';
-        console.log('OK: 已写入 hw_cookie.txt（' + n + ' 个 cookie）' + miss + '，窗口即将关闭。');
+        console.log('OK: 已写入 hw_cookie.txt（' + n + ' 个 cookie）' + miss + '。');
+        // 顺路采集码道门户（codearts.huaweicloud.com）会话：积分余额/即将过期接口用。
+        // 登录华为云后 CAS 单点登录通常自动放行；失败不影响签到，只是卡片暂无积分行。
+        try {
+          console.log('…正在顺路采集码道门户会话（用于「可用积分/即将过期」展示）…');
+          await page.goto('https://codearts.huaweicloud.com/portal/settings/personal-usage?locale=zh-cn',
+            { waitUntil: 'domcontentloaded', timeout: 60000 });
+          await page.waitForTimeout(9000); // 等 SSO 跳转 + cookie 落定
+          const url2 = page.url() || '';
+          const onPortal = url2.indexOf('codearts.huaweicloud.com') !== -1
+            && !/authui|login\.html/i.test(url2);
+          if (onPortal) {
+            // 只取对门户生效的 cookie（避免把 devcloud 专有的混进去重名）
+            const ca = await ctx.cookies('https://codearts.huaweicloud.com/');
+            const header = ca.map((c) => c.name + '=' + c.value).join('; ');
+            if (ca.some((c) => c.name === 'SessionID')) {
+              fs.writeFileSync(path.join(__dirname, 'hw_cookie_codearts.txt'), header + '\n');
+              console.log('OK: 已写入 hw_cookie_codearts.txt（' + ca.length + ' 个 cookie）');
+            } else {
+              console.log('WARN: 门户会话缺 SessionID，跳过写盘（不影响签到）');
+            }
+          } else {
+            console.log('WARN: 门户未自动登录（' + url2.slice(0, 60) + '），跳过（不影响签到）');
+          }
+        } catch (e) {
+          console.log('[portal] ' + e.message);
+        }
+        console.log('OK: 全部完成，窗口即将关闭。');
         setTimeout(async () => { try { await ctx.close(); } catch (e) {} process.exit(0); }, 1500);
         return;
       }

@@ -183,7 +183,7 @@ CRED_WIZARD = [
      "paste_hint": "粘贴 work.trae.cn 的 Cookie 整串",
      "hint": "本机可点「弹窗采集」自动导出（Cookie 约 14 天需重采一次，卡片会预警）。",
      "launcher": "trae_capture.js"},
-    {"key": "huawei", "files": ["hw_cookie.txt", os.path.join("huawei", "hw_cookie.txt")],
+    {"key": "huawei", "files": ["hw_cookie.txt", "hw_cookie_codearts.txt", os.path.join("huawei", "hw_cookie.txt")],
      "paste_hint": "粘贴 devcloud 的 Cookie 整串（须含 devclouddevuibjJ_SESSION_ID）",
      "hint": "本机可点「一键登录」弹出 Edge 登录华为云，自动获取会话（约 30~60 分钟有效，失效再点一次即可）。",
      "launcher": "huawei_login.js"},
@@ -2167,6 +2167,84 @@ def _hw_api(path, method="GET", body=None):
         )
 
 
+# ============ 码道门户（codearts.huaweicloud.com）积分余额/即将过期 ============
+# 签到走 devcloud.cn-north-4（hw_cookie.txt）；「个人用量」页的积分数据走 codearts
+# 门户（hw_cookie_codearts.txt，一键登录后顺路经 CAS 单点登录采集）。两个站点
+# 会话独立、各自短效，分文件存，互不干扰。
+HW_PORTAL_BASE = "https://codearts.huaweicloud.com"
+HW_PORTAL_COOKIE_FILE = os.path.join(BASE_DIR, "hw_cookie_codearts.txt")
+
+
+def _hw_portal_cookie():
+    _c = os.environ.get("HW_PORTAL_COOKIE", "").strip()
+    if _c:
+        return _c
+    try:
+        with open(HW_PORTAL_COOKIE_FILE, "r", encoding="utf-8") as _f:
+            return _f.read().strip()
+    except Exception:
+        return ""
+
+
+def _hw_portal_api(path, method="GET", body=None):
+    _cookie = _hw_portal_cookie()
+    if not _cookie:
+        raise RuntimeError("未配置码道门户会话（一键登录华为后会自动采集）")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+        "x-requested-with": "XMLHttpRequest",
+        "accept": "application/json, text/plain, */*",
+        "referer": HW_PORTAL_BASE + "/portal/settings/personal-usage?locale=zh-cn",
+        "Cookie": _cookie,
+    }
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    sep = "&" if "?" in path else "?"
+    url = "%s%s%s_=%d" % (HW_PORTAL_BASE, path, sep, int(time.time() * 1000))
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    with urllib.request.urlopen(req, timeout=25, context=_SSL_CTX) as r:
+        raw = r.read().decode("utf-8", "replace").strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        head = raw[:80].replace("\n", " ") if raw else "(空响应)"
+        raise RuntimeError(
+            "码道门户接口没返回数据（%s）：门户会话可能已失效，重新一键登录华为即可恢复。"
+            % head
+        )
+
+
+def _hw_portal_credit():
+    """码道门户 package/overview → 可用积分 + 即将过期。
+
+    口径（2026-11-17 实测）：all_credit_package.package_credit_remain = 可用积分，
+    expiring_credit_amount = 即将过期总额。门户接口**不返回精确到期日期**，
+    所以 date 置 None，前端用兜底文案提示去门户「个人用量」页看。
+    取不到一律返回 None（卡片不硬写，不因门户会话失效而影响签到主流程）。
+    """
+    if not _hw_portal_cookie():
+        return None
+    try:
+        d = _hw_portal_api("/portal/snap-manager/v1/package/overview")
+        a = d.get("all_credit_package") or {}
+        remain = a.get("package_credit_remain")
+        if remain is None:
+            return None
+        credit = {"balance": remain, "unit": "积分", "expiring": None}
+        exp = a.get("expiring_credit_amount") or 0
+        if exp > 0:
+            credit["expiring"] = {
+                "amount": exp,
+                "date": None,
+                "portal_note": "精确到期日期见码道门户「个人用量」页",
+            }
+        return credit
+    except Exception as _e:
+        print("[hw-portal] 积分查询失败（不影响签到）: %s" % _e, flush=True)
+        return None
+
+
 def _hw_record(ok, message):
     _append_rec(
         HW_STATE_FILE,
@@ -2260,6 +2338,7 @@ def _hw_done_card(mark):
         "metric_value": "已领 %s" % amount,
         "last_run": {"ts": ts, "ok": True, "message": mark.get("message") or "今日签到成功"},
         "rows": rows,
+        "credit": _hw_portal_credit(),
         "error": None,
     }
 
@@ -2351,6 +2430,7 @@ def _hw_live_card():
             "metric_value": metric_value,
             "last_run": lr,
             "rows": rows,
+            "credit": _hw_portal_credit(),
             "error": None,
         }
     except urllib.error.HTTPError as e:
@@ -6626,6 +6706,11 @@ function creditHTML(it){
          + ' '+esc(c.expiring.dedicated.label||'专属积分')+' 将于 '+dd.html+' 到期'
          + (dd.rest ? ' '+esc(dd.rest) : '')+'（仅指定模型可用，不计入可用积分）</div>';
     }
+  } else if(c.expiring && c.expiring.amount!=null){
+    // 无精确日期的「即将过期」（如华为码道门户口径）：只报总额，诚实标注日期去哪看
+    h += '<div class="credit-exp">⏳ '+esc(c.expiring.amount)+' '+(c.unit||'积分')+' 即将过期'
+       + (c.expiring.portal_note ? '<span class="sub">（'+esc(c.expiring.portal_note)+'）</span>' : '')
+       + '</div>';
   }
   return h;
 }
