@@ -218,6 +218,21 @@ def _capture_env():
     return env
 
 
+# 采集任务去重：记录每个平台最近一次 launch 的时间戳，防止连点弹出多个登录窗
+_CAPTURE_LAUNCH_TS = {}
+
+
+def _capture_launch_guard(name, window=20):
+    """20 秒内同平台重复点「一键更新」直接拦截，避免起多个 Edge 登录窗。"""
+    import time as _t
+    now = _t.time()
+    last = _CAPTURE_LAUNCH_TS.get(name, 0)
+    if now - last < window:
+        return False, int(window - (now - last))
+    _CAPTURE_LAUNCH_TS[name] = now
+    return True, 0
+
+
 def _find_workbuddy_exe():
     """定位本机 WorkBuddy 客户端 exe（解密 token 要借它自带的 node 运行时）。"""
     import glob as _glob
@@ -7095,7 +7110,7 @@ function openCredUpdate(name){
     var lb=$('cuLaunchBtn');
     if(lb) lb.addEventListener('click',function(){
       lb.disabled=true; lb.innerHTML='<span class="spin"></span> '+(isWB?'正在读取客户端登录态…':'正在打开登录窗口…');
-      var tip=$('cuMsg'); if(tip){ tip.style.color='#0a7'; tip.textContent=isWB?'正在从 WorkBuddy 客户端读取登录态并解密，请稍候…':'登录窗口已弹出，请在窗口里完成登录；成功后凭据会自动写回，本页会自动刷新。'; }
+      var tip=$('cuMsg'); if(tip){ tip.style.color='#0a7'; tip.textContent=isWB?'正在从 WorkBuddy 客户端读取登录态并解密，请稍候…':'Edge 登录窗已弹出（命令行黑窗口已隐藏，不用管它）。请在 Edge 里完成登录；登录成功前不会写盘，成功后本页自动刷新，不用再点第二次。'; }
       api("api/cred_wizard",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({name:name,action:"launch"})}).then(function(r){
         if(!r.ok){
@@ -7114,7 +7129,7 @@ function openCredUpdate(name){
               clearInterval(timer);
               if(tip){ tip.style.color='#0a7'; tip.textContent='✅ 检测到凭据已更新！正在刷新…'; }
               setTimeout(function(){ closeModal(); load(function(){ showMsg('凭据已更新，可以签到了 ✅','ok'); }); }, 900);
-            } else if(tries>=40){ clearInterval(timer); if(tip){ tip.textContent=isWB?'若仍未更新，请先打开 WorkBuddy 客户端登录一次再试。':'若已在窗口登录但仍未更新，请关闭本页稍后点「重新检查」。'; } }
+            } else if(tries>=100){ clearInterval(timer); if(tip){ tip.textContent=isWB?'若仍未更新，请先打开 WorkBuddy 客户端登录一次再试。':'等待约 5 分钟仍未检测到：请确认已在 Edge 窗口完成登录（扫码/账号），或关闭本页稍后点「重新检查」。'; } }
           }).catch(function(){});
         }, 3000);
       }).catch(function(e){ lb.disabled=false; lb.textContent=launchLabel; if($('cuMsg')) $('cuMsg').style.color='#c0392b'; if($('cuMsg')) $('cuMsg').textContent='启动失败：'+(e&&e.message); });
@@ -8860,6 +8875,12 @@ class Handler(BaseHTTPRequestHandler):
                         self._json(200, {"ok": ok, "launched": ok,
                                          "msg": msg if ok else "", "error": "" if ok else msg})
                         return
+                    # 去重：防止连点弹出多个 Edge 登录窗
+                    allowed, wait = _capture_launch_guard(name)
+                    if not allowed:
+                        self._json(200, {"ok": True, "launched": False,
+                                         "msg": "采集窗口已打开，请勿重复点击；请在弹出的 Edge 窗口里登录"})
+                        return
                     lp = os.path.join(BASE_DIR, launcher)
                     if not os.path.exists(lp):
                         self._json(200, {"ok": False, "error": "采集脚本不存在: %s" % launcher})
@@ -8869,14 +8890,18 @@ class Handler(BaseHTTPRequestHandler):
                         if not node:
                             self._json(200, {"ok": False, "error": "未找到 Node 运行环境（node.exe）"})
                             return
-                        flags = subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0
+                        # 隐藏命令行黑窗口，只留 Edge 登录窗；CREATE_NO_WINDOW 对子进程仍允许弹浏览器
+                        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                        # trae/doubao 是常驻脚本：网页一键模式传 --once，采到有效 cookie 就写盘并自动退出
+                        once_names = ("trae", "doubao")
+                        args = [node, launcher] + (["--once"] if name in once_names else [])
                         subprocess.Popen(
-                            [node, launcher], cwd=BASE_DIR,
+                            args, cwd=BASE_DIR,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             creationflags=flags, env=_capture_env(),
                         )
                         self._json(200, {"ok": True, "launched": True,
-                                         "msg": "已弹出采集窗口，登录成功后 cookie 自动写盘"})
+                                         "msg": "已弹出采集窗口，登录成功后凭据自动写回，本页会自动刷新"})
                     else:
                         if os.name != "nt":
                             self._json(200, {"ok": False, "error": "仅支持 Windows 本机启动 .bat"})

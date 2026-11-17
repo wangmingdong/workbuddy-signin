@@ -31,6 +31,9 @@ const TRIGGER    = path.join(__dirname, 'doubao_deploy.trigger');
 const PY         = require('./runtime_env').resolvePython();
 const TARGET     = 'https://www.doubao.com/';
 const CWD        = __dirname;
+// 网页「一键更新」会带 --once：采到有效 cookie 就写盘并退出（黑窗口自动关）
+// 手动双击 .bat 不带此参数：保持常驻守护（老用法不变）
+const ONCE       = process.argv.includes('--once');
 
 // 只收 doubao.com 相关域（含 .doubao.com / www.doubao.com / doubao.com）
 const isDoubao = (d) => (d || '').endsWith('doubao.com') || (d || '').includes('.doubao.com');
@@ -38,16 +41,18 @@ const isDoubao = (d) => (d || '').endsWith('doubao.com') || (d || '').includes('
 function exportCookies(ctx) {
   return ctx.cookies().then(async (all) => {
     const db = all.filter((c) => isDoubao(c.domain));
+    const names = db.map((c) => c.name);
+    // 关键：sessionid 是签到必需，没拿到就绝不写盘。
+    // 否则网页轮询会把"空写入"误判成登录成功，导致要点第二次才更新。
+    const hasSid = names.includes('sessionid');
+    if (!hasSid) {
+      console.log('[cookies] ⏳ 尚未拿到 sessionid，跳过写盘，等待登录…');
+      return 0;
+    }
     const header = db.map((c) => `${c.name}=${c.value}`).join('; ');
     fs.writeFileSync(COOKIE_JSON, JSON.stringify(db, null, 2));
     fs.writeFileSync(COOKIE_TXT, header);
-    console.log(`[cookies] doubao cookie 数量=${db.length}, 头串长度=${header.length}`);
-    const names = db.map((c) => c.name).join(',');
-    if (names) console.log('          字段: ' + names);
-    // sessionid 是签到必需；提示是否到手
-    const hasSid = db.some((c) => c.name === 'sessionid');
-    if (hasSid) console.log('          ✅ 已拿到 sessionid，可直接部署（python deploy_ui.py）');
-    else console.log('          ⏳ 尚未拿到 sessionid，请先在弹出的窗口里登录豆包');
+    console.log(`[cookies] ✅ doubao 有效 cookie 数量=${db.length}, 头串长度=${header.length}`);
     return db.length;
   }).catch((e) => {
     console.log('[cookies] 导出出错:', e.message);
@@ -76,10 +81,20 @@ function deploy() {
   const page = ctx.pages()[0] || await ctx.newPage();
 
   // 启动立即导一次（万一已登录）
-  await exportCookies(ctx);
+  const first = await exportCookies(ctx);
+  if (ONCE && first > 0) {
+    try { await ctx.close(); } catch (e) {}
+    setTimeout(() => process.exit(0), 800);
+  }
 
-  // 每 8 秒持续导出
-  setInterval(() => exportCookies(ctx), 8000);
+  // 每 8 秒持续导出；--once 模式拿到有效 cookie 就写盘并自动退出（黑窗口随之关闭）
+  setInterval(async () => {
+    const n = await exportCookies(ctx);
+    if (ONCE && n > 0) {
+      try { await ctx.close(); } catch (e) {}
+      setTimeout(() => process.exit(0), 800);
+    }
+  }, 8000);
 
   // 触发文件：touch doubao_deploy.trigger -> 导出最新 cookie 并自动部署
   setInterval(async () => {
