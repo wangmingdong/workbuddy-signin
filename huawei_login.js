@@ -50,6 +50,7 @@ function saveCookie(all) {
   }
   const deadline = Date.now() + MAX_MS;
   let done = false;
+  let sessionSince = 0; // 首次看到会话 cookie 的时刻
   const tick = async () => {
     if (done) return;
     try {
@@ -58,10 +59,21 @@ function saveCookie(all) {
       // 会话标识门槛：没登录就绝不写盘
       const hasSession = names.includes('devclouddevuibjJ_SESSION_ID') || names.includes('J_SESSION_ID');
       if (hasSession) {
+        // 关键：登录跳转完成后华为还会陆续补发 agencyID 等 cookie，
+        // 第一次看到 J_SESSION_ID 就写盘会缺 cookie 导致接口调不通。
+        // 所以：要么等到 agencyID 出现，要么再多观察 4 秒收全再写。
+        const hasAgency = names.some((n) => n.indexOf('agencyID') !== -1);
+        if (!sessionSince) {
+          sessionSince = Date.now();
+          console.log('OK: 检测到登录会话，再等几秒收全 cookie（agencyID 等）…');
+          return;
+        }
+        if (!hasAgency && Date.now() - sessionSince < 6000) return;
         done = true;
         clearInterval(timer);
         const n = saveCookie(all);
-        console.log('OK: 已检测到华为登录会话，写入 hw_cookie.txt（' + n + ' 个 cookie），窗口即将关闭。');
+        const miss = hasAgency ? '' : '（未见 agencyID，已按最长等待写入）';
+        console.log('OK: 已写入 hw_cookie.txt（' + n + ' 个 cookie）' + miss + '，窗口即将关闭。');
         setTimeout(async () => { try { await ctx.close(); } catch (e) {} process.exit(0); }, 1500);
         return;
       }

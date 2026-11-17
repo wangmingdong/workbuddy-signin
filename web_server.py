@@ -2109,7 +2109,17 @@ def _hw_api(path, method="GET", body=None):
         url += "%s_=%d" % (sep, int(time.time() * 1000))
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     with urllib.request.urlopen(req, timeout=25, context=_SSL_CTX) as r:
-        return json.loads(r.read().decode("utf-8", "replace"))
+        raw = r.read().decode("utf-8", "replace").strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        # 接口返回空/HTML（登录态失效被重定向到页面、或被 WAF 拦）时给人话报错，
+        # 而不是裸抛 "Expecting value: line 1 column 1" 让小白看不懂
+        head = raw[:80].replace("\n", " ") if raw else "(空响应)"
+        raise RuntimeError(
+            "华为接口没返回数据（%s）。多半是登录态已失效或不完整：请点「更新凭据」重新一键登录一次。"
+            % head
+        )
 
 
 def _hw_record(ok, message):
@@ -8904,11 +8914,25 @@ class Handler(BaseHTTPRequestHandler):
                         # qoder_login/huawei_login 本身即一次性，传 --once 兼容其退出逻辑
                         once_names = ("trae", "doubao", "qoder", "huawei")
                         args = [node, launcher] + (["--once"] if name in once_names else [])
-                        subprocess.Popen(
-                            args, cwd=BASE_DIR,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            creationflags=flags, env=_capture_env(),
-                        )
+                        # 脚本输出落日志（此前直接丢弃，脚本一崩浏览器秒关且无从排查）
+                        try:
+                            _logdir = os.path.join(BASE_DIR, "capture_logs")
+                            os.makedirs(_logdir, exist_ok=True)
+                            _lf = open(os.path.join(_logdir, name + ".log"), "w", encoding="utf-8")
+                        except Exception:
+                            _lf = subprocess.DEVNULL
+                        try:
+                            subprocess.Popen(
+                                args, cwd=BASE_DIR,
+                                stdout=_lf, stderr=subprocess.STDOUT,
+                                creationflags=flags, env=_capture_env(),
+                            )
+                        finally:
+                            if _lf is not subprocess.DEVNULL:
+                                try:
+                                    _lf.close()  # 子进程继承句柄，父进程可立即关闭
+                                except Exception:
+                                    pass
                         self._json(200, {"ok": True, "launched": True,
                                          "msg": "已弹出采集窗口，登录成功后凭据自动写回，本页会自动刷新"})
                     else:
