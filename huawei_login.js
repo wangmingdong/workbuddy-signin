@@ -50,25 +50,31 @@ function saveCookie(all) {
   }
   const deadline = Date.now() + MAX_MS;
   let done = false;
-  let sessionSince = 0; // 首次看到会话 cookie 的时刻
+  let homeSince = 0;      // 首次确认回到码道主页的时刻
+  let lastWaitLog = 0;
   const tick = async () => {
     if (done) return;
     try {
+      let url = '';
+      try { url = page.url() || ''; } catch (e) {}
       const all = await ctx.cookies();
       const names = all.filter((c) => isHw(c.domain)).map((c) => c.name);
-      // 会话标识门槛：没登录就绝不写盘
       const hasSession = names.includes('devclouddevuibjJ_SESSION_ID') || names.includes('J_SESSION_ID');
-      if (hasSession) {
-        // 关键：登录跳转完成后华为还会陆续补发 agencyID 等 cookie，
-        // 第一次看到 J_SESSION_ID 就写盘会缺 cookie 导致接口调不通。
-        // 所以：要么等到 agencyID 出现，要么再多观察 4 秒收全再写。
+      // ⚠️ 不能只看 J_SESSION_ID：打开登录页时华为就会发一个未激活的预登录
+      // J_SESSION_ID，把它当"已登录"会在用户还没扫码时就写盘关窗（踩过）。
+      // 真正登录完成的标志：浏览器回到码道主页（devcloud 域 /chat/ 路径），
+      // 登录页在 auth.huaweicloud.com 或带 login 字样的 URL 上。
+      const onHome = /huaweicloud\.com\/chat\//.test(url) && !/login|auth\.|signin/i.test(url);
+      if (hasSession && onHome) {
+        // 登录跳转完成后华为还会陆续补发 agencyID 等 cookie：
+        // 等它出现；迟迟不来就最多再观察 6 秒收全再写。
         const hasAgency = names.some((n) => n.indexOf('agencyID') !== -1);
-        if (!sessionSince) {
-          sessionSince = Date.now();
-          console.log('OK: 检测到登录会话，再等几秒收全 cookie（agencyID 等）…');
+        if (!homeSince) {
+          homeSince = Date.now();
+          console.log('OK: 已进入码道主页，再等几秒收全 cookie（agencyID 等）…');
           return;
         }
-        if (!hasAgency && Date.now() - sessionSince < 6000) return;
+        if (!hasAgency && Date.now() - homeSince < 6000) return;
         done = true;
         clearInterval(timer);
         const n = saveCookie(all);
@@ -76,6 +82,11 @@ function saveCookie(all) {
         console.log('OK: 已写入 hw_cookie.txt（' + n + ' 个 cookie）' + miss + '，窗口即将关闭。');
         setTimeout(async () => { try { await ctx.close(); } catch (e) {} process.exit(0); }, 1500);
         return;
+      }
+      // 还没登录完成：每 30 秒打一次进度，绝不提前关窗
+      if (Date.now() - lastWaitLog > 30000) {
+        lastWaitLog = Date.now();
+        console.log('WAIT: 等待登录完成…（当前页面: ' + (url ? url.slice(0, 80) : '未知') + '）');
       }
     } catch (e) {
       console.log('[tick] ' + e.message);
