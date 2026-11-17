@@ -233,6 +233,51 @@ def _capture_launch_guard(name, window=20):
     return True, 0
 
 
+# ============ 开机自启（仅 exe 版，写 HKCU Run 键，无需管理员权限） ============
+_AUTOSTART_NAME = "WbCheckinCenter"
+
+
+def _autostart_cmd():
+    """开机自启要执行的命令：exe 版用自身路径 + --silent（开机静默运行，不弹浏览器）；
+    本地 python 版不给（dev 场景无意义）。"""
+    if getattr(sys, "frozen", False):
+        return '"%s" --silent' % sys.executable
+    return ""
+
+
+def _autostart_status():
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return {"supported": False, "enabled": False}
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Run") as k:
+            v, _t = winreg.QueryValueEx(k, _AUTOSTART_NAME)
+        return {"supported": True,
+                "enabled": os.path.normcase(str(v)) == os.path.normcase(_autostart_cmd())}
+    except FileNotFoundError:
+        return {"supported": True, "enabled": False}
+    except Exception:
+        return {"supported": True, "enabled": False}
+
+
+def _set_autostart(enabled):
+    import winreg
+    cmd = _autostart_cmd()
+    if not cmd:
+        raise RuntimeError("仅 exe 桌面版支持开机自启")
+    path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    if enabled:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as k:
+            winreg.SetValueEx(k, _AUTOSTART_NAME, 0, winreg.REG_SZ, cmd)
+    else:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as k:
+                winreg.DeleteValue(k, _AUTOSTART_NAME)
+        except FileNotFoundError:
+            pass  # 本来就没设，视为已关闭
+
+
 def _find_workbuddy_exe():
     """定位本机 WorkBuddy 客户端 exe（解密 token 要借它自带的 node 运行时）。"""
     import glob as _glob
@@ -7146,7 +7191,7 @@ function openCredUpdate(name){
             if((cur.mtime||0)>startMt || (startMt===0 && cur.exists)){
               clearInterval(timer);
               if(tip){ tip.style.color='#0a7'; tip.textContent='✅ 检测到凭据已更新！正在刷新…'; }
-              setTimeout(function(){ closeModal(); load(function(){ showMsg('凭据已更新，可以签到了 ✅','ok'); }); }, 900);
+              setTimeout(function(){ closeModal(); load(function(){ showMsg('凭据已更新，可以签到了 ✅','ok',6000); }); }, 900);
             } else if(tries>=100){ clearInterval(timer); if(tip){ tip.textContent=isWB?'若仍未更新，请先打开 WorkBuddy 客户端登录一次再试。':'等待约 5 分钟仍未检测到：请确认已在 Edge 窗口完成登录（扫码/账号），或关闭本页稍后点「重新检查」。'; } }
           }).catch(function(){});
         }, 3000);
@@ -7161,7 +7206,7 @@ function openCredUpdate(name){
         body:JSON.stringify({name:name,content:v})}).then(function(r){
         sb.disabled=false; sb.textContent='💾 保存凭据';
         if(msg){ msg.style.color=r.ok?'#0a7':'#c0392b'; msg.textContent=r.ok?(r.msg||'已保存'):(r.error||'保存失败'); }
-        if(r.ok) load(function(){ showMsg(r.msg||'凭据已保存 ✅','ok'); });
+        if(r.ok) load(function(){ showMsg(r.msg||'凭据已保存 ✅','ok',6000); });
       }).catch(function(e){ sb.disabled=false; sb.textContent='💾 保存凭据'; if(msg){msg.style.color='#c0392b';msg.textContent='保存失败：'+(e&&e.message);} });
     });
   }).catch(function(e){
@@ -7204,7 +7249,7 @@ function openHwLogin(name){
       if(r.ok){
         if(msg){ msg.style.color = r.verified ? "#0a7" : "#b8860b"; msg.textContent = r.message || "已保存"; }
         showMsg(r.message || "华为会话已配置 ✅", "ok");
-        setTimeout(function(){ closeModal(); load(function(){ showMsg("华为会话已配置，可点立即签到 ✅", "ok"); }); }, 900);
+        setTimeout(function(){ closeModal(); load(function(){ showMsg("华为会话已配置，可点立即签到 ✅", "ok", 6000); }); }, 900);
       } else {
         if(msg){ msg.style.color = "#c0392b"; msg.textContent = "❌ " + (r.error || "保存失败"); }
         saveBtn.disabled = false; saveBtn.textContent = "💾 保存并验证";
@@ -7642,6 +7687,10 @@ function renderSettings(){
       +[0,15,30,60,120].map(function(m){ return '<option value="'+m+'" '+((s.schedule_jitter_min||0)===m?'selected':'')+'>'+(m?('基准后 0~'+m+' 分钟'):'不浮动（固定时刻）')+'</option>'; }).join('')
       +'</select></label>'
       +'<p class="ftip">到点后自动跑全部已启用平台。开启随机浮动后，每天在基准时间后的区间内随机抽一个时刻（当天抽签结果落盘，重启不重抽），避免每天同一秒发起签到。</p>'
+      +((s.autostart&&s.autostart.supported)
+        ? '<label class="fld"><span>开机自动运行</span><input type="checkbox" id="autoStart" '+(s.autostart.enabled?'checked':'')+'></label>'
+          +'<p class="ftip">勾上后开机自动运行签到中心，每天到点自动签到，无需再手动双击 exe。关闭浏览器不影响签到，程序在后台常驻。</p>'
+        : '')
       +'</div>'
       +'<div class="fgroup"><h4>🔑 中心访问口令</h4>'
       +'<label class="fld"><span>当前状态</span><span class="fval">'+(s.key_set?'页面已单独设置':'沿用服务器环境变量')+'</span></label>'
@@ -7661,6 +7710,15 @@ function renderSettings(){
     $('fbody').innerHTML=html;
     $('saveSettings').addEventListener('click', saveSettings);
     $('testWebhook').addEventListener('click', testWebhook);
+    var as=$('autoStart');
+    if(as) as.addEventListener('change', function(){
+      api('api/autostart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:as.checked})})
+        .then(function(r){
+          if(r.ok) showMsg(as.checked?'已开启开机自启 ✅ 明天开机就会自动运行':'已关闭开机自启','ok',6000);
+          else { as.checked=!as.checked; showMsg(r.error||'设置失败','err'); }
+        })
+        .catch(function(e){ as.checked=!as.checked; showMsg(netMsg(e,'设置失败'),'err'); });
+    });
     renderCredWizard();
   }).catch(function(e){ showMsg("读取设置失败："+(e&&e.message),"err"); });
 }
@@ -7768,7 +7826,12 @@ function testWebhook(){
     showMsg(r.ok?"测试推送已发送 ✅":("推送失败："+(r.error||"")),"ok");
   }).catch(function(e){ showMsg("测试失败："+(e&&e.message),"err"); });
 }
-function showMsg(t,kind){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok"); }
+var _msgTimer=null;
+function showMsg(t,kind,ms){ var m=$("msg"); m.textContent=t; m.className="msg show "+(kind||"ok");
+  if(_msgTimer){ clearTimeout(_msgTimer); _msgTimer=null; }
+  // 可选自动消失：不传 ms 则保持显示（执行中/错误类提示不该自己消失）
+  if(ms && ms>0) _msgTimer=setTimeout(function(){ hideMsg(); _msgTimer=null; }, ms);
+}
 function hideMsg(){ $("msg").className="msg"; }
 function api(path,opts){
   var k=getKey();
@@ -8514,6 +8577,7 @@ class Handler(BaseHTTPRequestHandler):
                 "platforms": SETTINGS.get("platforms", {}),
                 "notify_on": bool(SETTINGS.get("notify_on", False)),
                 "has_webhook": bool(SETTINGS.get("notify_webhook", "")),
+                "autostart": _autostart_status(),
             })
             return
         if u.path == "/api/cred_wizard":
@@ -8850,6 +8914,21 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)})
             return
+        if u.path == "/api/autostart":
+            # 开机自启开关（写 HKCU Run 键，仅 exe 版有效）
+            q = parse_qs(u.query)
+            if not self._key_ok(q):
+                self._json(401, {"ok": False, "error": "需要访问口令", "needKey": True})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                body = json.loads(self.rfile.read(length) or b"{}")
+                enabled = bool(body.get("enabled"))
+                _set_autostart(enabled)
+                self._json(200, {"ok": True, "enabled": enabled, "status": _autostart_status()})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)})
+            return
         if u.path == "/api/settings":
             q = parse_qs(u.query)
             if not self._key_ok(q):
@@ -9116,8 +9195,9 @@ def main():
     print("  停止服务: 按 Ctrl+C")
     print(line)
     sys.stdout.flush()
-    # exe 桌面版：服务起来后自动弹浏览器（小白双击 exe 即见页面，不用手输地址）
-    if getattr(sys, "frozen", False):
+    # exe 桌面版：服务起来后自动弹浏览器（小白双击 exe 即见页面，不用手输地址）；
+    # 开机自启（--silent）时不弹，静默常驻即可
+    if getattr(sys, "frozen", False) and "--silent" not in sys.argv:
         try:
             import webbrowser
             webbrowser.open_new("http://127.0.0.1:%d/" % PORT)
