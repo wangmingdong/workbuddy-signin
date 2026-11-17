@@ -140,6 +140,7 @@ workbuddy-signin/
 | `install_autostart.bat` | 可选：网页版开机自动后台运行（无需管理员） |
 | `qoder_login.js` | Qoder 一键登录采集器（exe 桌面版专用）：用 exe 内嵌 Node + playwright-core 拉起系统 Edge，登录 qoder.com 采到会话 cookie 写 `qoder_cookie.txt` 即自动退出，**不依赖 python**；未登录成功绝不写盘 |
 | `huawei_login.js` | 华为一键登录采集器（同上机制）：弹独立 Edge 登录 DevCloud，**登录完成判据 = 会话 cookie 存在 且 页面已回到码道主页**（只看 cookie 会把登录页的「预登录会话」误判成已登录，踩过），回主页后再等 `agencyID` 等补发 cookie 收全才写盘关窗 |
+| `build_exe.py` | 一键打包 exe 桌面版：PyInstaller 主程序 + 内嵌 Node 运行时 / playwright-core / 全部采集脚本 + 生成 `使用说明.txt`，产物在 `dist/签到中心/`（约 157MB）；打包前自动把旧产物改名让路，避免文件占用导致打包失败 |
 | `doubao_sign.js` | 本机豆包签名代理：Playwright 开真 Edge 算 `a_bogus` 真签；`/sync-cookie` 手动 + 每 30 分自动把 cookie 推给 112（方案二） |
 | `doubao_signer.bat` | 本机签名服务启动器：启动前释放 8791 端口防冲突 + node 崩溃 5s 自愈循环 |
 | `install_doubao_autostart.bat` | 一键注册豆包签名服务开机自启（双击即自动提权 + 注册计划任务 + 立即拉起） |
@@ -168,24 +169,38 @@ workbuddy-signin/
 
 ---
 
-## 🧭 两种使用方式（先选一条）
+## 🧭 使用方式（先选一条）
 
 本项目只有一份代码（`web_server.py`），按「谁常驻运行」分两种用法。**凭据、设置页、卡片功能完全一样**，区别只在本机跑还是服务器跑：
 
 | | 🖥️ **本机模式** | ☁️ **服务器模式** |
 |---|---|---|
 | 适合谁 | 有台电脑常开、只想自己用、零成本试用 | 电脑经常关机、想手机随时看、要公网地址 |
-| 谁来跑 | 你的 Windows 电脑 | 云服务器（nginx 反代） |
+| 谁来跑 | 你的 Windows 电脑（exe 或 Python） | 云服务器（nginx 反代） |
 | 访问地址 | `http://localhost:8765`（手机同 WiFi 用局域网 IP） | `https://你的域名/checkin/` |
 | 端口 | 默认 `8765`（`WB_PORT` 可改） | `127.0.0.1:8790`，由 nginx 反代 |
-| 自动签到 / 开机自启 | 设置页定时 + `install.bat` 写的启动文件夹 VBS | 设置页定时 + systemd `wb-checkin` 常驻 |
-| 凭据放哪 | 你电脑上的项目根目录 | 服务器 `/opt/wb-checkin/` |
-| 凭据采集 | 设置页「凭据向导」点「弹窗采集」，自动写盘 | 本机采集后推服务器（或向导里「粘贴凭据」） |
+| 自动签到 / 开机自启 | exe 版：设置页勾「开机自动运行」；Python 版：`install.bat` 写启动文件夹 | 设置页定时 + systemd `wb-checkin` 常驻 |
+| 凭据放哪 | 你电脑上的程序目录 | 服务器 `/opt/wb-checkin/` |
+| 凭据采集 | 卡片「更新凭据」一键登录或粘贴，自动写盘 | 本机采集后推服务器（服务器模式网页禁写凭据） |
 | 电脑关机后 | ❌ 停签 | ✅ 照常签 |
 
 > ⚠️ **两种模式不要同时开调度**——两边都设了定时会各签一次、各推一次通知（重复推送）。选定一边后，把另一边设置页的「启用自动签到」关掉即可。
 
-### 🖥️ 本机模式（3 步）
+### 🖥️ 本机模式
+
+本机模式有两种跑法，**小白直接选 A，想看代码/自定义才选 B**：
+
+**A. exe 桌面版（小白推荐，零环境依赖）**
+
+1. 拿到打包好的 `dist/签到中心/` 文件夹（自己打包见下；分发给别人时把整个文件夹压缩发过去即可）。
+2. 双击 **`签到中心.exe`** → 浏览器自动打开签到页 → 首次设访问口令。
+3. 卡片「🔑 更新凭据」配凭据（6 家平台一键登录，见下方专节）→ 设置页设签到时间、勾「**开机自动运行**」→ 完成。之后开机静默自启、每天到点自动签，无需再管。
+
+- exe **自带 Node 运行时和采集脚本**，电脑上不装 Python / Node.js 也能用全部功能。
+- 自己打包：本机装 Python 后跑 `python build_exe.py`，产物在 `dist/签到中心/`（约 157MB，含 PyInstaller 主程序 + 内嵌 Node + playwright-core + 采集脚本 + 使用说明）。
+- 常见问题（Defender 误报、日志位置等）见 exe 同目录 `使用说明.txt`。
+
+**B. Python 源码版（进阶）**
 
 1. 装 **Python 3.8+**（勾选 Add to PATH）；需要弹窗采集的平台再装 **Node.js**。
 2. 双击 **`install.bat`**：自动检测 Python → 写开机自启 → 起服务 → 打开 `http://localhost:8765`。
@@ -253,7 +268,8 @@ workbuddy-signin/
 - 一台常驻机器跑 `web_server.py`（本机 / 云服务器均可）；手机同 WiFi 或经 nginx 反代访问网页
 
 ### 1. 启动服务（按上面选的模式来）
-- **🖥️ 本机模式（推荐）**：双击 `install.bat` —— 检测 Python → 写开机自启 VBS → 起服务并打开 `http://localhost:8765`（端口默认 8765，`WB_PORT` 可改）。本机需要弹窗采集的平台，设置页「凭据向导」一键处理。
+- **📦 exe 桌面版（最简）**：`python build_exe.py` 打包出 `dist/签到中心/`，双击 `签到中心.exe` 即用——零环境依赖，开机自启在设置页勾选。
+- **🖥️ 本机 Python 模式**：双击 `install.bat` —— 检测 Python → 写开机自启 VBS → 起服务并打开 `http://localhost:8765`（端口默认 8765，`WB_PORT` 可改）。本机需要弹窗采集的平台，设置页「凭据向导」一键处理。
 - **☁️ 服务器模式**：`web_server.py` 由 systemd `wb-checkin` 常驻，监听 `127.0.0.1:8790`，nginx `location /checkin/` 反代；**进程内自带调度线程**，每天按 `settings.json` 的 `schedule_time` 自动签到。凭据在本机采集后推服务器。
 - **手动前台（调试用）**：`python web_server.py --daily` 跑一次签到；`python web_server.py` 起网页服务。旧脚本 `start_web.bat` / `setup_task.ps1` 仍可用，但新用户直接用 `install.bat` 即可。
 
