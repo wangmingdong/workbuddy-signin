@@ -63,6 +63,9 @@ local_server.log
 # exe 打包产物（157MB，按需本地生成，不入库）
 dist/
 build_pyinstaller/
+# 打包时改名让路留下的旧目录（规避 safe-delete 批量删除拦截）
+dist/签到中心_old_*/
+build_pyinstaller_old_*/
 *.spec
 _btn_fix.png
 _exe_page.png

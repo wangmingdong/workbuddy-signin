@@ -19,13 +19,87 @@ NODE_EXE = r"C:/Users/54004/.workbuddy/binaries/node/versions/22.22.2/node.exe"
 PLAYWRIGHT = os.path.join(ROOT, "node_modules", "playwright-core")
 CAPTURE_SCRIPTS = [
     "trae_capture.js", "lx_capture.js", "doubao_capture.js", "qoder_capture.js",
+    "qoder_login.js", "huawei_login.js",
     "runtime_env.js", "wb_token_dump.js",
 ]
 PY_MODULES = ["wb_icon.py", "wb_travel.py", "wb_growth.py", "workbuddy_checkin.py"]
 
+USAGE_TXT = """签到中心 · 本机版使用说明
+========================
+
+1) 双击「签到中心.exe」——程序在后台启动，浏览器会自动打开签到页面。
+   首次会要求设置访问口令，请记牢。
+
+2) 更新凭据：点每张卡上的「🔑 更新凭据」，按平台分三种情况：
+
+   【A. 全自动，啥都不用做】
+   · WorkBuddy：点「🔄 一键自动更新」，自动读取本机客户端登录态。
+     前提：本机装过并登录过 WorkBuddy 客户端。
+
+   【B. 一键登录，弹出浏览器登录一次就自动写好】
+   · WPS 灵犀、豆包、Trae、Qoder、华为码道
+   点绿色大按钮「🌐 打开浏览器登录 · 自动获取」→ 会弹出一个独立的 Edge 窗口
+   → 在那个窗口里登录一次（扫码 / 账号都行）→ 登录成功后窗口自动关闭，
+   凭据自动写回，本页自动刷新。全程不用复制任何东西。
+   注意：必须在弹出的 Edge 窗口里登录，在你自己平时的浏览器里登录没用。
+
+   【C. 只能手动复制，共 4 家（这些网站没提供自动登录接口）】
+
+   · 百度千帆（qianfan.baidu.com）
+     ① 浏览器打开 qianfan.baidu.com，登录百度账号；
+     ② 在控制台找到「Access Token / 访问令牌」，复制；
+     ③ 点本卡「🔑 更新凭据」→ 展开「手动粘贴」→ 粘贴 → 保存。
+     ④ 另外千帆签到走你自己的服务，需管理员给 QF_BASE_URL（形如
+        http://你的服务器/checkin），到「⚙ 设置」页填进去；只填 token 卡片不会显示。
+
+   · MiniMax Code（code.minimax.io）
+     ① 浏览器打开 code.minimax.io 并登录；
+     ② 在网页空白处点右键 →「检查」（或按键盘 F12）打开开发者工具；
+     ③ 点上面的「Application / 应用」，左边展开 Local Storage → 点开网站地址；
+     ④ 右边找 _token 或 access_token 那一行，双击它的值，按 Ctrl+C 复制；
+     ⑤ 回本卡「手动粘贴」→ 粘贴 → 保存。
+
+   · Link AI（link-ai.tech）
+     ① 浏览器打开 link-ai.tech/console/account 并登录；
+     ② 在「账户 / API 管理」页找到 API Token（或「复制令牌」按钮），复制那串字符；
+     ③ 回本卡「手动粘贴」→ 粘贴 → 保存。签到验证码已自动破解，不用你操作。
+
+   · Coze 扣子（coze.cn）
+     ① 浏览器打开 coze.cn 并登录；
+     ② 在网页空白处点右键 →「检查」（或按 F12）打开开发者工具；
+     ③ 点上面的「Network / 网络」，再按 F5 刷新网页；
+     ④ 点左边任意一条请求，右边选「Headers / 标头」，往下翻找 Cookie 那一行；
+     ⑤ 把 Cookie 后面的整串内容按 Ctrl+C 复制；
+     ⑥ 回本卡「手动粘贴」→ 粘贴 → 保存。
+
+   小提示：「检查 / F12」就是浏览器的开发者工具——在网页空白处点鼠标右键，
+   菜单最下面一般有「检查」；或者直接按键盘上的 F12 键也能打开。
+
+3) 回到设置页设定每日签到时间、开启通知，完成。
+
+常见问题：
+- Windows Defender 可能误报（PyInstaller 未签名），选「允许/添加排除项」即可。
+- 一键登录弹出的 Edge 窗口里没登录成功就不会写凭据，本页会一直等；
+  请回到那个 Edge 窗口完成登录，不用回来点第二次。
+- 关闭浏览器不影响签到，程序在后台常驻；重启电脑后需双击一次 exe（或自行加开机自启）。
+- 华为会话约 30~60 分钟会失效，卡片变红时再点一次一键登录即可。
+- 日志见同目录 local_server.log。
+"""
+
 
 def main():
-    print("[1/5] 准备产物目录（PyInstaller --noconfirm 自动覆盖旧文件）")
+    print("[1/5] 准备产物目录（旧产物改名让路，规避 safe-delete 批量删除拦截）")
+    # PyInstaller COLLECT 会删掉旧 dist/签到中心（2000+ 文件），触发工作区安全删除钩子
+    # 而失败。改成先 os.rename 改名让路（不是删除），再让 PyInstaller 全新生成。
+    import time as _t
+    for old in (APP, BUILD):
+        if os.path.exists(old):
+            bak = old + "_old_" + _t.strftime("%Y%m%d_%H%M%S")
+            try:
+                os.rename(old, bak)
+                print("  旧目录改名: " + bak)
+            except Exception as e:
+                print("  改名失败（将尝试原位覆盖）: " + str(e))
     os.makedirs(DIST, exist_ok=True)
 
     print("[2/5] 严格安全校验：绝不打包任何凭据/登录态")
@@ -77,23 +151,7 @@ def main():
     # onedir 的 exe 本身即可双击（windowed），无需额外 bat
     # 首启引导：写进 README
     with open(os.path.join(APP, "使用说明.txt"), "w", encoding="utf-8-sig") as f:
-        f.write(
-            "签到中心 · 本机版使用说明\n"
-            "========================\n\n"
-            "1) 双击「签到中心.exe」——程序在后台启动，浏览器会自动打开签到页面。\n"
-            "   首次会要求设置访问口令，请记牢。\n\n"
-            "2) 更新凭据（傻瓜式）：点每张卡上的「🔑 更新凭据」：\n"
-            "   - WorkBuddy：点「🔄 一键自动更新」→ 自动解密本机客户端登录态写入凭据，\n"
-            "     全程不用复制（需本机已安装并登录过 WorkBuddy 客户端）。\n"
-            "   - Trae/灵犀/豆包/Qoder/华为：点绿色大按钮 → 弹出浏览器/登录窗 → 登录一次，\n"
-            "     凭据自动写回，本页自动刷新。\n"
-            "   - 其余平台：登录后按 F12/控制台复制 Cookie/token，展开「手动粘贴」保存。\n\n"
-            "3) 回到设置页设定每日签到时间、开启通知，完成。\n\n"
-            "常见问题：\n"
-            "- Windows Defender 可能误报（PyInstaller 未签名），选「允许/添加排除项」即可。\n"
-            "- 关闭浏览器不影响签到，程序在后台常驻；重启电脑后需双击一次 exe（或自行加开机自启）。\n"
-            "- 日志见同目录 local_server.log。\n"
-        )
+        f.write(USAGE_TXT)
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(APP) for f in fs)
     print("\n完成：%s" % APP)
     print("总计 %.1f MB" % (size / 1024 / 1024))

@@ -160,20 +160,20 @@ CRED_WIZARD = [
      "hint": "点「一键更新」自动解密本机 WorkBuddy 客户端的登录态并写入凭据；也可手动粘贴 token。",
      "launcher": "__wb_client__"},
     {"key": "qianfan", "files": ["qf_token.txt"],
-     "paste_hint": "粘贴千帆 access_token",
-     "hint": "登录 qianfan.baidu.com 控制台 → Access Token，复制粘贴。",
+     "paste_hint": "粘贴千帆 access_token（仅 token 不够，还需在设置里配 QF_BASE_URL 签到服务地址）",
+     "hint": "手动两步：① 浏览器打开 qianfan.baidu.com 登录百度账号，在控制台找「Access Token / 访问令牌」复制，粘贴到下方保存；② 千帆签到走你自己的服务，还需管理员给 QF_BASE_URL（形如 http://你的服务器/checkin），到「⚙ 设置」页填进去，只填 token 卡片不会显示。",
      "launcher": None},
     {"key": "minimax", "files": ["mm_web_token.json"],
      "paste_hint": "粘贴网页端 token（JSON 或纯 token 均可）",
-     "hint": "登录 platform.minimax.io，F12 → Network 找鉴权 token 复制粘贴。",
+     "hint": "手动四步：① 浏览器打开 code.minimax.io 并登录；② 在网页空白处点右键→「检查」（或按键盘 F12）打开开发者工具，点上方的「Application / 应用」；③ 左侧依次展开 Local Storage → 点开网站地址，右边找 _token 或 access_token 那一行，双击它的值全选复制；④ 回到本页粘贴到下方保存。",
      "launcher": None},
-    {"key": "qoder", "files": ["qoder_token.txt"],
-     "paste_hint": "粘贴 Qoder token（token 或 token + # expiresAt=…）",
-     "hint": "Windows 本机可点「弹窗采集」安装守护（每 15 分钟自动领）；或从桌面客户端取 token 粘贴。",
-     "launcher": os.path.join("qoder_keeper", "install_keeper.bat")},
+    {"key": "qoder", "files": ["qoder_token.txt", "qoder_cookie.txt"],
+     "paste_hint": "粘贴 Qoder token（token 或 token + # expiresAt=…）；若粘贴的是网页 Cookie 整串请说明",
+     "hint": "本机可点「一键登录」弹出 Edge 登录 qoder.com，自动获取网页会话（看真实积分/到期）；每日 100 Credits 由本机守护领取。",
+     "launcher": "qoder_login.js"},
     {"key": "linkai", "files": ["linkai_token.txt"],
-     "paste_hint": "粘贴 Link AI 的 token",
-     "hint": "登录 console.link-ai.tech 取 token 粘贴（滑块验证码已实现自动破解）。",
+     "paste_hint": "粘贴 Link AI 控制台的 API Token（一长串字母数字）",
+     "hint": "手动三步：① 浏览器打开 link-ai.tech/console/account 并登录；② 在「账户 / API 管理」页找到 API Token（或「复制令牌」按钮），复制那串字符；③ 回到本页粘贴到下方保存（签到验证码已自动破解，无需你操作）。找不到令牌就在该页面按 F12→Application→Local Storage 找 token 字样。",
      "launcher": None},
     {"key": "lingxi", "files": ["lx_cookie.txt"],
      "paste_hint": "粘贴 lingxi.wps.cn 的 Cookie 整串",
@@ -184,12 +184,12 @@ CRED_WIZARD = [
      "hint": "本机可点「弹窗采集」自动导出（Cookie 约 14 天需重采一次，卡片会预警）。",
      "launcher": "trae_capture.js"},
     {"key": "huawei", "files": ["hw_cookie.txt", os.path.join("huawei", "hw_cookie.txt")],
-     "paste_hint": "粘贴 devcloud 的 Cookie",
-     "hint": "Windows 本机可点「弹窗采集」重新登录（会话静置 30~60 分钟失效，靠本机守护保活）。",
-     "launcher": os.path.join("huawei", "relogin_huawei.bat")},
+     "paste_hint": "粘贴 devcloud 的 Cookie 整串（须含 devclouddevuibjJ_SESSION_ID）",
+     "hint": "本机可点「一键登录」弹出 Edge 登录华为云，自动获取会话（约 30~60 分钟有效，失效再点一次即可）。",
+     "launcher": "huawei_login.js"},
     {"key": "coze", "files": ["coze_cookie.txt"],
-     "paste_hint": "粘贴 coze.cn 的 Cookie 整串",
-     "hint": "浏览器登录 coze.cn → F12 → Network 复制 Cookie 整串粘贴。",
+     "paste_hint": "粘贴 coze.cn 的 Cookie 整串（形如 name=value; name2=value2）",
+     "hint": "手动五步：① 浏览器打开 coze.cn 并登录；② 在网页空白处点右键→「检查」（或按 F12）打开开发者工具；③ 点上方的「Network / 网络」，再按 F5 刷新网页；④ 点左边列表里任意一条请求，右边选「Headers / 标头」，往下翻找到 Cookie 那一行；⑤ 把 Cookie 后面的整串内容复制，回到本页粘贴到下方保存。",
      "launcher": None},
     {"key": "doubao", "files": ["doubao_cookie.json", "doubao_cookies_server.json"],
      "paste_hint": "粘贴豆包 cookie JSON（含 sessionid）",
@@ -2031,13 +2031,25 @@ HW_SESSION_DEAD_MSG = (
     "恢复办法：在电脑上双击 relogin_huawei.bat，在弹出的窗口里登录一次华为云，"
     "看到「已推送」即可（约 1 分钟，本卡自动变绿）。"
 )
-HW_COOKIE = os.environ.get("HW_COOKIE", "")
-if not HW_COOKIE:
+HW_COOKIE = os.environ.get("HW_COOKIE", "")  # 环境变量兜底（systemd 注入优先）
+HW_COOKIE_FILE = os.path.join(BASE_DIR, "hw_cookie.txt")
+
+
+def _hw_cookie():
+    """每次现读盘取华为会话 Cookie（环境变量 HW_COOKIE 优先）。
+
+    2026-11-17 修正：原来是模块导入时读一次的常量，导致「一键登录」写回
+    hw_cookie.txt 后运行中的进程仍用旧值，必须重启才生效。改成现读盘后，
+    一键登录成功即可立即签到，和 qoder/doubao 口径一致。
+    """
+    env = (os.environ.get("HW_COOKIE", "") or "").strip()
+    if env:
+        return env
     try:
-        with open(os.path.join(BASE_DIR, "hw_cookie.txt"), "r", encoding="utf-8") as _f:
-            HW_COOKIE = _f.read().strip()
+        with open(HW_COOKIE_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
     except Exception:
-        HW_COOKIE = ""
+        return HW_COOKIE  # 连文件都没有时退回启动兜底值
 
 
 def set_hw_cookie(cookie):
@@ -2047,19 +2059,14 @@ def set_hw_cookie(cookie):
     最稳妥的「网页里登录」方式就是用户从浏览器 DevTools 复制登录后的 Cookie 粘进来，
     服务器持有它即可立即签到。返回 verified（是否实测可访问华为接口）。
     """
-    global HW_COOKIE
     cookie = (cookie or "").strip()
     if not cookie:
         raise RuntimeError("Cookie 不能为空")
     if "devclouddevuibjJ_SESSION_ID=" not in cookie and "J_SESSION_ID=" not in cookie:
         raise RuntimeError("Cookie 里没发现华为会话标识（devclouddevuibjJ_SESSION_ID），请从登录后的浏览器复制完整 Cookie")
-    HW_COOKIE = cookie
-    # 持久化到 hw_cookie.txt（已在 .gitignore，不会入库）
-    try:
-        with open(os.path.join(BASE_DIR, "hw_cookie.txt"), "w", encoding="utf-8") as _f:
-            _f.write(cookie)
-    except Exception:
-        pass  # 内存里已生效，文件保存失败仅影响重启后
+    # 持久化到 hw_cookie.txt（已在 .gitignore，不会入库）；_hw_cookie() 每次现读盘，无需改内存常量
+    with open(HW_COOKIE_FILE, "w", encoding="utf-8") as _f:
+        _f.write(cookie)
     # 实测验证：能否访问华为接口
     verified = False
     try:
@@ -2075,6 +2082,7 @@ def _hw_api(path, method="GET", body=None):
     # 必须带浏览器同款头，否则华为网关会把接口请求当普通页面访问、
     # 返回 SPA 的 HTML 而非 JSON（导致解析失败）。实测关键头：
     #   x-requested-with / agent-type / x-language / language / accept + GET 的 _ 缓存戳
+    _cookie = _hw_cookie()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
         "agent-type": "PromptCenter",
@@ -2083,10 +2091,10 @@ def _hw_api(path, method="GET", body=None):
         "x-requested-with": "XMLHttpRequest",
         "accept": "application/json, text/plain, */*",
         "referer": "https://devcloud.cn-north-4.huaweicloud.com/chat/home",
-        "Cookie": HW_COOKIE,
+        "Cookie": _cookie,
     }
     # 华为 CSRF 令牌以 header 名 "cftk" 下发（从登录 Cookie devclouddevuibjtcftk 取值）
-    for _part in HW_COOKIE.split(";"):
+    for _part in _cookie.split(";"):
         _part = _part.strip()
         if _part.startswith("devclouddevuibjtcftk="):
             headers["cftk"] = _part.split("=", 1)[1]
@@ -2223,7 +2231,7 @@ def get_hw_card():
 
 def _hw_live_card():
     """真实查询华为签到状态（会 ping 华为接口，依赖会话 Cookie）。"""
-    if not HW_COOKIE:
+    if not _hw_cookie():
         return {
             "name": "huawei",
             "title": "华为码道每日签到",
@@ -2322,8 +2330,8 @@ def _hw_live_card():
 
 def run_hw_checkin():
     """执行华为码道每日签到（campaignId=1），已签则幂等跳过。"""
-    if not HW_COOKIE:
-        raise RuntimeError("未配置华为登录 Cookie（hw_cookie.txt 或 HW_COOKIE）")
+    if not _hw_cookie():
+        raise RuntimeError("未配置华为登录 Cookie（点「一键登录」或 hw_cookie.txt / HW_COOKIE）")
     # 先看今天是否已签，避免重复领取报错
     try:
         d = _hw_api("/v1/ops/delivery?channel=WEB")
@@ -7096,9 +7104,9 @@ function openCredUpdate(name){
         +   '<div id="cuMsg2" class="mg-note" style="margin-top:10px"></div>'
         + '</details>';
     } else {
-      // 本机但该平台无采集脚本：只能手动，给清晰引导
-      h += '<div class="mg-note" style="margin-bottom:10px">'+esc(it.hint||'')+'</div>'
-        + '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
+      // 本机但该平台无采集脚本：只能手动。顶部 mg-note 已渲染完整 hint（含傻瓜步骤），
+      // 这里不再重复输出，否则长文案在手机上出现两遍、占满屏。
+      h += '<div class="ftip" style="margin-bottom:6px">'+esc(it.paste_hint)+'</div>'
         + '<textarea id="cuText" class="cw-ta" placeholder="粘贴到这里…"></textarea>'
         + '<div class="cu-actions">'
         +   '<button class="cu-save" id="cuSave" type="button">💾 保存凭据</button>'
@@ -8892,8 +8900,9 @@ class Handler(BaseHTTPRequestHandler):
                             return
                         # 隐藏命令行黑窗口，只留 Edge 登录窗；CREATE_NO_WINDOW 对子进程仍允许弹浏览器
                         flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-                        # trae/doubao 是常驻脚本：网页一键模式传 --once，采到有效 cookie 就写盘并自动退出
-                        once_names = ("trae", "doubao")
+                        # 这些脚本支持 --once：网页一键模式采到有效 cookie 就写盘并自动退出
+                        # qoder_login/huawei_login 本身即一次性，传 --once 兼容其退出逻辑
+                        once_names = ("trae", "doubao", "qoder", "huawei")
                         args = [node, launcher] + (["--once"] if name in once_names else [])
                         subprocess.Popen(
                             args, cwd=BASE_DIR,
