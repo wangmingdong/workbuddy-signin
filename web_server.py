@@ -1854,6 +1854,7 @@ def _run_trae_checkin_locked():
 LX_COOKIE_FILE = os.path.join(BASE_DIR, "lx_cookie.txt")
 LX_STATE_FILE = os.path.join(BASE_DIR, "lx_last_run.json")
 LX_TASK_API = "https://lingxi.wps.cn/api/public/v1/tasks"
+LX_BALANCE_API = "https://lingxi.wps.cn/api/public/v1/credits/balance"
 
 
 def _lx_cookie():
@@ -1883,6 +1884,56 @@ def _lx_api(path, method="GET", body=None):
     )
     with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
         return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def _lx_credit():
+    """灵犀智点：credits/balance 一次给可用总额 + 每笔赠送智点的到期时间。
+
+    口径（2026-11-18 实测）：total_balance = 可用智点；bonus_credits[] 每笔带
+    balance/expire_time（ISO +08:00）。「即将过期」取未来 7 天内到期的笔数合计
+    （与华为卡同款 7 天窗口口径），日期取最早一笔的 YYYY-MM-DD HH:MM。
+    取不到返回 None，不影响签到主流程。服务器端裸调实测通（不绑 IP）。
+    """
+    ck = _lx_cookie()
+    if not ck:
+        return None
+    try:
+        req = urllib.request.Request(LX_BALANCE_API, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://lingxi.wps.cn/",
+            "x-requested-with": "XMLHttpRequest",
+            "accept": "application/json, text/plain, */*",
+            "Cookie": ck,
+        })
+        with urllib.request.urlopen(req, timeout=20, context=_SSL_CTX) as r:
+            d = json.loads(r.read().decode("utf-8", "replace"))
+        data = d.get("data") or {}
+        total = data.get("total_balance")
+        if total is None:
+            return None
+        credit = {"balance": total, "unit": "智点", "expiring": None}
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cut = now + datetime.timedelta(days=7)
+        soon = []
+        for b in (data.get("bonus_credits") or []):
+            raw = b.get("expire_time") or ""
+            try:
+                exp = datetime.datetime.fromisoformat(raw)
+            except ValueError:
+                continue
+            left = float(b.get("balance") or 0)
+            if exp > now and exp <= cut and left > 0:
+                soon.append((exp, left))
+        if soon:
+            soon.sort(key=lambda x: x[0])
+            amount = sum(x[1] for x in soon)
+            amount = int(amount) if amount == int(amount) else amount
+            earliest = soon[0][0].astimezone(datetime.timezone(datetime.timedelta(hours=8)))
+            credit["expiring"] = {"amount": amount, "date": earliest.strftime("%Y-%m-%d %H:%M")}
+        return credit
+    except Exception as _e:
+        print("[lx-credit] 智点查询失败（不影响签到）: %s" % _e, flush=True)
+        return None
 
 
 def _lx_record(ok, message):
@@ -1942,9 +1993,9 @@ def get_lx_card():
         claimed = daily.get("status") == "claimed"
         checked = bool(daily.get("checked") or claimed)
         reward = daily.get("reward_amount") or 100
+        cr = _lx_credit()
         rows = [
             {"k": "今日智点", "v": "+%s" % reward},
-            {"k": "累计智点", "v": "暂无法获取"},
             {
                 "k": "签到状态",
                 "v": "✅ 今日已签" if checked else ("已领取" if claimed else "待签到"),
@@ -1967,6 +2018,7 @@ def get_lx_card():
             "checked": checked,
             "metric_label": "今日状态",
             "metric_value": "已签到" if checked else "待签到",
+            "credit": cr,
             "last_run": lr,
             "rows": rows,
             "error": None,
