@@ -5341,6 +5341,10 @@ ADAPTERS = {
 # 卡片仍展示余额/到期，只读接口不受影响。官方恢复活动后把 "qoder" 加回下面元组。
 AUTO_PLATFORMS = ("workbuddy", "qianfan", "doubao", "minimax",  # "qoder",
                   "linkai", "lingxi", "trae", "coze", "huawei")
+# 【2026-11-19 暂停】官方下掉签到活动的平台：卡片保留只读展示（余额/到期），
+# 但不计入「已签 x/y、平台数、需维护、可用积分、今日已得」等概览统计，避免永远差一个、误报待维护。
+# Qoder 恢复活动后：把这里清空 + 把 "qoder" 加回 AUTO_PLATFORMS 和 run_daily_all.order 即可。
+PAUSED_PLATFORMS = ("qoder",)
 # 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
 # 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
 AUTO_RUN = AUTO_PLATFORMS + ("travel",)
@@ -6138,11 +6142,14 @@ def get_center():
         if "credit" not in it:
             it["credit"] = {"balance": None, "unit": "积分"}
         it["disabled"] = not platform_enabled(it.get("name"))
+        # 【2026-11-19 暂停】停签平台：卡片只读保留，但不计入概览统计/已签分母
+        it["paused"] = it.get("name") in PAUSED_PLATFORMS
         # 统一挂载官网入口（详情弹窗用），覆盖成长/每日任务等无官网的子卡
         _oname = it.get("name")
         if _oname in OFFICIAL_SITES:
             it["official_url"], it["official_label"] = OFFICIAL_SITES[_oname]
-    signed = sum(1 for it in items if it.get("checked") and not it.get("disabled"))
+    # 【2026-11-19 暂停】停签平台不计入已签统计（它们是只读展示卡，不是"今天没签"）
+    signed = sum(1 for it in items if it.get("checked") and not it.get("disabled") and not it.get("paused"))
     g_entry, d_entry, t_entry = sub.get("growth"), sub.get("daily"), sub.get("travel")
     for it in items:
         it["group"] = "auto" if it.get("name") in AUTO_PLATFORMS else "manual"
@@ -6160,7 +6167,8 @@ def get_center():
         "ok": True,
         "server_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "signed_count": signed,
-        "total_count": len(ADAPTERS),
+        # 【2026-11-19 暂停】分母排除停签平台（Qoder 活动下线，不应永远差一个）
+        "total_count": sum(1 for n in order if n not in PAUSED_PLATFORMS),
         # 概览条要用的调度信息（前端不用再单独打一次 /api/settings）
         "schedule_enabled": bool(SETTINGS.get("schedule_enabled", True)),
         "schedule_time": SETTINGS.get("schedule_time", "08:35"),
@@ -6909,7 +6917,22 @@ if(window.addEventListener){
   });
 }
 function cardHTML(it){
-  var manualTag = it.group==='manual' ? '<span class="badge manual">✋ 手动</span>' : '';
+  var manualTag = (it.group==='manual' && !it.paused) ? '<span class="badge manual">✋ 手动</span>' : '';
+  if(it.paused){
+    // 【2026-11-19 暂停】官方活动下线：卡片只读保留（余额/到期照常显示），不摆签到按钮
+    var drows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
+    var pentries = entriesHTML(it);
+    return ''+
+      '<div class="card disabled" data-name="'+esc(it.name)+'" style="--c:'+it.brand+';--c2:'+it.brand2+'">'+
+        '<div class="card-main">'+
+          '<div class="card-top"><div class="cicon">'+iconFor(it)+'</div><div class="ctitle">'+esc(it.title)+'</div><span class="badge todo">⏸ 活动暂停</span></div>'+
+          '<div class="metric"><span class="mlabel">'+esc(it.metric_label)+'</span><br><span class="mval">'+esc(it.metric_value)+'</span></div>'+
+          creditHTML(it) +
+          '<div class="rows">'+drows+'</div>'+
+          '<div class="card-acts"><button class="cta ghost recheck" data-name="'+esc(it.name)+'">重新检查</button>'+pentries+'</div>'+
+        '</div>'+
+      '</div>';
+  }
   if(it.disabled){
     var drows = (it.rows||[]).map(function(r){return '<div class="row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';}).join("");
     var dentries = entriesHTML(it);
@@ -8137,7 +8160,8 @@ function renderCredAlert(alerts){
 }
 function renderStats(d, items){
   var el = $('stats'); if(!el) return;
-  var live = items.filter(function(it){ return !it.disabled; });
+  // 【2026-11-19 暂停】停签平台（Qoder）只读展示但不计入任何概览统计
+  var live = items.filter(function(it){ return !it.disabled && !it.paused; });
   // 需维护：手动组里未签到 / 凭据失效 / 带 error 的（诚实计数，不掩盖故障）
   // 另外把「凭据即将过期/已过期」也算进来——那同样是待办事项，且比已过期更容易补救。
   var credWarn = function(it){
@@ -8188,8 +8212,9 @@ function renderCenter(d){
   $("prog").style.width = pct+"%";
   var auto = d.items.filter(function(it){ return it.group!=='manual'; });
   var manual = d.items.filter(function(it){ return it.group==='manual'; });
-  var autoDone = auto.filter(function(it){ return it.checked && !it.disabled; }).length;
-  var manualTodo = manual.filter(function(it){ return !it.checked || it.needs_auth; }).length;
+  var autoDone = auto.filter(function(it){ return it.checked && !it.disabled && !it.paused; }).length;
+  // 【2026-11-19 暂停】停签平台不计入待处理（它是只读展示卡，不是"要你去签"）
+  var manualTodo = manual.filter(function(it){ return !it.paused && (!it.checked || it.needs_auth); }).length;
   renderStats(d, d.items);
   renderCredAlert(d.cred_alerts);
   renderTabs(auto.length, autoDone, manual.length, manualTodo);
