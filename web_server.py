@@ -3261,8 +3261,11 @@ def _qd_query_campaigns():
         # 主路径接口通但今天确实没有 CLAIM_BENEFIT 活动（活动暂停/改版）
         return [], _fp_api, QD_CAMPAIGN_PATH
     if cookie:
-        # cookie 路通用但无活动（活动可能在桌面端，待本机守护领取）
-        raise RuntimeError("网页会话查询无活动（活动可能在桌面端，待本机守护领取）")
+        # 网页会话有效但今日没下发 CLAIM_BENEFIT（官方活动改版/暂停）。
+        # 2026-11-19 实证：接口只剩 VIEW_DETAILS 订阅广告，本机守护带完整
+        # token+设备指纹同样查不到——这不是登录/配置故障，不能误报成红色错误。
+        # 交给上层「今日无活动」兜底卡诚实展示，活动恢复后自动领取。
+        return [], _qd_web_api, QD_WEB_CAMPAIGN_PATH
     raise RuntimeError("缺 Qoder 登录态（qoder_token.txt + qoder_local_status.json 指纹，或 qoder_cookie.txt）")
 
 
@@ -5331,8 +5334,13 @@ ADAPTERS = {
 #     但那属于「偶尔维护凭据」，和 trae/lingxi 同理，不影响它归入自动签到。
 #     注：cookie 失效时的恢复指引仍在 _manual_guide() 里保留（见 get_hw_card 的
 #     manual_guide 挂载），不会因为移出手动组而丢失。
-AUTO_PLATFORMS = ("workbuddy", "qianfan", "doubao", "minimax", "qoder", "linkai",
-                  "lingxi", "trae", "coze", "huawei")
+# 【2026-11-19 暂停】Qoder 签到——官方下掉每日 100 Credits 签到活动：接口只剩
+# 「首购订阅加赠 Credits」订阅广告（VIEW_DETAILS），不再有 CLAIM_BENEFIT。
+# 本机守护带完整 token+设备指纹实测同样查不到，非登录/配置故障。
+# 暂从自动签到列表移除，避免每天空跑、误报「未签到」和无意义推送。
+# 卡片仍展示余额/到期，只读接口不受影响。官方恢复活动后把 "qoder" 加回下面元组。
+AUTO_PLATFORMS = ("workbuddy", "qianfan", "doubao", "minimax",  # "qoder",
+                  "linkai", "lingxi", "trae", "coze", "huawei")
 # 「派猫猫旅行」不再单独成卡，它作为 WorkBuddy 卡内的入口（弹窗），但仍是全自动项目：
 # 每天派出 + 到点自动领奖，所以「立即全部签到」/每日自动要把 travel 一起带上。
 AUTO_RUN = AUTO_PLATFORMS + ("travel",)
@@ -6198,7 +6206,9 @@ def run_checkin_for(name):
     if name == "huawei":
         return run_hw_checkin()
     if name == "qoder":
-        return run_qd_checkin()
+        # 【2026-11-19 暂停】官方下掉每日签到活动，暂时不执行签到，只返回只读卡片。
+        # 恢复时改回 return run_qd_checkin()
+        return get_qd_card()
     if name == "travel":
         run_travel_background()
         return get_travel_card()
@@ -9368,8 +9378,9 @@ def main():
         return
     threading.Thread(target=_scheduler_loop, daemon=True).start()
     threading.Thread(target=_travel_poll_loop, daemon=True).start()
-    # Qoder 每日 10:00(UTC+8) 开放，08:35 主定时会早于开放时间，起常驻补签线程（10:01 起每 30 分，至 13:00）
-    threading.Thread(target=_qoder_topup_loop, daemon=True).start()
+    # 【2026-11-19 暂停】Qoder 官方下掉每日签到活动，停掉补签线程，避免空跑和重复推送。
+    # 恢复时取消下一行注释：
+    # threading.Thread(target=_qoder_topup_loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     ip = lan_ip()
     line = "=" * 58
@@ -9413,7 +9424,7 @@ def run_daily_all(scope=None):
         ("travel", "派猫猫旅行"),
         ("qianfan", "百度千帆"),
         ("minimax", "MiniMax Code"),
-        ("qoder", "Qoder"),
+        # ("qoder", "Qoder"),  # 【2026-11-19 暂停】官方下掉每日签到活动，恢复时取消注释
         ("linkai", "Link AI"),
         ("lingxi", "WPS 灵犀"),
         ("trae", "Trae Work"),

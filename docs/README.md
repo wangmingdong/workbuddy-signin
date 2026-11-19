@@ -6,6 +6,18 @@
 
 ---
 
+> ## ⚠️ 2026-11-19：Qoder 官方下掉「每日领 100 Credits」签到活动
+>
+> 实测结论：用本机完整登录态（token 有效 + `runtime-info.exe` 设备指纹正常、接口 HTTP 200）查询，`campaigns` 接口已**不再返回 `CLAIM_BENEFIT` 活动**，只剩一条「首购订阅加赠 Credits」的订阅广告（`VIEW_DETAILS`）。本机守护、服务端代领、exe 一键签到三条路都查不到活动——**非登录/配置故障**，等官方恢复即可。
+>
+> 应对（已做）：
+> - `web_server.py` 里 Qoder 的**自动签到执行代码已暂时注释**——从 `AUTO_PLATFORMS` 移除、`run_checkin_for` 不再触发签到、补签线程 `_qoder_topup_loop` 停止启动、`run_daily_all` 顺序表移除。均带 `【2026-11-19 暂停】` 注释标记。
+> - **卡片只读展示保留**：余额、逐包到期积分照常显示，不受影响。
+> - **官方恢复后**：搜索 `【2026-11-19 暂停】` 逐处取消注释（含 `AUTO_PLATFORMS` 的 `"qoder"`、`run_checkin_for` 的 `return run_qd_checkin()`、补签线程启动行、顺序表 `("qoder", "Qoder")`）即可恢复，无需改逻辑。
+> - 下方第 5 步 / 接口说明里关于 Qoder 自动领取的描述为**活动下线前的历史机制**，供恢复时参考。
+
+---
+
 ## 它能签到哪些平台
 
 卡片顺序 = `web_server.py` 中 `ADAPTERS` 字典的插入顺序。**共 10 张卡**。
@@ -19,8 +31,7 @@
 >   从未失败）；之前误放在手动组，是因为其 Cookie 短效需偶尔重登，
 >   但那属于「维护凭据」而非「手动签到」。
 >
-> Qoder 每日 100 Credits 由**本机守护领取 + 服务端代领双保险**（见下方第 5 步），
-> 已回归 `AUTO_RUN` 自动列表；本机守护不在线时服务端可兜底。
+> **Qoder 签到已于 2026-11-19 暂停**（官方下掉每日活动，见顶部公告）；卡片仅保留积分展示，恢复方法见顶部公告。下方第 5 步为其历史领取机制。
 > **豆包为「浏览器签名代理」架构**——详见下方「第 9 步 · 豆包」。
 
 > 所有卡片底部统一显示「可用积分」（4 家真实有余额：千帆 / WorkBuddy / Qoder / Link AI；其余接口不提供余额则诚实显示「—」）。
@@ -31,7 +42,7 @@
 | WorkBuddy | workbuddy.cn | 100 积分 | `token.info` | 打开一次客户端自动续期 |
 | 百度千帆 | qianfan.baidu.com | — | `qf_token.txt`（另一台 ECS 同步） | 自动 |
 | MiniMax Code | platform.minimax.io | 400 智点 | `mm_web_token.json` | 约 40 天，过期重新登录 |
-| Qoder | qoder.com | 100 Credits（本机守护自动领） | `qoder_token.txt` | 约 1 个月，失效重新取出 |
+| Qoder | qoder.com | ~~100 Credits~~ **活动已于 2026-11-19 下线，暂停签到**（余额展示保留） | `qoder_token.txt` | — |
 | Link AI | console.link-ai.tech | 每日签到随机积分（**已实现自动绕过滑块验证码**，见下方 FAQ） | `linkai_token.txt` | 不定期 |
 | WPS 灵犀 | lingxi.wps.cn | 100 智点 | `lx_cookie.txt` | 不定期需重新导出 Cookie |
 | Trae Work | work.trae.cn | 150+50 积分 | `trae_cookie.txt` | 约 14 天，需重新导出 Cookie |
