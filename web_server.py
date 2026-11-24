@@ -1889,9 +1889,13 @@ def _lx_api(path, method="GET", body=None):
 def _lx_credit():
     """灵犀智点：credits/balance 一次给可用总额 + 每笔赠送智点的到期时间。
 
-    口径（2026-11-18 实测）：total_balance = 可用智点；bonus_credits[] 每笔带
-    balance/expire_time（ISO +08:00）。「即将过期」取未来 7 天内到期的笔数合计
-    （与华为卡同款 7 天窗口口径），日期取最早一笔的 YYYY-MM-DD HH:MM。
+    口径（2026-11-24 修正）：total_balance = 可用智点；bonus_credits[] 每笔带
+    balance/expire_time（ISO +08:00）。官方「智点详情」每笔独立到期日，不能把
+    7 天总额绑到最早那一天（旧口径显示「1400 将于 11-25 过期」误导——11-25
+    实际只到期 200）。现对齐 Trae 逐包口径：
+      - amount/date = 最早到期一档的金额与时间（主行）
+      - d7 = 未来 7 天到期合计（子行「7 天内 X 智点将过期」）
+      - detail = 逐日明细（按到期日分桶，最近 6 档），前端拼「近期到期」
     取不到返回 None，不影响签到主流程。服务器端裸调实测通（不绑 IP）。
     """
     ck = _lx_cookie()
@@ -1912,9 +1916,11 @@ def _lx_credit():
         if total is None:
             return None
         credit = {"balance": total, "unit": "智点", "expiring": None}
+        tz8 = datetime.timezone(datetime.timedelta(hours=8))
         now = datetime.datetime.now(datetime.timezone.utc)
-        cut = now + datetime.timedelta(days=7)
-        soon = []
+        # 按到期「日」（UTC+8）分桶，逐日累计剩余智点；只收未来有余额的包
+        buckets = {}
+        day_exp = {}
         for b in (data.get("bonus_credits") or []):
             raw = b.get("expire_time") or ""
             try:
@@ -1922,14 +1928,31 @@ def _lx_credit():
             except ValueError:
                 continue
             left = float(b.get("balance") or 0)
-            if exp > now and exp <= cut and left > 0:
-                soon.append((exp, left))
-        if soon:
-            soon.sort(key=lambda x: x[0])
-            amount = sum(x[1] for x in soon)
-            amount = int(amount) if amount == int(amount) else amount
-            earliest = soon[0][0].astimezone(datetime.timezone(datetime.timedelta(hours=8)))
-            credit["expiring"] = {"amount": amount, "date": earliest.strftime("%Y-%m-%d %H:%M")}
+            if exp <= now or left <= 0:
+                continue
+            day = exp.astimezone(tz8).date()
+            buckets[day] = buckets.get(day, 0.0) + left
+            if day not in day_exp or exp < day_exp[day]:
+                day_exp[day] = exp
+        if buckets:
+            def _num(x):
+                return int(x) if x == int(x) else x
+            first = min(buckets)
+            today8 = now.astimezone(tz8).date()
+            d7 = sum(v for day, v in buckets.items() if 0 <= (day - today8).days <= 7)
+            d30 = sum(v for day, v in buckets.items() if 0 <= (day - today8).days <= 30)
+            expiring = {
+                "amount": _num(buckets[first]),
+                "date": day_exp[first].astimezone(tz8).strftime("%Y-%m-%d %H:%M"),
+                "d7": _num(d7) if d7 else None,
+                "d30": _num(d30) if d30 else None,
+                # 官方「智点详情」逐笔独立到期日 → 逐日明细（最近 6 档）
+                "detail": [
+                    {"date": day.strftime("%Y-%m-%d"), "amount": _num(v)}
+                    for day, v in sorted(buckets.items())[:6]
+                ],
+            }
+            credit["expiring"] = expiring
         return credit
     except Exception as _e:
         print("[lx-credit] 智点查询失败（不影响签到）: %s" % _e, flush=True)
