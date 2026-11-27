@@ -5024,22 +5024,34 @@ def _db_request(path, body):
     req = urllib.request.Request(
         url, data=json.dumps(body).encode("utf-8"), headers=hdr, method="POST"
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30, context=_SSL_CTX) as r:
-            raw = r.read()
-            enc = r.headers.get("Content-Encoding", "")
-            if "gzip" in enc:
-                import gzip as _g
-                raw = _g.decompress(raw)
-            elif "deflate" in enc:
-                import zlib as _z
-                raw = _z.decompress(raw)
-            resp = json.loads(raw.decode("utf-8", "replace"))
-    except urllib.error.HTTPError as e:
-        _b = e.read().decode("utf-8", "replace")[:300]
-        raise RuntimeError("豆包接口 HTTP %s：%s" % (e.code, _b))
-    except Exception as e:
-        raise RuntimeError("豆包接口请求失败：%s" % e)
+    # 内外超时必须匹配：get_center() 外层给单卡 12s，内层网络超时须明显小于它，
+    # 否则偶发慢请求（首次冷启动 DNS/TLS 可达 8s）会被外层笼统判「校验超时」，
+    # 而内层其实还在跑——用户看到「多次刷新又正常」正是这个原因。
+    # 内层 7s + 失败重试 1 次（第二次多为热连接 <1s），最坏 14s 仍略超外层，
+    # 但两次都慢的概率极低；内层超时会抛诚实错误而非外层统一超时。
+    last_err = None
+    for _attempt in range(2):
+        try:
+            with urllib.request.urlopen(req, timeout=7, context=_SSL_CTX) as r:
+                raw = r.read()
+                enc = r.headers.get("Content-Encoding", "")
+                if "gzip" in enc:
+                    import gzip as _g
+                    raw = _g.decompress(raw)
+                elif "deflate" in enc:
+                    import zlib as _z
+                    raw = _z.decompress(raw)
+                resp = json.loads(raw.decode("utf-8", "replace"))
+            break
+        except urllib.error.HTTPError as e:
+            _b = e.read().decode("utf-8", "replace")[:300]
+            raise RuntimeError("豆包接口 HTTP %s：%s" % (e.code, _b))
+        except Exception as e:
+            last_err = e
+            if _attempt == 0:
+                continue
+    else:
+        raise RuntimeError("豆包接口请求失败：%s" % last_err)
     code = resp.get("code")
     if code == 710012001:
         raise RuntimeError("豆包登录态已过期（code=710012001），请重新在 doubao.com 登录后导出 sessionid")
@@ -6120,13 +6132,15 @@ def _decorate_cred_expiry(items):
 
 
 def get_center():
-    # 并发拉取各平台卡片 + 子卡，单平台最多 8s；任一平台慢/卡死只标记超时，绝不拖累整页。
+    # 并发拉取各平台卡片 + 子卡，单平台最多 12s；任一平台慢/卡死只标记超时，绝不拖累整页。
+    # 12s 是为覆盖首次冷启动（DNS/TLS 可达 8s）；各平台内层网络超时须明显小于此值，
+    # 让慢请求在内层就抛诚实错误，而不是被这里笼统标成「校验超时」。
     order = list(ADAPTERS.keys())
     results, sub = {}, {}
     lock = threading.Lock()
 
     def _wk(name, fn):
-        r = _tc_call(fn, 6)
+        r = _tc_call(fn, 12)
         if r is _TC_TIMEOUT:
             card = {"name": name, "checked": False,
                     "error": "校验超时（平台接口响应过慢，已自动跳过，可稍后刷新）",
@@ -6141,7 +6155,7 @@ def get_center():
             results[name] = card
 
     def _sub(key, fn):
-        r = _tc_call(fn, 6)
+        r = _tc_call(fn, 12)
         if r is _TC_TIMEOUT:
             v = {"ok": False, "error": "校验超时"}
         elif isinstance(r, Exception):
