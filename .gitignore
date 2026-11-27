@@ -39,6 +39,8 @@ trae_profile/
 hw_probe_profile/
 doubao_profile/
 lx_profile/
+minimax_profile/
+capture_logs/
 
 # 抓取/调试产物
 hw_capture.log

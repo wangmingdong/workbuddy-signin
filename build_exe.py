@@ -19,7 +19,7 @@ NODE_EXE = r"C:/Users/54004/.workbuddy/binaries/node/versions/22.22.2/node.exe"
 PLAYWRIGHT = os.path.join(ROOT, "node_modules", "playwright-core")
 CAPTURE_SCRIPTS = [
     "trae_capture.js", "lx_capture.js", "doubao_capture.js", "qoder_capture.js",
-    "qoder_login.js", "huawei_login.js",
+    "qoder_login.js", "huawei_login.js", "minimax_capture.js",
     "runtime_env.js", "wb_token_dump.js",
 ]
 PY_MODULES = ["wb_icon.py", "wb_travel.py", "wb_growth.py", "workbuddy_checkin.py"]
